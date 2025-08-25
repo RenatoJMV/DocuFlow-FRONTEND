@@ -17,7 +17,7 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     formData.append("file", file);
 
     try {
-        const response = await fetch('http://localhost:8080/upload', {
+        const response = await fetch('https://touched-included-elephant.ngrok-free.app/upload', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData
