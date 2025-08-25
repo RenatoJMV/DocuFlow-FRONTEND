@@ -7,7 +7,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     const password = document.getElementById('password').value;
 
     try {
-        const response = await fetch('http://localhost:8080/login', {
+        const response = await fetch('https://touched-included-elephant.ngrok-free.app/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
