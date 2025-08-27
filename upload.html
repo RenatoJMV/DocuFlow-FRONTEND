@@ -19,8 +19,8 @@
       <button type="submit" class="btn btn-primary w-100">Subir</button>
     </form>
 
-    <div id="error-message" class="alert alert-danger mt-3"></div>
-    <div id="success-message" class="alert alert-success mt-3"></div>
+    <div id="error-message" class="alert alert-danger mt-3" style="display:none"></div>
+    <div id="success-message" class="alert alert-success mt-3" style="display:none"></div>
 
     <!-- Tabla de archivos subidos -->
     <div class="mt-5">
@@ -38,8 +38,7 @@
     </div>
   </div>
 
-  <script src="services/apiService.js"></script>
-  <script src="utils/uiHelpers.js"></script>
-  <script src="controllers/uploadController.js"></script>
+  <!-- 🚨 SOLO el controlador, que ya importa a los demás -->
+  <script type="module" src="controllers/uploadController.js"></script>
 </body>
 </html>
