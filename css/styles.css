@@ -1,0 +1,26 @@
+body {
+  background: linear-gradient(45deg, #6a11cb, #2575fc);
+  min-height: 100vh;
+}
+
+.login-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.login-form {
+  background-color: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+.alert {
+  font-size: 14px;
+  padding: 10px;
+  display: none;
+}
