@@ -1,4 +1,4 @@
-const BASE_URL = "https://docuflow-backend.onrender.com/";
+const BASE_URL = "https://docuflow-backend.onrender.com";
 
 // 🔹 Subir archivo
 export async function apiUpload(file) {
