@@ -85,7 +85,7 @@
       const password = document.getElementById('password').value;
       const result = await login(username, password);
       if (result.success) {
-        window.location.href = 'upload.html';
+        window.location.href = 'dashboard.html';
       } else {
         errorDiv.textContent = result.error || 'Credenciales inválidas';
         errorDiv.style.display = 'block';
