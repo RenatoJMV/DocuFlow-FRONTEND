@@ -94,3 +94,33 @@ export async function login(username, password) {
     return { success: false, error: "No se pudo conectar con el servidor" };
   }
 }
+
+// 🔹 Descargar archivo con JWT
+export async function apiDownloadFile(id) {
+  const token = localStorage.getItem("token");
+  if (!token) return { success: false, error: "Debes iniciar sesión primero." };
+
+  try {
+    const response = await fetch(`${BASE_URL}/files/${id}/download`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      return { success: false, error: `Error ${response.status} al descargar archivo` };
+    }
+
+    // Intentar obtener el nombre de archivo del header
+    let filename = "archivo";
+    const disposition = response.headers.get("Content-Disposition");
+    if (disposition && disposition.includes("filename=")) {
+      filename = disposition.split("filename=")[1].replaceAll('"', '').trim();
+    }
+
+    const blob = await response.blob();
+    return { success: true, blob, filename };
+  } catch (err) {
+    console.error("Error al descargar archivo:", err);
+    return { success: false, error: "No se pudo conectar con el servidor." };
+  }
+}

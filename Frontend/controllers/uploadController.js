@@ -36,11 +36,39 @@ async function loadFiles() {
         <td>${file.filename}</td>
         <td>${file.size ? (file.size / 1024).toFixed(2) + " KB" : "N/A"}</td>
         <td>
-          <a class="btn btn-success btn-sm" href="https://docuflow-backend.onrender.com/files/${file.id}/download" target="_blank">Descargar</a>
+          <button class="btn btn-success btn-sm btn-download" data-id="${file.id}" data-filename="${file.filename}">Descargar</button>
           <button class="btn btn-danger btn-sm" data-id="${file.id}">Eliminar</button>
         </td>
       `;
       tbody.appendChild(row);
+    });
+
+    // Evento para descargar
+    document.querySelectorAll(".btn-download").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        const filename = btn.getAttribute("data-filename") || "archivo";
+        btn.disabled = true;
+        btn.textContent = "Descargando...";
+        const { apiDownloadFile } = await import("../services/apiService.js");
+        const result = await apiDownloadFile(id);
+        btn.disabled = false;
+        btn.textContent = "Descargar";
+        if (result.success) {
+          const url = window.URL.createObjectURL(result.blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = result.filename || filename;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            a.remove();
+          }, 100);
+        } else {
+          showError("error-message", result.error || "Error al descargar archivo");
+        }
+      });
     });
 
     // Eventos para eliminar
