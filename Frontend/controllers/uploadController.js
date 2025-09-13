@@ -14,6 +14,7 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
   const result = await apiUpload(file);
   if (result.success) {
     showSuccess("success-message", result.mensaje);
+    document.getElementById('fileInput').value = ""; // Limpiar input después de subir
     await loadFiles();
   } else {
     showError("error-message", result.error || "Error al subir archivo");
