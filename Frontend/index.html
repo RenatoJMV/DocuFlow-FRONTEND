@@ -1,33 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
-  <script type="module" src="./utils/uiHelpers.js"></script>
-  <script type="module" src="./controllers/loginController.js"></script>
-  <script type="module" src="./services/apiService.js"></script>
+  <title>DocuFlow - Inicio</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #4f8cff 0%, #a6e1fa 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .card {
+      border-radius: 1.5rem;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+      backdrop-filter: blur(4px);
+      background: rgba(255,255,255,0.85);
+      animation: fadeInDown 1s;
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-40px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .btn-animated {
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(79,140,255,0.15);
+    }
+    .btn-animated:hover {
+      transform: scale(1.07) translateY(-2px);
+      box-shadow: 0 6px 18px rgba(79,140,255,0.25);
+    }
+    .logo {
+      width: 60px;
+      margin-bottom: 1rem;
+      animation: spin 2s linear infinite alternate;
+    }
+    @keyframes spin {
+      from { transform: rotate(-10deg); }
+      to { transform: rotate(10deg); }
+    }
+  </style>
 </head>
 <body>
-  <div class="login-container">
-    <div class="login-form">
-      <h2>Bienvenido</h2>
-      <form id="loginForm">
-        <div class="mb-3">
-          <label for="username" class="form-label">Usuario</label>
-          <input type="text" class="form-control" id="username" required>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-5">
+        <div class="card p-4 text-center">
+          <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" alt="DocuFlow Logo" class="logo">
+          <h1 class="mb-3">Bienvenido a <span class="text-primary">DocuFlow</span></h1>
+          <p class="mb-4">Gestiona, sube y descarga tus documentos de forma segura y moderna.</p>
+          <a href="upload.html" class="btn btn-primary btn-lg btn-animated mb-2 w-100">Subir Archivos</a>
+          <a href="upload.html" class="btn btn-outline-primary btn-lg btn-animated w-100">Ver Mis Archivos</a>
         </div>
-        <div class="mb-3">
-          <label for="password" class="form-label">Contraseña</label>
-          <input type="password" class="form-control" id="password" required>
-        </div>
-        <button type="submit" class="btn btn-primary w-100">Login</button>
-      </form>
-      <div id="error-message" class="alert alert-danger mt-3"></div>
+      </div>
     </div>
   </div>
-
 </body>
 </html>

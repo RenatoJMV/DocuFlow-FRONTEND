@@ -1,44 +1,105 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Subir Archivo</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>DocuFlow - Archivos</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #4f8cff 0%, #a6e1fa 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .dashboard-card {
+      border-radius: 1.5rem;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+      backdrop-filter: blur(4px);
+      background: rgba(255,255,255,0.92);
+      animation: fadeInDown 1s;
+      padding: 2.5rem 2rem 2rem 2rem;
+      margin-top: 2rem;
+      width: 100%;
+      max-width: 600px;
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-40px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .btn-animated {
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(79,140,255,0.15);
+    }
+    .btn-animated:hover {
+      transform: scale(1.07) translateY(-2px);
+      box-shadow: 0 6px 18px rgba(79,140,255,0.25);
+    }
+    .table {
+      border-radius: 1rem;
+      overflow: hidden;
+      background: #fff;
+      animation: fadeInUp 1s;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(40px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .logo {
+      width: 48px;
+      margin-bottom: 1rem;
+      animation: spin 2s linear infinite alternate;
+    }
+    @keyframes spin {
+      from { transform: rotate(-10deg); }
+      to { transform: rotate(10deg); }
+    }
+    .alert {
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    .alert[style*="display: none"] {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  </style>
 </head>
 <body>
-  <div class="container mt-5">
-    <h2 class="text-center">Gestión de Archivos</h2>
-
-    <form id="uploadForm" class="mt-4">
-      <div class="mb-3">
-        <label for="fileInput" class="form-label">Selecciona un archivo</label>
-        <input type="file" class="form-control" id="fileInput" required>
+  <div class="container d-flex flex-column align-items-center justify-content-center">
+    <div class="dashboard-card">
+      <div class="text-center mb-3">
+        <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" alt="DocuFlow Logo" class="logo">
+        <h2 class="mb-2">Gestión de Archivos</h2>
+        <a href="index.html" class="btn btn-link text-primary">&larr; Volver al inicio</a>
       </div>
-      <button type="submit" class="btn btn-primary w-100">Subir</button>
-    </form>
-
-    <div id="error-message" class="alert alert-danger mt-3" style="display:none"></div>
-    <div id="success-message" class="alert alert-success mt-3" style="display:none"></div>
-
-    <!-- Tabla de archivos subidos -->
-    <div class="mt-5">
-      <h4>Archivos Subidos</h4>
-      <table class="table table-striped" id="filesTable">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Tamaño</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <form id="uploadForm" class="mb-4">
+        <div class="mb-3">
+          <label for="fileInput" class="form-label">Selecciona un archivo</label>
+          <input type="file" class="form-control" id="fileInput" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-animated w-100">Subir</button>
+      </form>
+      <div id="error-message" class="alert alert-danger mt-3" style="display:none"></div>
+      <div id="success-message" class="alert alert-success mt-3" style="display:none"></div>
+      <div class="mt-4">
+        <h5 class="mb-3">Archivos Subidos</h5>
+        <div class="table-responsive">
+          <table class="table table-striped align-middle" id="filesTable">
+            <thead class="table-primary">
+              <tr>
+                <th>Nombre</th>
+                <th>Tamaño</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
-
-  <!-- 🚨 SOLO el controlador, que ya importa a los demás -->
   <script type="module" src="controllers/uploadController.js"></script>
 </body>
 </html>
