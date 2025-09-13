@@ -1,0 +1,75 @@
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #4f8cff 0%, #a6e1fa 100%);
+  font-family: 'Segoe UI', sans-serif;
+}
+.dashboard-container {
+  max-width: 1100px;
+  margin: 40px auto;
+  padding: 2rem;
+  border-radius: 2rem;
+  background: rgba(255,255,255,0.95);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  animation: fadeInDown 1s;
+}
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+.dashboard-header .logo {
+  width: 48px;
+  margin-right: 1rem;
+  animation: spin 2s linear infinite alternate;
+}
+@keyframes spin {
+  from { transform: rotate(-10deg); }
+  to { transform: rotate(10deg); }
+}
+.dashboard-widgets {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+.widget {
+  flex: 1 1 220px;
+  background: #f8faff;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(79,140,255,0.08);
+  text-align: center;
+  min-width: 220px;
+  margin-bottom: 1rem;
+}
+.widget-title {
+  font-size: 1.1rem;
+  color: #4f8cff;
+  margin-bottom: 0.5rem;
+}
+.widget-value {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: #222;
+}
+.dashboard-table {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 2px 8px rgba(79,140,255,0.08);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+.dashboard-table h5 {
+  margin-bottom: 1rem;
+}
+.table thead {
+  background: #e3f0ff;
+}
+.table th, .table td {
+  vertical-align: middle;
+}
