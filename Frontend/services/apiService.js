@@ -3,7 +3,7 @@ export async function apiGetUsers() {
   const token = localStorage.getItem("token");
   if (!token) return { success: false, users: [] };
   try {
-    const response = await fetch(`${BASE_URL}/users`, {
+    const response = await fetch(`${BASE_URL}/dashboard/users`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -23,7 +23,7 @@ export async function apiGetComments() {
   const token = localStorage.getItem("token");
   if (!token) return { success: false, comments: [] };
   try {
-    const response = await fetch(`${BASE_URL}/comments`, {
+    const response = await fetch(`${BASE_URL}/dashboard/comments`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -43,7 +43,7 @@ export async function apiGetDownloadsToday() {
   const token = localStorage.getItem("token");
   if (!token) return { success: false, count: 0 };
   try {
-    const response = await fetch(`${BASE_URL}/stats/downloads/today`, {
+    const response = await fetch(`${BASE_URL}/dashboard/downloads/today`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -63,7 +63,7 @@ export async function apiGetLogs() {
   const token = localStorage.getItem("token");
   if (!token) return { success: false, logs: [] };
   try {
-    const response = await fetch(`${BASE_URL}/logs`, {
+    const response = await fetch(`${BASE_URL}/dashboard/logs`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
