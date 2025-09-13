@@ -36,7 +36,7 @@ async function loadFiles() {
         <td>${file.filename}</td>
         <td>${file.size ? (file.size / 1024).toFixed(2) + " KB" : "N/A"}</td>
         <td>
-          <a class="btn btn-success btn-sm" href="https://touched-included-elephant.ngrok-free.app/files/${file.id}/download" target="_blank">Descargar</a>
+          <a class="btn btn-success btn-sm" href="https://docuflow-backend.onrender.com/files/${file.id}/download" target="_blank">Descargar</a>
           <button class="btn btn-danger btn-sm" data-id="${file.id}">Eliminar</button>
         </td>
       `;
