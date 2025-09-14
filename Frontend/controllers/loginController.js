@@ -1,4 +1,4 @@
-import { login } from "../services/apiService.js";
+import { login } from "../services/userService.js";
 import { showError } from "../utils/uiHelpers.js";
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {

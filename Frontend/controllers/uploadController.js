@@ -1,4 +1,4 @@
-import { apiUpload, apiGetFiles, apiDeleteFile } from "../services/apiService.js";
+import { apiUploadFile, apiGetFiles, apiDownloadFile } from "../services/fileService.js";
 import { showSuccess, showError } from "../utils/uiHelpers.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -11,7 +11,7 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
   const file = document.getElementById('fileInput').files[0];
   if (!file) return showError("error-message", "Selecciona un archivo");
 
-  const result = await apiUpload(file);
+  const result = await apiUploadFile(file);
   if (result.success) {
     showSuccess("success-message", result.mensaje);
     document.getElementById('fileInput').value = ""; // Limpiar input después de subir
@@ -56,8 +56,7 @@ async function loadFiles() {
         const filename = btn.getAttribute("data-filename") || "archivo";
         btn.disabled = true;
         btn.textContent = "Descargando...";
-        const { apiDownloadFile } = await import("../services/apiService.js");
-        const result = await apiDownloadFile(id);
+  const result = await apiDownloadFile(id, filename);
         btn.disabled = false;
         btn.textContent = "Descargar";
         if (result.success) {

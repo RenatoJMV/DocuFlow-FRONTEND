@@ -1,7 +1,10 @@
 // controllers/dashboardController.js
 // Controlador para poblar el dashboard con datos reales desde el backend
 
-import { apiGetFiles, apiGetUsers, apiGetComments, apiGetDownloadsToday, apiGetLogs } from '../services/apiService.js';
+import { apiGetFiles } from '../services/fileService.js';
+import { apiGetUsers, apiGetDownloadsToday } from '../services/userService.js';
+import { apiGetComments } from '../services/commentService.js';
+import { apiGetLogs } from '../services/logService.js';
 
 // Utilidad para obtener el token
 function getToken() {
