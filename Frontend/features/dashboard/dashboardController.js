@@ -1,10 +1,8 @@
-// controllers/dashboardController.js
-// Controlador para poblar el dashboard con datos reales desde el backend
-
 import { apiGetFiles } from '../../services/fileService.js';
 import { apiGetUsers } from '../../services/userService.js';
 import { apiGetDownloadsToday } from '../../services/dashboardService.js';
 import { apiGetCommentsByDocument } from '../../services/commentService.js';
+import { apiGetLogs } from '../../services/logService.js';
 
 // Obtener el total de comentarios
 async function apiGetTotalComments() {
@@ -24,15 +22,11 @@ async function apiGetTotalComments() {
     return { success: false, count: 0 };
   }
 }
-import { apiGetLogs } from '../../services/logService.js';
 
 // Utilidad para obtener el token
 function getToken() {
   return localStorage.getItem('token');
 }
-
-
-
 async function setupDocumentCommentCount() {
   // Obtener documentos
   const filesRes = await apiGetFiles();
