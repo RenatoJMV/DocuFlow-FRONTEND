@@ -1,0 +1,35 @@
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #4f8cff 0%, #a6e1fa 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Segoe UI', sans-serif;
+}
+/* Estilos específicos para la página de subida de archivos */
+
+.upload-container {
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-card {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 16px rgba(79,140,255,0.08);
+  padding: 2rem;
+}
+
+.btn-animated {
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(79,140,255,0.15);
+}
+
+.btn-animated:hover {
+  transform: scale(1.07) translateY(-2px);
+  box-shadow: 0 6px 18px rgba(79,140,255,0.25);
+}
