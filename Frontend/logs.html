@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logs del Sistema</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/logs.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body style="min-height: 100vh; background: linear-gradient(135deg, #4f8cff 0%, #a6e1fa 100%); font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; min-height: 100vh;">
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm rounded-pill px-4 mb-4" style="margin-top: 2rem;">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.html">
+        <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" alt="DocuFlow Logo" class="logo" style="width:36px;">
+        <span class="fw-bold text-primary">DocuFlow</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto gap-2">
+          <li class="nav-item">
+            <a class="nav-link" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="upload.html"><i class="bi bi-cloud-arrow-up"></i> Archivos</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="comments.html"><i class="bi bi-chat-dots"></i> Comentarios</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="alert('Próximamente'); return false;"><i class="bi bi-people"></i> Permisos</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" aria-current="page" href="logs.html"><i class="bi bi-clipboard-data"></i> Logs</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  <div class="dashboard-container d-flex flex-column align-items-center justify-content-center" style="min-height: 90vh;">
+    <div class="dashboard-card w-100" style="max-width: 1100px; background: #fff; border-radius: 1rem; box-shadow: 0 4px 16px rgba(79,140,255,0.08); padding: 2.5rem 2rem 2rem 2rem;">
+      <div class="dashboard-header text-center mb-4">
+        <div class="d-flex flex-column align-items-center">
+          <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" alt="DocuFlow Logo" class="logo" style="width:60px; animation: spin 2s linear infinite alternate; filter: drop-shadow(0 2px 8px #4f8cff33);">
+          <h2 class="mb-0 mt-2 fw-bold" style="letter-spacing:1px;">Logs del Sistema</h2>
+        </div>
+      </div>
+      <div class="mb-3 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+        <div class="d-flex gap-2 align-items-center">
+          <input type="date" id="filter-date" class="form-control form-control-sm" style="max-width: 180px;">
+          <input type="text" id="filter-user" class="form-control form-control-sm" placeholder="Usuario" style="max-width: 140px;">
+          <select id="filter-action" class="form-select form-select-sm" style="max-width: 140px;">
+            <option value="">Todas las acciones</option>
+            <option value="upload">Subida</option>
+            <option value="download">Descarga</option>
+            <option value="delete">Eliminación</option>
+            <option value="comment">Comentario</option>
+          </select>
+          <button class="btn btn-outline-primary btn-sm" id="btn-clear-filters"><i class="bi bi-x-circle"></i> Limpiar</button>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-download-log"><i class="bi bi-download"></i> Descargar log diario</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle" id="logs-table">
+          <thead class="table-light">
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Acción</th>
+              <th>Usuario</th>
+              <th>ID Documento</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Aquí se renderizan los logs -->
+          </tbody>
+        </table>
+      </div>
+      <div id="logs-pagination" class="d-flex justify-content-center mt-3"></div>
+    </div>
+  </div>
+  <script type="module" src="controllers/logsController.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
