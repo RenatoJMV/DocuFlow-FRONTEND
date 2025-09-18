@@ -1,3 +1,18 @@
+// Eliminar archivo
+export async function apiDeleteFile(fileId) {
+  const token = localStorage.getItem("token");
+  if (!token) return { success: false };
+  try {
+    const response = await fetch(`${BACKEND_URL}/files/${fileId}`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json().catch(() => null);
+    return response.ok ? { success: true, ...data } : { success: false, error: data?.error };
+  } catch {
+    return { success: false };
+  }
+}
 import { BACKEND_URL } from './config.js';
 
 // 🔹 Archivos (Files)

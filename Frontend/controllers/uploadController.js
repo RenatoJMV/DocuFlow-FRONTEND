@@ -1,4 +1,4 @@
-import { apiUploadFile, apiGetFiles, apiDownloadFile } from "../services/fileService.js";
+import { apiUploadFile, apiGetFiles, apiDownloadFile, apiDeleteFile } from "../services/fileService.js";
 import { showSuccess, showError } from "../utils/uiHelpers.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
