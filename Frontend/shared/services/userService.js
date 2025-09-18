@@ -46,7 +46,7 @@ export async function apiSetUserRole(userId, role) {
   }
 }
 
-// Obtener permisos de un usuario
+// Obtener permissions de un usuario
 export async function apiGetUserPermissions(userId) {
   const token = localStorage.getItem("token");
   if (!token) return { success: false, permissions: [] };
@@ -66,7 +66,7 @@ export async function apiGetUserPermissions(userId) {
   }
 }
 
-// Actualizar permisos de un usuario
+// Actualizar permissions de un usuario
 export async function apiSetUserPermissions(userId, permissions) {
   const token = localStorage.getItem("token");
   if (!token) return { success: false };

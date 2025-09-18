@@ -5,11 +5,11 @@ const userSelect = document.getElementById("user-select");
 const roleSelect = document.getElementById("role-select");
 const permissionsList = document.getElementById("permissions-list");
 const saveBtn = document.getElementById("save-permissions");
-const mensajeDiv = document.getElementById("permisos-mensaje");
+const mensajeDiv = document.getElementById("permissions-mensaje");
 
 let usuarios = [];
 let roles = [];
-const PERMISOS_DISPONIBLES = [
+const PERMISSIONS_DISPONIBLES = [
   { id: "descargar", nombre: "Descargar archivos" },
   { id: "eliminar", nombre: "Eliminar archivos" },
   { id: "comentar", nombre: "Comentar" },
@@ -43,8 +43,8 @@ async function cargarDatosUsuario(userId) {
   // Obtener permisos actuales
   const resPerms = await apiGetUserPermissions(userId);
   const permisos = resPerms.permissions || [];
-  // Renderizar checkboxes de permisos
-  permissionsList.innerHTML = PERMISOS_DISPONIBLES.map(p =>
+  // Renderizar checkboxes de permissions
+  permissionsList.innerHTML = PERMISSIONS_DISPONIBLES.map(p =>
     `<div class='form-check'>
       <input class='form-check-input' type='checkbox' id='perm-${p.id}' value='${p.id}' ${permisos.includes(p.id) ? "checked" : ""}>
       <label class='form-check-label' for='perm-${p.id}'>${p.nombre}</label>
@@ -66,13 +66,13 @@ async function asignarRol(role) {
 
 async function guardarCambios() {
   const userId = userSelect.value;
-  const permisosSeleccionados = Array.from(permissionsList.querySelectorAll("input:checked")).map(cb => cb.value);
-  const res = await apiSetUserPermissions(userId, permisosSeleccionados);
+  const permissionsSeleccionados = Array.from(permissionsList.querySelectorAll("input:checked")).map(cb => cb.value);
+  const res = await apiSetUserPermissions(userId, permissionsSeleccionados);
   if (res.success) {
-    mensajeDiv.textContent = "Permisos actualizados";
+  mensajeDiv.textContent = "Permissions actualizados";
     mensajeDiv.classList.remove("d-none");
   } else {
-    mensajeDiv.textContent = res.error || "Error al actualizar permisos";
+  mensajeDiv.textContent = res.error || "Error al actualizar permissions";
     mensajeDiv.classList.remove("d-none");
   }
 }
