@@ -5,7 +5,7 @@ export async function apiGetFiles() {
   const token = localStorage.getItem("token");
   if (!token) return { success: false, files: [] };
   try {
-    const response = await fetch(`${BACKEND_URL}/dashboard/files`, {
+    const response = await fetch(`${BACKEND_URL}/files`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -44,7 +44,7 @@ export async function apiDownloadFile(fileId, newName) {
   const token = localStorage.getItem("token");
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/dashboard/files/${fileId}/download`, {
+    const response = await fetch(`${BACKEND_URL}/files/${fileId}/download`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
