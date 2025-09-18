@@ -1,4 +1,4 @@
-import { login } from '../services/apiService.js';
+import { login } from '../services/userService.js';
 const form = document.getElementById('loginForm');
 const errorDiv = document.getElementById('error-message');
 form.addEventListener('submit', async (e) => {
