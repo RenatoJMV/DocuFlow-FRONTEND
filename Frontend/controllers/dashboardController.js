@@ -2,7 +2,8 @@
 // Controlador para poblar el dashboard con datos reales desde el backend
 
 import { apiGetFiles } from '../services/fileService.js';
-import { apiGetUsers, apiGetDownloadsToday } from '../services/userService.js';
+import { apiGetUsers } from '../services/userService.js';
+import { apiGetDownloadsToday } from '../services/dashboardService.js';
 import { apiGetComments } from '../services/commentService.js';
 import { apiGetLogs } from '../services/logService.js';
 
