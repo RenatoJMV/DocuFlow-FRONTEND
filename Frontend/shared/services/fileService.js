@@ -1,3 +1,4 @@
+import { BACKEND_URL } from './config.js';
 // Eliminar archivo
 export async function apiDeleteFile(fileId) {
   const token = localStorage.getItem("token");
@@ -13,8 +14,6 @@ export async function apiDeleteFile(fileId) {
     return { success: false };
   }
 }
-import { BACKEND_URL } from './config.js';
-
 // 🔹 Archivos (Files)
 export async function apiGetFiles() {
   const token = localStorage.getItem("token");
