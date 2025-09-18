@@ -28,7 +28,7 @@ export async function apiUploadFile(file, metadata = {}) {
   Object.entries(metadata).forEach(([key, value]) => formData.append(key, value));
   try {
     // Cambia la URL aquí según tu backend real
-    const response = await fetch(`${BACKEND_URL}/api/upload`, {
+  const response = await fetch(`${BACKEND_URL}/upload`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${token}` },
       body: formData
