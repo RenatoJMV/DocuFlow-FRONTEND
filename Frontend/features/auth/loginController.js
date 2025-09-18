@@ -1,5 +1,5 @@
-import { login } from "../services/userService.js";
-import { showError } from "../utils/uiHelpers.js";
+import { login } from "../../shared/services/userService.js";
+import { showError } from "../../shared/utils/uiHelpers.js";
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -10,7 +10,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const result = await login(username, password);
 
   if (result.success) {
-    window.location.href = "upload.html"; // redirigir si login OK
+    window.location.href = "dashboard.html"; // redirigir si login OK
   } else {
     showError("error-message", result.error);
   }

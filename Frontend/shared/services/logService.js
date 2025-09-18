@@ -1,4 +1,4 @@
-import { BACKEND_URL } from './config.js';
+import { BACKEND_URL } from '../../services/config.js';
 
 // 🔹 Logs
 export async function apiGetLogs() {
