@@ -1,95 +1,503 @@
-import { apiUploadFile, apiGetFiles, apiDownloadFile, apiDeleteFile } from "/shared/services/fileService.js";
-import { showSuccess, showError } from "/shared/utils/uiHelpers.js";
+import { docuFlowAPI } from '../../shared/services/apiClient.js';
+import { appStore } from '../../shared/services/store.js';
+import { createNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
 
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadFiles();
-});
-
-document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const file = document.getElementById('fileInput').files[0];
-  if (!file) return showError("error-message", "Selecciona un archivo");
-
-  const result = await apiUploadFile(file);
-  if (result.success) {
-    showSuccess("success-message", result.mensaje);
-    document.getElementById('fileInput').value = ""; // Limpiar input después de subir
-    await loadFiles();
-  } else {
-    showError("error-message", result.error || "Error al subir archivo");
+class UploadController {
+  constructor() {
+    this.selectedFiles = [];
+    this.currentView = 'table'; // table or grid
+    this.currentPage = 1;
+    this.itemsPerPage = 10;
+    this.allFiles = [];
+    this.filteredFiles = [];
+    
+    this.initializeComponents();
+    this.setupEventListeners();
+    this.loadFiles();
+    this.updateStats();
   }
-});
 
-// 🔹 Función para cargar y mostrar los archivos
-async function loadFiles() {
-  const result = await apiGetFiles();
-  const tbody = document.querySelector("#filesTable tbody");
-  tbody.innerHTML = "";
+  initializeComponents() {
+    // Create navbar
+    createNavbar('files');
+    
+    // Initialize drag & drop
+    this.setupDragAndDrop();
+  }
 
-  const files = Array.isArray(result) ? result : (result.files || []);
+  setupDragAndDrop() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
 
-  if (files.length > 0) {
+    // Drag & drop events
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, this.preventDefaults, false);
+      document.body.addEventListener(eventName, this.preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      this.handleFileSelection([...files]);
+    });
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        this.handleFileSelection([...e.target.files]);
+      }
+    });
+  }
+
+  preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  handleFileSelection(files) {
     files.forEach(file => {
-      const row = document.createElement("tr");
+      // Check if file already selected
+      if (!this.selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+        this.selectedFiles.push(file);
+      }
+    });
+    
+    this.renderSelectedFiles();
+    this.updateUploadButton();
+  }
+
+  renderSelectedFiles() {
+    const container = document.getElementById('selectedFiles');
+    container.innerHTML = '';
+
+    if (this.selectedFiles.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'block';
+    
+    this.selectedFiles.forEach((file, index) => {
+      const fileElement = document.createElement('div');
+      fileElement.className = 'file-item';
+      
+      const fileIcon = this.getFileIcon(file.type);
+      const fileSize = this.formatFileSize(file.size);
+      
+      fileElement.innerHTML = `
+        <div class="file-info">
+          <div class="file-icon ${fileIcon.class}">${fileIcon.icon}</div>
+          <div class="file-details">
+            <h6>${file.name}</h6>
+            <small>${fileSize}</small>
+          </div>
+        </div>
+        <button class="file-remove" onclick="uploadController.removeFile(${index})">
+          <i class="bi bi-x"></i>
+        </button>
+      `;
+      
+      container.appendChild(fileElement);
+    });
+  }
+
+  removeFile(index) {
+    this.selectedFiles.splice(index, 1);
+    this.renderSelectedFiles();
+    this.updateUploadButton();
+  }
+
+  updateUploadButton() {
+    const uploadBtn = document.getElementById('uploadBtn');
+    const count = this.selectedFiles.length;
+    
+    if (count > 0) {
+      uploadBtn.disabled = false;
+      uploadBtn.innerHTML = `<i class="bi bi-cloud-upload me-2"></i>Subir ${count} archivo${count > 1 ? 's' : ''}`;
+    } else {
+      uploadBtn.disabled = true;
+      uploadBtn.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Seleccionar archivos';
+    }
+  }
+
+  getFileIcon(mimeType) {
+    if (mimeType.startsWith('image/')) return { class: 'img', icon: '<i class="bi bi-image"></i>' };
+    if (mimeType.includes('pdf')) return { class: 'pdf', icon: '<i class="bi bi-file-earmark-pdf"></i>' };
+    if (mimeType.includes('word') || mimeType.includes('document')) return { class: 'doc', icon: '<i class="bi bi-file-earmark-word"></i>' };
+    if (mimeType.includes('zip') || mimeType.includes('rar')) return { class: 'zip', icon: '<i class="bi bi-file-earmark-zip"></i>' };
+    return { class: 'default', icon: '<i class="bi bi-file-earmark"></i>' };
+  }
+
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  setupEventListeners() {
+    // Upload form
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm) {
+      uploadForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.handleUpload();
+      });
+    }
+
+    // Search
+    const searchInput = document.getElementById('searchFiles');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => this.filterFiles());
+    }
+
+    // View toggle
+    document.querySelectorAll('.view-toggle .btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.currentView = e.target.dataset.view;
+        this.updateViewToggle();
+        this.renderFiles();
+      });
+    });
+
+    // Refresh button
+    const refreshBtn = document.getElementById('refreshFiles');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.loadFiles());
+    }
+  }
+
+  async handleUpload() {
+    if (this.selectedFiles.length === 0) {
+      showNotification('Selecciona al menos un archivo', 'warning');
+      return;
+    }
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const originalText = uploadBtn.innerHTML;
+    
+    try {
+      uploadBtn.disabled = true;
+      uploadBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin me-2"></i>Subiendo...';
+
+      // Show progress
+      const progressContainer = document.getElementById('uploadProgress');
+      const progressBar = progressContainer.querySelector('.progress-bar');
+      progressContainer.style.display = 'block';
+
+      let uploaded = 0;
+      const total = this.selectedFiles.length;
+
+      for (const file of this.selectedFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        await docuFlowAPI.files.upload(formData);
+        uploaded++;
+        
+        const progress = (uploaded / total) * 100;
+        progressBar.style.width = `${progress}%`;
+        progressBar.textContent = `${uploaded}/${total} archivos`;
+      }
+
+      showNotification(`${uploaded} archivo${uploaded > 1 ? 's' : ''} subido${uploaded > 1 ? 's' : ''} exitosamente`, 'success');
+      
+      // Clear selection
+      this.selectedFiles = [];
+      this.renderSelectedFiles();
+      this.updateUploadButton();
+      
+      // Hide progress and reload files
+      setTimeout(() => {
+        progressContainer.style.display = 'none';
+        this.loadFiles();
+        this.updateStats();
+      }, 1000);
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      showNotification('Error al subir archivos', 'error');
+    } finally {
+      uploadBtn.disabled = false;
+      uploadBtn.innerHTML = originalText;
+    }
+  }
+
+  async loadFiles() {
+    try {
+      const response = await docuFlowAPI.files.list();
+      this.allFiles = response.files || [];
+      this.filterFiles();
+    } catch (error) {
+      console.error('Error loading files:', error);
+      showNotification('Error al cargar archivos', 'error');
+      this.allFiles = [];
+      this.renderFiles();
+    }
+  }
+
+  filterFiles() {
+    const searchTerm = document.getElementById('searchFiles')?.value.toLowerCase() || '';
+    
+    this.filteredFiles = this.allFiles.filter(file => 
+      file.filename.toLowerCase().includes(searchTerm)
+    );
+
+    this.currentPage = 1;
+    this.renderFiles();
+    this.updatePagination();
+  }
+
+  renderFiles() {
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    const filesToShow = this.filteredFiles.slice(startIndex, endIndex);
+
+    if (this.currentView === 'table') {
+      this.renderTableView(filesToShow);
+    } else {
+      this.renderGridView(filesToShow);
+    }
+
+    this.updateShowingCount();
+  }
+
+  renderTableView(files) {
+    const tableContainer = document.getElementById('filesTableContainer');
+    const gridContainer = document.getElementById('filesGridContainer');
+    
+    tableContainer.style.display = 'block';
+    gridContainer.style.display = 'none';
+
+    const tbody = document.getElementById('filesTableBody');
+    tbody.innerHTML = '';
+
+    if (files.length === 0) {
+      const emptyState = document.getElementById('filesEmptyState');
+      emptyState.classList.remove('d-none');
+      return;
+    } else {
+      document.getElementById('filesEmptyState').classList.add('d-none');
+    }
+
+    files.forEach(file => {
+      const row = document.createElement('tr');
       row.innerHTML = `
-        <td>${file.filename}</td>
-        <td>${file.size ? (file.size / 1024).toFixed(2) + " KB" : "N/A"}</td>
-        <td class="d-flex gap-2 justify-content-center">
-          <button class="btn btn-outline-primary btn-sm btn-download d-flex align-items-center gap-1" data-id="${file.id}" data-filename="${file.filename}" title="Descargar">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.6a.5.5 0 0 1 1 0v2.6A2 2 0 0 1 14 15H2a2 2 0 0 1-2-2v-2.6a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-            Descargar
-          </button>
-          <button class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1 btn-delete" data-id="${file.id}" title="Eliminar">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6zm2 .5a.5.5 0 0 1 .5-.5.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1 0-2h3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3a.5.5 0 0 0-.5.5V4h12v-.5a.5.5 0 0 0-.5-.5h-11z"/></svg>
-            Eliminar
-          </button>
+        <td>
+          <input type="checkbox" class="form-check-input file-checkbox" data-file-id="${file.id}">
+        </td>
+        <td>
+          <div class="file-name">
+            <i class="${this.getFileIconClass(file.filename)}"></i>
+            <span>${file.filename}</span>
+          </div>
+        </td>
+        <td>${this.formatFileSize(file.size || 0)}</td>
+        <td>${new Date(file.uploadDate || Date.now()).toLocaleDateString()}</td>
+        <td>${file.uploader || 'Usuario'}</td>
+        <td>
+          <div class="file-actions">
+            <button class="action-btn download" onclick="uploadController.downloadFile('${file.id}', '${file.filename}')" title="Descargar">
+              <i class="bi bi-download"></i>
+            </button>
+            <button class="action-btn preview" onclick="uploadController.previewFile('${file.id}')" title="Vista previa">
+              <i class="bi bi-eye"></i>
+            </button>
+            <button class="action-btn delete" onclick="uploadController.deleteFile('${file.id}')" title="Eliminar">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
         </td>
       `;
       tbody.appendChild(row);
     });
+  }
 
-    // Evento para descargar
-    document.querySelectorAll(".btn-download").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-id");
-        const filename = btn.getAttribute("data-filename") || "archivo";
-        btn.disabled = true;
-        btn.textContent = "Descargando...";
-  const result = await apiDownloadFile(id, filename);
-        btn.disabled = false;
-        btn.textContent = "Descargar";
-        if (result.success) {
-          const url = window.URL.createObjectURL(result.blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = result.filename || filename;
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(() => {
-            window.URL.revokeObjectURL(url);
-            a.remove();
-          }, 100);
-        } else {
-          showError("error-message", result.error || "Error al descargar archivo");
-        }
-      });
-    });
+  renderGridView(files) {
+    const tableContainer = document.getElementById('filesTableContainer');
+    const gridContainer = document.getElementById('filesGridContainer');
+    
+    tableContainer.style.display = 'none';
+    gridContainer.style.display = 'block';
 
-    // Eventos para eliminar
-    document.querySelectorAll(".btn-delete").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-id");
-        const del = await apiDeleteFile(id);
-        if (del.success) {
-          showSuccess("success-message", del.mensaje);
-          await loadFiles();
-        } else {
-          showError("error-message", del.error || "Error al eliminar archivo");
-        }
-      });
+    gridContainer.innerHTML = '';
+
+    if (files.length === 0) {
+      gridContainer.innerHTML = `
+        <div class="col-12">
+          <div class="empty-state">
+            <i class="bi bi-folder2-open display-1 text-gray-400"></i>
+            <h5 class="text-gray-600 mt-3">No hay archivos</h5>
+            <p class="text-gray-500">Los archivos aparecerán aquí cuando los subas</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    files.forEach(file => {
+      const col = document.createElement('div');
+      col.className = 'col-lg-3 col-md-4 col-sm-6 mb-4';
+      
+      const fileIcon = this.getFileIcon(file.mimeType || '');
+      
+      col.innerHTML = `
+        <div class="file-card">
+          <div class="file-icon ${fileIcon.class}">
+            ${fileIcon.icon}
+          </div>
+          <h6>${file.filename}</h6>
+          <p class="file-meta">
+            ${this.formatFileSize(file.size || 0)}<br>
+            <small>${new Date(file.uploadDate || Date.now()).toLocaleDateString()}</small>
+          </p>
+          <div class="file-actions">
+            <button class="action-btn download" onclick="uploadController.downloadFile('${file.id}', '${file.filename}')" title="Descargar">
+              <i class="bi bi-download"></i>
+            </button>
+            <button class="action-btn preview" onclick="uploadController.previewFile('${file.id}')" title="Vista previa">
+              <i class="bi bi-eye"></i>
+            </button>
+            <button class="action-btn delete" onclick="uploadController.deleteFile('${file.id}')" title="Eliminar">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+      `;
+      gridContainer.appendChild(col);
     });
-  } else {
-    tbody.innerHTML = `<tr><td colspan="3">No hay archivos subidos</td></tr>`;
+  }
+
+  getFileIconClass(filename) {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const iconMap = {
+      'pdf': 'bi bi-file-earmark-pdf text-danger',
+      'doc': 'bi bi-file-earmark-word text-primary',
+      'docx': 'bi bi-file-earmark-word text-primary',
+      'xls': 'bi bi-file-earmark-excel text-success',
+      'xlsx': 'bi bi-file-earmark-excel text-success',
+      'ppt': 'bi bi-file-earmark-ppt text-warning',
+      'pptx': 'bi bi-file-earmark-ppt text-warning',
+      'jpg': 'bi bi-file-earmark-image text-info',
+      'jpeg': 'bi bi-file-earmark-image text-info',
+      'png': 'bi bi-file-earmark-image text-info',
+      'gif': 'bi bi-file-earmark-image text-info',
+      'zip': 'bi bi-file-earmark-zip text-secondary',
+      'rar': 'bi bi-file-earmark-zip text-secondary'
+    };
+    return iconMap[ext] || 'bi bi-file-earmark text-muted';
+  }
+
+  updateViewToggle() {
+    document.querySelectorAll('.view-toggle .btn').forEach(btn => {
+      btn.classList.remove('active');
+      if (btn.dataset.view === this.currentView) {
+        btn.classList.add('active');
+      }
+    });
+  }
+
+  updatePagination() {
+    const totalItems = this.filteredFiles.length;
+    const totalPages = Math.ceil(totalItems / this.itemsPerPage);
+    
+    const paginationContainer = document.getElementById('paginationContainer');
+    if (!paginationContainer) return;
+
+    if (totalPages <= 1) {
+      paginationContainer.innerHTML = '';
+      return;
+    }
+
+    const pagination = new Pagination(paginationContainer, {
+      currentPage: this.currentPage,
+      totalPages: totalPages,
+      onPageChange: (page) => {
+        this.currentPage = page;
+        this.renderFiles();
+      }
+    });
+  }
+
+  updateShowingCount() {
+    const showingElement = document.getElementById('showingCount');
+    const totalElement = document.getElementById('totalCount');
+    
+    if (showingElement && totalElement) {
+      const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+      const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredFiles.length);
+      
+      showingElement.textContent = this.filteredFiles.length > 0 ? `${startIndex + 1}-${endIndex}` : '0';
+      totalElement.textContent = this.filteredFiles.length;
+    }
+  }
+
+  async updateStats() {
+    try {
+      const stats = await docuFlowAPI.files.getStats();
+      
+      document.getElementById('totalFiles').textContent = stats.totalFiles || this.allFiles.length;
+      document.getElementById('totalSize').textContent = this.formatFileSize(stats.totalSize || 0);
+      document.getElementById('todayUploads').textContent = stats.todayUploads || 0;
+      
+    } catch (error) {
+      console.error('Error updating stats:', error);
+    }
+  }
+
+  async downloadFile(fileId, filename) {
+    try {
+      const response = await docuFlowAPI.files.download(fileId);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(response);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      showNotification('Archivo descargado', 'success');
+    } catch (error) {
+      console.error('Download error:', error);
+      showNotification('Error al descargar archivo', 'error');
+    }
+  }
+
+  async deleteFile(fileId) {
+    if (!confirm('¿Estás seguro de eliminar este archivo?')) return;
+
+    try {
+      await docuFlowAPI.files.delete(fileId);
+      showNotification('Archivo eliminado', 'success');
+      this.loadFiles();
+      this.updateStats();
+    } catch (error) {
+      console.error('Delete error:', error);
+      showNotification('Error al eliminar archivo', 'error');
+    }
+  }
+
+  async previewFile(fileId) {
+    // TODO: Implement file preview functionality
+    showNotification('Vista previa no disponible aún', 'info');
   }
 }
+
+// Initialize controller and make it globally available
+let uploadController;
+document.addEventListener('DOMContentLoaded', () => {
+  uploadController = new UploadController();
+});
