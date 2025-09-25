@@ -1,9 +1,9 @@
-import { apiGetFiles } from '../..shared/services/fileService.js';
-import { apiGetUsers } from '../..shared/services/userService.js';
-import { apiGetDownloadsToday } from '../../shared/services/dashboardService.js';
-import { apiGetCommentsByDocument } from '../../shared/services/commentService.js';
-import { apiGetLogs } from '../../shared/services/logService.js';
-import { BACKEND_URL } from '../../shared/services/config.js';
+import { apiGetFiles } from '/shared/services/fileService.js';
+import { apiGetUsers } from '/shared/services/userService.js';
+import { apiGetDownloadsToday } from '/shared/services/dashboardService.js';
+import { apiGetCommentsByDocument } from '/shared/services/commentService.js';
+import { apiGetLogs } from '/shared/services/logService.js';
+import { BACKEND_URL } from '/shared/services/config.js';
 
 // Obtener el total de comentarios
 async function apiGetTotalComments() {

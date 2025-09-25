@@ -4,7 +4,7 @@ import {
 	apiEditComment,
 	apiAssignUsersToComment,
 	apiDeleteComment
-} from '../../shared/services/commentService.js';
+} from '/shared/services/commentService.js';
 
 const commentsSection = document.getElementById('commentsSection');
 const newCommentForm = document.getElementById('newCommentForm');

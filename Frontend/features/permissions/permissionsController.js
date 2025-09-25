@@ -1,4 +1,4 @@
-import { apiGetUsers, apiGetRoles, apiGetUserPermissions, apiSetUserRole, apiSetUserPermissions } from "../../shared/services/userService.js";
+import { apiGetUsers, apiGetRoles, apiGetUserPermissions, apiSetUserRole, apiSetUserPermissions } from "/shared/services/userService.js";
 
 const userSelect = document.getElementById("user-select");
 const roleSelect = document.getElementById("role-select");

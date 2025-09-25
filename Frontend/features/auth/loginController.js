@@ -1,5 +1,5 @@
-import { login } from "../../shared/services/userService.js";
-import { showError } from "../../shared/utils/uiHelpers.js";
+import { login } from "/shared/services/userService.js";
+import { showError } from "/shared/utils/uiHelpers.js";
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
