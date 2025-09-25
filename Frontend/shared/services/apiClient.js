@@ -1,17 +1,17 @@
 // Cliente API moderno con fallback offline para DocuFlow
 import { store } from './store.js';
 import { showNotification, showLoading } from '../utils/uiHelpers.js';
-import { getCurrentConfig } from './config.js';
-import '../utils/devUtils.js'; // Cargar utilidades de desarrollo
 
 class ApiClient {
   constructor() {
-    const config = getCurrentConfig();
-    this.config = config;
+    // Configuración simplificada sin dependencia externa
+    const isLocalhost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
     
-    // Aplicar overrides de desarrollo si existen
-    this.baseUrl = this.getEffectiveApiUrl(config);
-    this.offlineMode = this.shouldForceOfflineMode(config);
+    this.baseUrl = isLocalhost 
+      ? 'http://localhost:3000/api'
+      : 'https://docuflow-backend.onrender.com/api';
+      
+    this.offlineMode = false;
     
     this.interceptors = {
       request: [],
@@ -21,45 +21,14 @@ class ApiClient {
     
     // Configuración por defecto
     this.defaults = {
-      timeout: config.APP.timeout,
+      timeout: 10000,
       headers: {
         'Content-Type': 'application/json'
       }
     };
 
-    // Log de configuración (solo en desarrollo)
-    if (config.isDevelopment) {
-      console.log(`🌐 DocuFlow API configurada:`, {
-        environment: config.environment,
-        apiUrl: this.baseUrl,
-        offlineMode: this.offlineMode,
-        hasOverrides: this.baseUrl !== config.apiUrl || this.offlineMode
-      });
-    }
-  }
-
-  getEffectiveApiUrl(config) {
-    // Verificar override temporal en desarrollo
-    if (config.isDevelopment) {
-      const tempUrl = localStorage.getItem('DOCUFLOW_TEMP_API_URL');
-      if (tempUrl) {
-        console.log(`🔧 Usando API URL temporal: ${tempUrl}`);
-        return tempUrl;
-      }
-    }
-    return config.apiUrl;
-  }
-
-  shouldForceOfflineMode(config) {
-    // Verificar si el modo offline está forzado en desarrollo
-    if (config.isDevelopment) {
-      const forceOffline = localStorage.getItem('DOCUFLOW_FORCE_OFFLINE');
-      if (forceOffline === 'true') {
-        console.log('🔌 Modo offline forzado activado');
-        return true;
-      }
-    }
-    return false;
+    // Log de configuración
+    console.log(`🌐 DocuFlow API configurada: ${this.baseUrl}`);
   }
 
   // Agregar interceptores
@@ -126,20 +95,22 @@ class ApiClient {
 
     } catch (error) {
       // Si hay error de conexión, activar modo offline y usar datos demo
-      if (error.name === 'AbortError' || error.message.includes('Failed to fetch') || 
-          error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('NetworkError')) {
-        
+      const isConnectionError = error.name === 'AbortError' || 
+                               error.name === 'TypeError' ||
+                               error.message.includes('Failed to fetch') || 
+                               error.message.includes('ERR_CONNECTION_REFUSED') || 
+                               error.message.includes('NetworkError') ||
+                               error.message.includes('net::ERR_');
+      
+      if (isConnectionError) {
         if (!this.offlineMode) {
           console.warn('🔌 Servidor no disponible, activando modo offline');
           console.info(`📡 Intentaba conectar a: ${this.baseUrl}${endpoint}`);
           this.offlineMode = true;
           
-          // Mostrar notificación de modo offline (se puede comentar si es molesta)
+          // Mostrar notificación de modo offline
           if (typeof showNotification === 'function') {
-            const message = this.config.isDevelopment 
-              ? 'Modo offline - usando datos de demostración' 
-              : 'Conexión con servidor no disponible - modo offline activado';
-            showNotification(message, 'info', 3000);
+            showNotification('Modo offline - usando datos de demostración', 'info', 3000);
           }
         }
         

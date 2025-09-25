@@ -135,7 +135,18 @@ class LoginController {
       loginBtn.innerHTML = originalText;
     }
   }
+
+  // Función para mostrar modal de recuperación de contraseña
+  showForgotPassword() {
+    showNotification('Función de recuperación de contraseña próximamente', 'info');
+    // Aquí podrías implementar un modal de recuperación de contraseña
+  }
 }
+
+// Función global para el HTML
+window.showForgotPassword = function() {
+  showNotification('Función de recuperación de contraseña próximamente', 'info');
+};
 
 // Initialize controller when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
