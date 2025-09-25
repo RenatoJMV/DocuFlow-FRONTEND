@@ -1,6 +1,6 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
-import { createNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
+import { initializeNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
 
 class UploadController {
   constructor() {
@@ -19,7 +19,7 @@ class UploadController {
 
   initializeComponents() {
     // Create navbar
-    createNavbar('files');
+    initializeNavbar('files');
     
     // Initialize drag & drop
     this.setupDragAndDrop();

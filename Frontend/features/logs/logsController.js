@@ -1,6 +1,6 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
-import { createNavbar, showNotification, Pagination } from '../../shared/utils/uiHelpers.js';
+import { initializeNavbar, showNotification, Pagination } from '../../shared/utils/uiHelpers.js';
 
 class LogsController {
   constructor() {
@@ -22,7 +22,7 @@ class LogsController {
 
   initializeComponents() {
     // Create navbar
-    createNavbar('logs');
+    initializeNavbar('logs');
     
     // Setup filters
     this.setupFilters();

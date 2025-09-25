@@ -401,8 +401,6 @@ export const docuFlowAPI = {
 
   // Dashboard
   dashboard: {
-    getStats: () => apiClient.get('/dashboard/stats'),
-    getRecentActivity: () => apiClient.get('/dashboard/activity'),
     getUsers: () => apiClient.get('/dashboard/users'),
     getComments: () => apiClient.get('/dashboard/comments'),
     getLogs: () => apiClient.get('/dashboard/logs'),

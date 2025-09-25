@@ -29,8 +29,18 @@ class DashboardController {
       
     } catch (error) {
       console.error('Error initializing dashboard:', error);
-      showNotification('Error al cargar el dashboard', 'error');
+      showNotification('Error al exportar la actividad', 'error');
     }
+  }
+
+  formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   setupStoreSubscriptions() {
@@ -65,31 +75,70 @@ class DashboardController {
     try {
       store.setLoading(true);
 
-      // Cargar estadísticas del dashboard
-      const [statsResult, activityResult] = await Promise.allSettled([
-        docuFlowAPI.dashboard.getStats(),
-        docuFlowAPI.dashboard.getRecentActivity()
+      // Cargar datos reales de PostgreSQL
+      const [usersResult, commentsResult, logsResult, filesResult, downloadsResult] = await Promise.allSettled([
+        docuFlowAPI.dashboard.getUsers(),
+        docuFlowAPI.dashboard.getComments(),
+        docuFlowAPI.dashboard.getLogs(),
+        docuFlowAPI.dashboard.getFiles(),
+        docuFlowAPI.dashboard.getDownloadsToday()
       ]);
 
-      if (statsResult.status === 'fulfilled' && statsResult.value && statsResult.value.success) {
-        store.updateDashboardStats(statsResult.value.data);
-      } else {
-        // Datos de demostración si no hay backend
-        this.loadDemoData();
-      }
+      // Procesar usuarios
+      const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
+      const totalUsers = users.length;
+      const adminUsers = users.filter(u => u.role === 'admin').length;
 
-      if (activityResult.status === 'fulfilled' && activityResult.value && activityResult.value.success) {
-        const dashboard = store.getState('dashboard') || {};
-        store.setState('dashboard', {
-          ...dashboard,
-          recentActivity: activityResult.value.data
-        });
-      } else {
-        this.loadDemoActivity();
-      }
+      // Procesar comentarios  
+      const comments = commentsResult.status === 'fulfilled' ? commentsResult.value : [];
+      const totalComments = comments.length;
+      const pendingTasks = comments.filter(c => c.isTask).length;
+
+      // Procesar logs
+      const logs = logsResult.status === 'fulfilled' ? logsResult.value : [];
+      const totalLogs = logs.length;
+
+      // Procesar archivos
+      const files = filesResult.status === 'fulfilled' ? filesResult.value : [];
+      const totalFiles = files.length;
+      const totalSizeBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
+      const totalSize = this.formatFileSize(totalSizeBytes);
+
+      // Procesar descargas de hoy
+      const downloads = downloadsResult.status === 'fulfilled' ? downloadsResult.value : { count: 0 };
+      const downloadsToday = downloads.count || 0;
+
+      // Actualizar el store con estadísticas reales
+      store.updateDashboardStats({
+        totalFiles,
+        totalUsers,
+        pendingTasks,
+        totalStorage: totalSize,
+        downloadsToday,
+        adminUsers,
+        totalComments,
+        totalLogs
+      });
+
+      // Guardar datos para otras vistas
+      store.setState('dashboardUsers', users);
+      store.setState('dashboardFiles', files);
+      store.setState('dashboardComments', comments);
+      store.setState('dashboardLogs', logs);
+
+      console.log('✅ Datos del dashboard cargados:', {
+        usuarios: totalUsers,
+        archivos: totalFiles, 
+        comentarios: totalComments,
+        logs: totalLogs,
+        descargasHoy: downloadsToday
+      });
 
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error('❌ Error cargando datos del dashboard:', error);
+      showNotification('Error cargando datos del dashboard', 'error');
+      
+      // Fallback a datos básicos
       this.loadDemoData();
     } finally {
       store.setLoading(false);

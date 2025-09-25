@@ -1,6 +1,6 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
-import { createNavbar, showNotification, FormValidator } from '../../shared/utils/uiHelpers.js';
+import { initializeNavbar, showNotification, FormValidator } from '../../shared/utils/uiHelpers.js';
 
 class PermissionsController {
   constructor() {
@@ -25,7 +25,7 @@ class PermissionsController {
 
   initializeComponents() {
     // Create navbar
-    createNavbar('permissions');
+    initializeNavbar('permissions');
     
     // Setup form validation
     this.setupFormValidation();

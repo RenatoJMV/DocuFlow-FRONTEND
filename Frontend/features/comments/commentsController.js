@@ -1,6 +1,6 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
-import { createNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
+import { initializeNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
 
 class CommentsController {
   constructor() {
@@ -18,7 +18,7 @@ class CommentsController {
 
   initializeComponents() {
     // Create navbar
-    createNavbar('comments');
+    initializeNavbar('comments');
     
     // Setup form validation
     this.setupFormValidation();
