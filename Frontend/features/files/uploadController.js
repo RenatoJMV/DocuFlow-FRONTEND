@@ -240,7 +240,13 @@ class UploadController {
   async loadFiles() {
     try {
       const response = await docuFlowAPI.files.getAll();
-      this.allFiles = response || [];
+      console.log('📁 Respuesta del servidor (archivos):', response);
+      console.log('📁 Tipo de respuesta:', typeof response);
+      console.log('📁 Es array:', Array.isArray(response));
+      
+      this.allFiles = Array.isArray(response) ? response : [];
+      console.log('📁 Archivos cargados:', this.allFiles.length);
+      
       this.filterFiles();
     } catch (error) {
       console.error('Error loading files:', error);
@@ -293,10 +299,15 @@ class UploadController {
 
     if (files.length === 0) {
       const emptyState = document.getElementById('emptyState');
-      emptyState.classList.remove('d-none');
+      if (emptyState) {
+        emptyState.classList.remove('d-none');
+      }
       return;
     } else {
-      document.getElementById('filesEmptyState').classList.add('d-none');
+      const emptyState = document.getElementById('emptyState');
+      if (emptyState) {
+        emptyState.classList.add('d-none');
+      }
     }
 
     files.forEach(file => {
