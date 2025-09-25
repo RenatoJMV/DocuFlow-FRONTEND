@@ -70,7 +70,22 @@ class UploadController {
     });
     
     this.renderSelectedFiles();
+    this.showUploadForm(); // Mostrar el formulario cuando hay archivos
     this.updateUploadButton();
+  }
+
+  showUploadForm() {
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm && this.selectedFiles.length > 0) {
+      uploadForm.style.display = 'block';
+    }
+  }
+
+  hideUploadForm() {
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm && this.selectedFiles.length === 0) {
+      uploadForm.style.display = 'none';
+    }
   }
 
   renderSelectedFiles() {
@@ -111,11 +126,16 @@ class UploadController {
   removeFile(index) {
     this.selectedFiles.splice(index, 1);
     this.renderSelectedFiles();
+    if (this.selectedFiles.length === 0) {
+      this.hideUploadForm();
+    }
     this.updateUploadButton();
   }
 
   updateUploadButton() {
     const uploadBtn = document.getElementById('uploadBtn');
+    if (!uploadBtn) return; // Safety check
+    
     const count = this.selectedFiles.length;
     
     if (count > 0) {
@@ -182,6 +202,11 @@ class UploadController {
     }
 
     const uploadBtn = document.getElementById('uploadBtn');
+    if (!uploadBtn) {
+      console.error('Upload button not found!');
+      return;
+    }
+    
     const originalText = uploadBtn.innerHTML;
     
     try {
@@ -190,8 +215,8 @@ class UploadController {
 
       // Show progress
       const progressContainer = document.getElementById('uploadProgress');
-      const progressBar = progressContainer.querySelector('.progress-bar');
-      progressContainer.style.display = 'block';
+      const progressBar = progressContainer?.querySelector('.progress-bar');
+      if (progressContainer) progressContainer.style.display = 'block';
 
       let uploaded = 0;
       const total = this.selectedFiles.length;
@@ -266,6 +291,7 @@ class UploadController {
     this.currentPage = 1;
     this.renderFiles();
     this.updatePagination();
+    this.updateStats(); // Actualizar estadísticas después de filtrar
   }
 
   renderFiles() {
@@ -416,7 +442,35 @@ class UploadController {
 
   async updateStats() {
     try {
-      // Calcular estadísticas basándose en los archivos cargados
+      // Usar los nuevos endpoints del backend
+      const statsResponse = await docuFlowAPI.files.getStats();
+      console.log('📊 Estadísticas del servidor:', statsResponse);
+      
+      if (statsResponse && statsResponse.totalFiles !== undefined) {
+        const totalFilesEl = document.getElementById('total-files');
+        const totalSizeEl = document.getElementById('total-size');
+        
+        if (totalFilesEl) totalFilesEl.textContent = statsResponse.totalFiles;
+        if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(statsResponse.totalSize);
+        
+        console.log(`📊 Estadísticas actualizadas: ${statsResponse.totalFiles} archivos, ${this.formatFileSize(statsResponse.totalSize)}`);
+      } else {
+        // Fallback: calcular desde los archivos cargados
+        const totalFiles = this.allFiles.length;
+        const totalSize = this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+        
+        const totalFilesEl = document.getElementById('total-files');
+        const totalSizeEl = document.getElementById('total-size');
+        
+        if (totalFilesEl) totalFilesEl.textContent = totalFiles;
+        if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);
+        
+        console.log(`📊 Estadísticas fallback: ${totalFiles} archivos, ${this.formatFileSize(totalSize)}`);
+      }
+      
+    } catch (error) {
+      console.error('Error updating stats:', error);
+      // Fallback en caso de error
       const totalFiles = this.allFiles.length;
       const totalSize = this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
       
@@ -425,9 +479,6 @@ class UploadController {
       
       if (totalFilesEl) totalFilesEl.textContent = totalFiles;
       if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);
-      
-    } catch (error) {
-      console.error('Error updating stats:', error);
     }
   }
 
@@ -478,4 +529,13 @@ class UploadController {
 let uploadController;
 document.addEventListener('DOMContentLoaded', () => {
   uploadController = new UploadController();
+  
+  // Exponer métodos específicos globalmente para onclick handlers
+  window.uploadController = {
+    downloadFile: (fileId) => uploadController.downloadFile(fileId),
+    deleteFile: (fileId) => uploadController.deleteFile(fileId),
+    openPreviewModal: (fileId) => uploadController.previewFile(fileId),
+    removeFile: (index) => uploadController.removeFile(index),
+    refreshFileList: () => uploadController.loadFiles()
+  };
 });

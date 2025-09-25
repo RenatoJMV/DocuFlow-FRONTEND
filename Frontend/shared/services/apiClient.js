@@ -181,18 +181,27 @@ class ApiClient {
     }
 
     // Dashboard stats
-    if (endpoint === '/dashboard/stats') {
+    if (endpoint === '/api/dashboard/stats') {
       return {
         success: true,
         data: {
           totalFiles: 156,
+          totalStorageUsed: 2147483648, // 2GB en bytes
           totalUsers: 23,
           totalComments: 89,
-          downloadsToday: 45,
-          documents: 156,
-          processed: 142,
-          pending: 12,
-          errors: 2
+          recentActivities: 45
+        }
+      };
+    }
+
+    // File stats
+    if (endpoint === '/files/stats') {
+      return {
+        success: true,
+        data: {
+          totalFiles: 156,
+          totalSize: 2147483648,
+          fileTypes: { pdf: 45, docx: 32, xlsx: 79 }
         }
       };
     }
@@ -401,6 +410,12 @@ export const docuFlowAPI = {
 
   // Dashboard
   dashboard: {
+    getStats: () => apiClient.get('/api/dashboard/stats'),
+    getFileStats: () => apiClient.get('/api/dashboard/files/stats'),
+    getActivity: () => apiClient.get('/api/dashboard/activity'),
+    getRecentFiles: (limit = 5) => apiClient.get(`/api/dashboard/recent-files?limit=${limit}`),
+    getRecentActivities: (limit = 10) => apiClient.get(`/api/dashboard/recent-activities?limit=${limit}`),
+    // Endpoints legacy para compatibilidad
     getUsers: () => apiClient.get('/dashboard/users'),
     getComments: () => apiClient.get('/dashboard/comments'),
     getLogs: () => apiClient.get('/dashboard/logs'),
@@ -418,8 +433,26 @@ export const docuFlowAPI = {
   logs: {
     getAll: (params = {}) => {
       const queryString = new URLSearchParams(params).toString();
-      return apiClient.get(`/logs${queryString ? `?${queryString}` : ''}`);
-    }
+      return apiClient.get(`/api/logs${queryString ? `?${queryString}` : ''}`);
+    },
+    getRecent: (limit = 10) => apiClient.get(`/api/logs/recent?limit=${limit}`),
+    getCount: () => apiClient.get('/api/logs/count'),
+    getByUser: (username) => apiClient.get(`/api/logs/user/${username}`)
+  },
+
+  // Files con endpoints mejorados
+  files: {
+    getAll: () => apiClient.get('/files'),
+    upload: (formData) => apiClient.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    download: (id) => apiClient.get(`/files/${id}/download`, { responseType: 'blob' }),
+    delete: (id) => apiClient.delete(`/files/${id}`),
+    getById: (id) => apiClient.get(`/files/${id}`),
+    // Nuevos endpoints de estadísticas
+    getStats: () => apiClient.get('/files/stats'),
+    getCount: () => apiClient.get('/files/count'),
+    getTotalSize: () => apiClient.get('/files/total-size')
   }
 };
 

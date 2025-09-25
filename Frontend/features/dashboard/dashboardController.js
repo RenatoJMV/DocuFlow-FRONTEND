@@ -75,64 +75,67 @@ class DashboardController {
     try {
       store.setLoading(true);
 
-      // Cargar datos reales de PostgreSQL
-      const [usersResult, commentsResult, logsResult, filesResult, downloadsResult] = await Promise.allSettled([
-        docuFlowAPI.dashboard.getUsers(),
-        docuFlowAPI.dashboard.getComments(),
-        docuFlowAPI.dashboard.getLogs(),
-        docuFlowAPI.dashboard.getFiles(),
-        docuFlowAPI.dashboard.getDownloadsToday()
+      // Cargar datos usando los nuevos endpoints mejorados
+      const [statsResult, fileStatsResult, activityResult] = await Promise.allSettled([
+        docuFlowAPI.dashboard.getStats(),
+        docuFlowAPI.files.getStats(),
+        docuFlowAPI.dashboard.getActivity()
       ]);
 
-      // Procesar usuarios
-      const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
-      const totalUsers = users.length;
-      const adminUsers = users.filter(u => u.role === 'admin').length;
+      // Procesar estadísticas principales
+      let combinedStats = {
+        totalFiles: 0,
+        totalUsers: 0,
+        totalComments: 0,
+        totalStorage: '0 B',
+        downloadsToday: 0,
+        uploadsToday: 0,
+        commentsToday: 0
+      };
 
-      // Procesar comentarios  
-      const comments = commentsResult.status === 'fulfilled' ? commentsResult.value : [];
-      const totalComments = comments.length;
-      const pendingTasks = comments.filter(c => c.isTask).length;
+      if (statsResult.status === 'fulfilled' && statsResult.value) {
+        const stats = statsResult.value;
+        combinedStats = {
+          ...combinedStats,
+          totalFiles: stats.totalFiles || 0,
+          totalUsers: stats.totalUsers || 0,
+          totalComments: stats.totalComments || 0,
+          totalStorage: this.formatFileSize(stats.totalStorageUsed || 0),
+          recentActivities: stats.recentActivities || 0
+        };
+      }
 
-      // Procesar logs
-      const logs = logsResult.status === 'fulfilled' ? logsResult.value : [];
-      const totalLogs = logs.length;
+      if (fileStatsResult.status === 'fulfilled' && fileStatsResult.value) {
+        const fileStats = fileStatsResult.value;
+        combinedStats.totalFiles = fileStats.totalFiles || combinedStats.totalFiles;
+        combinedStats.totalStorage = this.formatFileSize(fileStats.totalSize || 0);
+      }
 
-      // Procesar archivos
-      const files = filesResult.status === 'fulfilled' ? filesResult.value : [];
-      const totalFiles = files.length;
-      const totalSizeBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
-      const totalSize = this.formatFileSize(totalSizeBytes);
-
-      // Procesar descargas de hoy
-      const downloads = downloadsResult.status === 'fulfilled' ? downloadsResult.value : { count: 0 };
-      const downloadsToday = downloads.count || 0;
+      if (activityResult.status === 'fulfilled' && activityResult.value) {
+        const activity = activityResult.value;
+        combinedStats = {
+          ...combinedStats,
+          uploadsToday: activity.uploadsToday || 0,
+          commentsToday: activity.commentsToday || 0,
+          downloadsToday: activity.downloadsToday || 0
+        };
+      }
 
       // Actualizar el store con estadísticas reales
       store.updateDashboardStats({
-        totalFiles,
-        totalUsers,
-        pendingTasks,
-        totalStorage: totalSize,
-        downloadsToday,
-        adminUsers,
-        totalComments,
-        totalLogs
+        totalFiles: combinedStats.totalFiles,
+        totalUsers: combinedStats.totalUsers,
+        pendingTasks: 0, // Por ahora
+        totalStorage: combinedStats.totalStorage,
+        downloadsToday: combinedStats.downloadsToday,
+        adminUsers: 0, // Por ahora
+        totalComments: combinedStats.totalComments,
+        totalLogs: combinedStats.recentActivities || 0,
+        uploadsToday: combinedStats.uploadsToday,
+        commentsToday: combinedStats.commentsToday
       });
 
-      // Guardar datos para otras vistas
-      store.setState('dashboardUsers', users);
-      store.setState('dashboardFiles', files);
-      store.setState('dashboardComments', comments);
-      store.setState('dashboardLogs', logs);
-
-      console.log('✅ Datos del dashboard cargados:', {
-        usuarios: totalUsers,
-        archivos: totalFiles, 
-        comentarios: totalComments,
-        logs: totalLogs,
-        descargasHoy: downloadsToday
-      });
+      console.log('✅ Datos del dashboard cargados:', combinedStats);
 
     } catch (error) {
       console.error('❌ Error cargando datos del dashboard:', error);
