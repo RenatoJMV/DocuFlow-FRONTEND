@@ -10,7 +10,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const result = await login(username, password);
 
   if (result.success) {
-    window.location.href = "dashboard.html"; // redirigir si login OK
+    window.location.href = "../dashboard/dashboard.html"; // redirigir si login OK
   } else {
     showError("error-message", result.error);
   }
