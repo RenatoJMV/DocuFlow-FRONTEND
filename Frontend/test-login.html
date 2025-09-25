@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Login - DocuFlow</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 400px; 
+            margin: 50px auto; 
+            padding: 20px; 
+        }
+        .form-group { 
+            margin-bottom: 15px; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 5px; 
+        }
+        input { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        button { 
+            background: #007bff; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            width: 100%; 
+        }
+        .demo-buttons { 
+            margin: 20px 0; 
+            display: flex; 
+            gap: 10px; 
+        }
+        .demo-btn { 
+            background: #28a745; 
+            padding: 5px 10px; 
+            font-size: 12px; 
+            width: auto; 
+        }
+        .notification {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .notification.success { background: #d4edda; color: #155724; }
+        .notification.error { background: #f8d7da; color: #721c24; }
+        .notification.info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h2>Prueba de Login - DocuFlow</h2>
+    
+    <div id="notification" class="notification"></div>
+    
+    <form id="loginForm">
+        <div class="form-group">
+            <label for="username">Email/Usuario:</label>
+            <input type="text" id="username" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Contraseña:</label>
+            <input type="password" id="password" required>
+        </div>
+        <button type="submit" id="loginBtn">Iniciar Sesión</button>
+    </form>
+    
+    <div class="demo-buttons">
+        <button class="demo-btn" data-demo-user="admin">Admin</button>
+        <button class="demo-btn" data-demo-user="user">Usuario</button>
+        <button class="demo-btn" data-demo-user="guest">Invitado</button>
+    </div>
+    
+    <p><strong>Credenciales de prueba:</strong></p>
+    <ul>
+        <li>Admin: admin@docuflow.com / admin123</li>
+        <li>Usuario: user@docuflow.com / user123</li>
+        <li>Invitado: guest@docuflow.com / guest123</li>
+    </ul>
+
+    <script type="module">
+        import { docuFlowAPI } from './shared/services/apiClient.js';
+        
+        function showNotification(message, type, duration = 5000) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, duration);
+        }
+
+        // Llenar credenciales demo
+        document.querySelectorAll('[data-demo-user]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const userType = e.target.dataset.demoUser;
+                const credentials = {
+                    admin: { username: 'admin@docuflow.com', password: 'admin123' },
+                    user: { username: 'user@docuflow.com', password: 'user123' },
+                    guest: { username: 'guest@docuflow.com', password: 'guest123' }
+                };
+                
+                const cred = credentials[userType];
+                if (cred) {
+                    document.getElementById('username').value = cred.username;
+                    document.getElementById('password').value = cred.password;
+                    showNotification(`Credenciales de ${userType} cargadas`, 'info', 2000);
+                }
+            });
+        });
+
+        // Manejar login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const loginBtn = document.getElementById('loginBtn');
+            const originalText = loginBtn.textContent;
+            
+            try {
+                loginBtn.disabled = true;
+                loginBtn.textContent = 'Iniciando sesión...';
+                
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                
+                console.log('Intentando login con:', { username });
+                
+                const response = await docuFlowAPI.auth.login({ username, password });
+                
+                console.log('Respuesta del login:', response);
+                
+                if (response.success) {
+                    showNotification(`¡Bienvenido ${response.user.name}!`, 'success');
+                    console.log('Login exitoso:', response.user);
+                    
+                    // Aquí podrías redirigir al dashboard
+                    setTimeout(() => {
+                        alert(`Login exitoso! Usuario: ${response.user.name}, Rol: ${response.user.role}`);
+                    }, 1000);
+                } else {
+                    throw new Error(response.error || 'Error en el login');
+                }
+                
+            } catch (error) {
+                console.error('Error en login:', error);
+                showNotification(error.message || 'Error al iniciar sesión', 'error');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = originalText;
+            }
+        });
+    </script>
+</body>
+</html>

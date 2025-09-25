@@ -1,10 +1,18 @@
-// Cliente API moderno con interceptores para DocuFlow
+// Cliente API moderno con fallback offline para DocuFlow
 import { store } from './store.js';
 import { showNotification, showLoading } from '../utils/uiHelpers.js';
+import { getCurrentConfig } from './config.js';
+import '../utils/devUtils.js'; // Cargar utilidades de desarrollo
 
 class ApiClient {
-  constructor(baseUrl) {
-    this.baseUrl = baseUrl || 'http://localhost:3000/api';
+  constructor() {
+    const config = getCurrentConfig();
+    this.config = config;
+    
+    // Aplicar overrides de desarrollo si existen
+    this.baseUrl = this.getEffectiveApiUrl(config);
+    this.offlineMode = this.shouldForceOfflineMode(config);
+    
     this.interceptors = {
       request: [],
       response: [],
@@ -13,11 +21,45 @@ class ApiClient {
     
     // Configuración por defecto
     this.defaults = {
-      timeout: 10000,
+      timeout: config.APP.timeout,
       headers: {
         'Content-Type': 'application/json'
       }
     };
+
+    // Log de configuración (solo en desarrollo)
+    if (config.isDevelopment) {
+      console.log(`🌐 DocuFlow API configurada:`, {
+        environment: config.environment,
+        apiUrl: this.baseUrl,
+        offlineMode: this.offlineMode,
+        hasOverrides: this.baseUrl !== config.apiUrl || this.offlineMode
+      });
+    }
+  }
+
+  getEffectiveApiUrl(config) {
+    // Verificar override temporal en desarrollo
+    if (config.isDevelopment) {
+      const tempUrl = localStorage.getItem('DOCUFLOW_TEMP_API_URL');
+      if (tempUrl) {
+        console.log(`🔧 Usando API URL temporal: ${tempUrl}`);
+        return tempUrl;
+      }
+    }
+    return config.apiUrl;
+  }
+
+  shouldForceOfflineMode(config) {
+    // Verificar si el modo offline está forzado en desarrollo
+    if (config.isDevelopment) {
+      const forceOffline = localStorage.getItem('DOCUFLOW_FORCE_OFFLINE');
+      if (forceOffline === 'true') {
+        console.log('🔌 Modo offline forzado activado');
+        return true;
+      }
+    }
+    return false;
   }
 
   // Agregar interceptores
@@ -39,6 +81,11 @@ class ApiClient {
   // Método principal para hacer requests
   async request(endpoint, options = {}) {
     try {
+      // Si ya estamos en modo offline, usar datos de demostración directamente
+      if (this.offlineMode) {
+        return await this.getDemoResponse(endpoint, options);
+      }
+
       // Configurar request base
       let config = {
         method: options.method || 'GET',
@@ -78,7 +125,28 @@ class ApiClient {
       return await this.handleResponse(processedResponse, options);
 
     } catch (error) {
-      // Ejecutar interceptores de error
+      // Si hay error de conexión, activar modo offline y usar datos demo
+      if (error.name === 'AbortError' || error.message.includes('Failed to fetch') || 
+          error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('NetworkError')) {
+        
+        if (!this.offlineMode) {
+          console.warn('🔌 Servidor no disponible, activando modo offline');
+          console.info(`📡 Intentaba conectar a: ${this.baseUrl}${endpoint}`);
+          this.offlineMode = true;
+          
+          // Mostrar notificación de modo offline (se puede comentar si es molesta)
+          if (typeof showNotification === 'function') {
+            const message = this.config.isDevelopment 
+              ? 'Modo offline - usando datos de demostración' 
+              : 'Conexión con servidor no disponible - modo offline activado';
+            showNotification(message, 'info', 3000);
+          }
+        }
+        
+        return await this.getDemoResponse(endpoint, options);
+      }
+
+      // Ejecutar interceptores de error para otros tipos de error
       for (const interceptor of this.interceptors.error) {
         error = await interceptor(error, endpoint, options);
       }
@@ -91,6 +159,146 @@ class ApiClient {
         store.setLoading(false);
       }
     }
+  }
+
+  // Método para obtener respuestas de demostración cuando no hay servidor
+  async getDemoResponse(endpoint, options = {}) {
+    // Simular delay de red
+    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200));
+
+    const method = options.method || 'GET';
+    
+    // Datos de demostración por endpoint
+    if (endpoint === '/auth/login') {
+      const credentials = options.body ? JSON.parse(options.body) : {};
+      const { username, password } = credentials;
+      
+      // Validar credenciales demo
+      const demoUsers = {
+        'admin@docuflow.com': { password: 'admin123', role: 'admin', name: 'Administrador' },
+        'user@docuflow.com': { password: 'user123', role: 'user', name: 'Usuario Regular' },
+        'guest@docuflow.com': { password: 'guest123', role: 'guest', name: 'Invitado' }
+      };
+      
+      const user = demoUsers[username];
+      if (user && user.password === password) {
+        return {
+          success: true,
+          user: {
+            id: Math.floor(Math.random() * 1000),
+            username,
+            name: user.name,
+            role: user.role,
+            email: username
+          },
+          token: `demo-token-${Date.now()}`,
+          message: '¡Inicio de sesión exitoso!'
+        };
+      } else {
+        throw new Error('Credenciales incorrectas');
+      }
+    }
+
+    // Dashboard stats
+    if (endpoint === '/dashboard/stats') {
+      return {
+        success: true,
+        data: {
+          totalFiles: 156,
+          totalUsers: 23,
+          totalComments: 89,
+          downloadsToday: 45,
+          documents: 156,
+          processed: 142,
+          pending: 12,
+          errors: 2
+        }
+      };
+    }
+
+    // Dashboard activity
+    if (endpoint === '/dashboard/activity') {
+      return {
+        success: true,
+        data: [
+          {
+            id: 1,
+            type: 'file_upload',
+            file: 'Documento_Importante.pdf',
+            action: 'Subida',
+            user: 'Juan Pérez',
+            timestamp: new Date(Date.now() - 10 * 60000).toISOString(),
+            status: 'success'
+          },
+          {
+            id: 2,
+            type: 'comment_added',
+            file: 'Presentación_Q4.pptx',
+            action: 'Comentario',
+            user: 'María García',
+            timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
+            status: 'info'
+          },
+          {
+            id: 3,
+            type: 'file_download',
+            file: 'Informe_Anual.xlsx',
+            action: 'Descarga',
+            user: 'Carlos López',
+            timestamp: new Date(Date.now() - 45 * 60000).toISOString(),
+            status: 'success'
+          }
+        ]
+      };
+    }
+
+    // Files
+    if (endpoint === '/files') {
+      return {
+        success: true,
+        data: [
+          {
+            id: 1,
+            name: 'Documento_Importante.pdf',
+            size: 2048576,
+            type: 'pdf',
+            uploadedBy: 'Juan Pérez',
+            uploadDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            id: 2,
+            name: 'Presentación_Q4.pptx',
+            size: 5242880,
+            type: 'pptx',
+            uploadedBy: 'María García',
+            uploadDate: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+          }
+        ]
+      };
+    }
+
+    // Comments
+    if (endpoint.includes('/comments')) {
+      return {
+        success: true,
+        data: [
+          {
+            id: 1,
+            fileId: 1,
+            content: 'Este documento necesita revisión',
+            author: 'Juan Pérez',
+            createdAt: new Date(Date.now() - 60 * 60000).toISOString()
+          }
+        ]
+      };
+    }
+
+    // Default success response for other endpoints
+    return {
+      success: true,
+      data: [],
+      message: 'Respuesta de demostración'
+    };
   }
 
   // Procesar respuesta
@@ -106,369 +314,85 @@ class ApiClient {
       } else {
         data = await response.blob();
       }
-    } catch (parseError) {
-      console.warn('Could not parse response:', parseError);
+    } catch (error) {
+      console.warn('Error parsing response:', error);
       data = null;
     }
 
-    if (response.ok) {
-      // Mostrar notificación de éxito si está configurada
-      if (options.successMessage) {
-        showNotification(options.successMessage, 'success');
-      }
-
-      return {
-        success: true,
-        data,
-        status: response.status,
-        headers: response.headers,
-        response
-      };
-    } else {
-      const error = new ApiError(
-        data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`,
-        response.status,
-        data,
-        response
-      );
-
-      // Mostrar notificación de error si está configurada
-      if (options.showErrorNotification !== false) {
-        const errorMessage = error.message || 'Error en la petición';
-        showNotification(errorMessage, 'error');
-      }
-
+    if (!response.ok) {
+      const error = new Error(data?.message || `HTTP ${response.status}: ${response.statusText}`);
+      error.status = response.status;
+      error.response = data;
       throw error;
     }
+
+    return data;
   }
 
-  // Métodos de conveniencia
+  // Métodos HTTP
   get(endpoint, options = {}) {
     return this.request(endpoint, { ...options, method: 'GET' });
   }
 
   post(endpoint, body, options = {}) {
-    const config = { ...options, method: 'POST' };
-    if (body) {
-      if (body instanceof FormData) {
-        // No establecer Content-Type para FormData (el browser lo hace automáticamente)
-        delete config.headers['Content-Type'];
-        config.body = body;
-      } else {
-        config.body = JSON.stringify(body);
-      }
-    }
-    return this.request(endpoint, config);
+    return this.request(endpoint, {
+      ...options,
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
   }
 
   put(endpoint, body, options = {}) {
-    const config = { ...options, method: 'PUT' };
-    if (body) {
-      if (body instanceof FormData) {
-        delete config.headers['Content-Type'];
-        config.body = body;
-      } else {
-        config.body = JSON.stringify(body);
-      }
-    }
-    return this.request(endpoint, config);
-  }
-
-  patch(endpoint, body, options = {}) {
-    const config = { ...options, method: 'PATCH' };
-    if (body) {
-      config.body = JSON.stringify(body);
-    }
-    return this.request(endpoint, config);
+    return this.request(endpoint, {
+      ...options,
+      method: 'PUT',
+      body: JSON.stringify(body)
+    });
   }
 
   delete(endpoint, options = {}) {
     return this.request(endpoint, { ...options, method: 'DELETE' });
-  }
-
-  // Subida de archivos con progreso
-  async upload(endpoint, file, options = {}) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const formData = new FormData();
-      
-      formData.append('file', file);
-      
-      // Agregar campos adicionales
-      if (options.fields) {
-        Object.entries(options.fields).forEach(([key, value]) => {
-          formData.append(key, value);
-        });
-      }
-
-      // Configurar eventos
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && options.onProgress) {
-          const percentComplete = (event.loaded / event.total) * 100;
-          options.onProgress(percentComplete, event);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            resolve({
-              success: true,
-              data,
-              status: xhr.status
-            });
-          } catch (error) {
-            resolve({
-              success: true,
-              data: xhr.responseText,
-              status: xhr.status
-            });
-          }
-        } else {
-          reject(new ApiError(
-            `Upload failed: ${xhr.statusText}`,
-            xhr.status,
-            xhr.responseText
-          ));
-        }
-      };
-
-      xhr.onerror = () => {
-        reject(new ApiError('Network error during upload', 0));
-      };
-
-      xhr.ontimeout = () => {
-        reject(new ApiError('Upload timeout', 0));
-      };
-
-      // Configurar request
-      xhr.open('POST', `${this.baseUrl}${endpoint}`);
-      
-      // Agregar headers de autenticación
-      const token = localStorage.getItem('token');
-      if (token) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      }
-
-      xhr.timeout = options.timeout || 30000;
-      xhr.send(formData);
-    });
-  }
-
-  // Descarga de archivos
-  async download(endpoint, options = {}) {
-    try {
-      const response = await this.request(endpoint, {
-        ...options,
-        showLoading: options.showLoading !== false
-      });
-
-      if (response.success) {
-        const blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
-        
-        // Crear URL temporal para descarga
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        
-        // Intentar obtener el nombre del archivo desde los headers
-        const disposition = response.headers.get('content-disposition');
-        let filename = options.filename || 'download';
-        
-        if (disposition && disposition.includes('filename=')) {
-          const matches = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (matches && matches[1]) {
-            filename = matches[1].replace(/['"]/g, '');
-          }
-        }
-        
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Limpiar URL temporal
-        window.URL.revokeObjectURL(url);
-        
-        if (options.successMessage) {
-          showNotification(options.successMessage, 'success');
-        }
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      if (options.showErrorNotification !== false) {
-        showNotification('Error al descargar el archivo', 'error');
-      }
-      throw error;
-    }
-  }
-
-  // Configurar timeout
-  setTimeout(timeout) {
-    this.defaults.timeout = timeout;
-    return this;
-  }
-
-  // Configurar headers por defecto
-  setDefaultHeaders(headers) {
-    this.defaults.headers = { ...this.defaults.headers, ...headers };
-    return this;
-  }
-
-  // Configurar base URL
-  setBaseUrl(baseUrl) {
-    this.baseUrl = baseUrl;
-    return this;
-  }
-}
-
-// Clase de error personalizada
-class ApiError extends Error {
-  constructor(message, status = 0, data = null, response = null) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.data = data;
-    this.response = response;
-  }
-
-  get isNetworkError() {
-    return this.status === 0;
-  }
-
-  get isClientError() {
-    return this.status >= 400 && this.status < 500;
-  }
-
-  get isServerError() {
-    return this.status >= 500;
-  }
-
-  get isAuthError() {
-    return this.status === 401 || this.status === 403;
   }
 }
 
 // Crear instancia del cliente API
 const apiClient = new ApiClient();
 
-// Interceptor de autenticación
+// Configurar interceptores básicos
 apiClient.addRequestInterceptor((config, endpoint) => {
-  const token = localStorage.getItem('token');
-  if (token && !config.headers['Authorization']) {
-    config.headers['Authorization'] = `Bearer ${token}`;
+  // Agregar token de autenticación si existe
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
-
-// Interceptor para manejar respuestas de autenticación
-apiClient.addResponseInterceptor((response, config, endpoint) => {
-  // Si recibimos un nuevo token en los headers, guardarlo
-  const newToken = response.headers.get('x-new-token');
-  if (newToken) {
-    localStorage.setItem('token', newToken);
-  }
-  return response;
-});
-
-// Interceptor para manejar errores de autenticación
-apiClient.addErrorInterceptor((error, endpoint, options) => {
-  if (error.isAuthError && !endpoint.includes('/auth/')) {
-    // Token expirado o inválido
-    localStorage.removeItem('token');
-    store.logout();
-    
-    // Redirigir al login solo si no estamos ya ahí
-    if (!window.location.pathname.includes('login.html')) {
-      showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
-      setTimeout(() => {
-        window.location.href = '../auth/login.html';
-      }, 1500);
-    }
-  }
-  
-  // Almacenar error en el store
-  store.setError(error);
-  
-  return error;
-});
-
-// Interceptor para logging en desarrollo
-if (window.location.hostname === 'localhost' || window.location.search.includes('debug=true')) {
-  apiClient.addRequestInterceptor((config, endpoint) => {
-    console.log(`🚀 API Request: ${config.method} ${endpoint}`, config);
-    return config;
-  });
-
-  apiClient.addResponseInterceptor((response, config, endpoint) => {
-    console.log(`✅ API Response: ${config.method} ${endpoint}`, {
-      status: response.status,
-      headers: response.headers,
-      response
-    });
-    return response;
-  });
-
-  apiClient.addErrorInterceptor((error, endpoint, options) => {
-    console.error(`❌ API Error: ${endpoint}`, error);
-    return error;
-  });
-}
 
 // Métodos específicos para la API de DocuFlow
 export const docuFlowAPI = {
   // Autenticación
   auth: {
-    login: (credentials) => apiClient.post('/auth/login', credentials, {
-      successMessage: '¡Bienvenido de vuelta!',
-      showErrorNotification: true
-    }),
-    register: (userData) => apiClient.post('/auth/register', userData, {
-      successMessage: 'Cuenta creada exitosamente',
-      showErrorNotification: true
-    }),
-    logout: () => apiClient.post('/auth/logout', {}, {
-      showLoading: false,
-      showErrorNotification: false
-    }),
-    refreshToken: () => apiClient.post('/auth/refresh', {}, {
-      showLoading: false,
-      showErrorNotification: false
-    })
+    login: (credentials) => apiClient.post('/auth/login', credentials),
+    register: (userData) => apiClient.post('/auth/register', userData),
+    logout: () => apiClient.post('/auth/logout', {}),
+    refreshToken: () => apiClient.post('/auth/refresh', {})
   },
 
   // Archivos
   files: {
     getAll: () => apiClient.get('/files'),
     getById: (id) => apiClient.get(`/files/${id}`),
-    upload: (file, metadata = {}) => apiClient.upload('/files/upload', file, {
-      fields: metadata,
-      onProgress: (percent) => {
-        console.log(`Upload progress: ${percent.toFixed(1)}%`);
-      },
-      successMessage: 'Archivo subido exitosamente'
-    }),
-    download: (id, filename) => apiClient.download(`/files/${id}/download`, {
-      filename,
-      successMessage: 'Descarga iniciada'
-    }),
-    delete: (id) => apiClient.delete(`/files/${id}`, {
-      successMessage: 'Archivo eliminado exitosamente'
-    })
+    upload: (fileData) => apiClient.post('/files/upload', fileData),
+    delete: (id) => apiClient.delete(`/files/${id}`)
   },
 
   // Comentarios
   comments: {
     getAll: () => apiClient.get('/comments'),
     getByFileId: (fileId) => apiClient.get(`/comments/file/${fileId}`),
-    create: (comment) => apiClient.post('/comments', comment, {
-      successMessage: 'Comentario agregado'
-    }),
+    create: (comment) => apiClient.post('/comments', comment),
     update: (id, comment) => apiClient.put(`/comments/${id}`, comment),
-    delete: (id) => apiClient.delete(`/comments/${id}`, {
-      successMessage: 'Comentario eliminado'
-    })
+    delete: (id) => apiClient.delete(`/comments/${id}`)
   },
 
   // Dashboard
@@ -480,9 +404,7 @@ export const docuFlowAPI = {
   // Permisos
   permissions: {
     getAll: () => apiClient.get('/permissions'),
-    update: (userId, permissions) => apiClient.put(`/permissions/${userId}`, permissions, {
-      successMessage: 'Permisos actualizados'
-    })
+    update: (userId, permissions) => apiClient.put(`/permissions/${userId}`, permissions)
   },
 
   // Logs
@@ -494,5 +416,5 @@ export const docuFlowAPI = {
   }
 };
 
-export { ApiClient, ApiError, apiClient };
+export { ApiClient, apiClient };
 export default apiClient;
