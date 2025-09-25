@@ -1,4 +1,3 @@
-saveBtn.addEventListener("click", guardarCambios);
 import { apiGetUsers, apiGetRoles, apiGetUserPermissions, apiSetUserRole, apiSetUserPermissions } from "../../shared/services/userService.js";
 
 const userSelect = document.getElementById("user-select");
@@ -31,7 +30,6 @@ async function cargarDatos() {
 
 userSelect.addEventListener("change", e => cargarDatosUsuario(e.target.value));
 roleSelect.addEventListener("change", e => asignarRol(e.target.value));
-saveBtn.addEventListener("click", guardarCambios);
 
 async function cargarDatosUsuario(userId) {
   // Obtener usuario seleccionado
@@ -76,4 +74,9 @@ async function guardarCambios() {
     mensajeDiv.classList.remove("d-none");
   }
 }
+
+saveBtn.addEventListener("click", guardarCambios);
+
+// Inicializar
+cargarDatos();
 

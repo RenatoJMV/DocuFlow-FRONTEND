@@ -3,6 +3,7 @@ import { apiGetUsers } from '../../services/userService.js';
 import { apiGetDownloadsToday } from '../../services/dashboardService.js';
 import { apiGetCommentsByDocument } from '../../services/commentService.js';
 import { apiGetLogs } from '../../services/logService.js';
+import { BACKEND_URL } from '../../shared/services/config.js';
 
 // Obtener el total de comentarios
 async function apiGetTotalComments() {
@@ -70,7 +71,7 @@ async function setupDocumentCommentCount() {
 async function loadDashboard() {
   const token = getToken();
   if (!token) {
-    window.location.href = 'index.html';
+    window.location.href = '../auth/login.html';
     return;
   }
 
