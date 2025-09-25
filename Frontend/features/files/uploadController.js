@@ -239,8 +239,8 @@ class UploadController {
 
   async loadFiles() {
     try {
-      const response = await docuFlowAPI.files.list();
-      this.allFiles = response.files || [];
+      const response = await docuFlowAPI.files.getAll();
+      this.allFiles = response || [];
       this.filterFiles();
     } catch (error) {
       console.error('Error loading files:', error);
@@ -277,17 +277,22 @@ class UploadController {
   }
 
   renderTableView(files) {
-    const tableContainer = document.getElementById('filesTableContainer');
-    const gridContainer = document.getElementById('filesGridContainer');
+    const tableContainer = document.getElementById('tableView');
+    const gridContainer = document.getElementById('gridView'); // Nota: probablemente no existe
     
-    tableContainer.style.display = 'block';
-    gridContainer.style.display = 'none';
+    if (tableContainer) tableContainer.style.display = 'block';
+    if (gridContainer) gridContainer.style.display = 'none';
 
     const tbody = document.getElementById('filesTableBody');
+    if (!tbody) {
+      console.warn('Element filesTableBody not found');
+      return;
+    }
+    
     tbody.innerHTML = '';
 
     if (files.length === 0) {
-      const emptyState = document.getElementById('filesEmptyState');
+      const emptyState = document.getElementById('emptyState');
       emptyState.classList.remove('d-none');
       return;
     } else {
@@ -328,58 +333,10 @@ class UploadController {
   }
 
   renderGridView(files) {
-    const tableContainer = document.getElementById('filesTableContainer');
-    const gridContainer = document.getElementById('filesGridContainer');
-    
-    tableContainer.style.display = 'none';
-    gridContainer.style.display = 'block';
-
-    gridContainer.innerHTML = '';
-
-    if (files.length === 0) {
-      gridContainer.innerHTML = `
-        <div class="col-12">
-          <div class="empty-state">
-            <i class="bi bi-folder2-open display-1 text-gray-400"></i>
-            <h5 class="text-gray-600 mt-3">No hay archivos</h5>
-            <p class="text-gray-500">Los archivos aparecerán aquí cuando los subas</p>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    files.forEach(file => {
-      const col = document.createElement('div');
-      col.className = 'col-lg-3 col-md-4 col-sm-6 mb-4';
-      
-      const fileIcon = this.getFileIcon(file.mimeType || '');
-      
-      col.innerHTML = `
-        <div class="file-card">
-          <div class="file-icon ${fileIcon.class}">
-            ${fileIcon.icon}
-          </div>
-          <h6>${file.filename}</h6>
-          <p class="file-meta">
-            ${this.formatFileSize(file.size || 0)}<br>
-            <small>${new Date(file.uploadDate || Date.now()).toLocaleDateString()}</small>
-          </p>
-          <div class="file-actions">
-            <button class="action-btn download" onclick="uploadController.downloadFile('${file.id}', '${file.filename}')" title="Descargar">
-              <i class="bi bi-download"></i>
-            </button>
-            <button class="action-btn preview" onclick="uploadController.previewFile('${file.id}')" title="Vista previa">
-              <i class="bi bi-eye"></i>
-            </button>
-            <button class="action-btn delete" onclick="uploadController.deleteFile('${file.id}')" title="Eliminar">
-              <i class="bi bi-trash"></i>
-            </button>
-          </div>
-        </div>
-      `;
-      gridContainer.appendChild(col);
-    });
+    // Por ahora, la vista de grid no está implementada en el HTML
+    // Redirigir a la vista de tabla
+    console.log('Grid view no implementada, usando vista de tabla');
+    this.renderTableView(files);
   }
 
   getFileIconClass(filename) {
@@ -448,11 +405,15 @@ class UploadController {
 
   async updateStats() {
     try {
-      const stats = await docuFlowAPI.files.getStats();
+      // Calcular estadísticas basándose en los archivos cargados
+      const totalFiles = this.allFiles.length;
+      const totalSize = this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
       
-      document.getElementById('totalFiles').textContent = stats.totalFiles || this.allFiles.length;
-      document.getElementById('totalSize').textContent = this.formatFileSize(stats.totalSize || 0);
-      document.getElementById('todayUploads').textContent = stats.todayUploads || 0;
+      const totalFilesEl = document.getElementById('total-files');
+      const totalSizeEl = document.getElementById('total-size');
+      
+      if (totalFilesEl) totalFilesEl.textContent = totalFiles;
+      if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);
       
     } catch (error) {
       console.error('Error updating stats:', error);
