@@ -13,7 +13,11 @@ class UploadController {
     
     this.initializeComponents();
     this.setupEventListeners();
-    this.loadFiles();
+    this.init(); // Cambiar a método async
+  }
+
+  async init() {
+    await this.loadFiles();
     this.updateStats();
   }
 
@@ -71,7 +75,10 @@ class UploadController {
     
     this.renderSelectedFiles();
     this.showUploadForm(); // Mostrar el formulario cuando hay archivos
-    this.updateUploadButton();
+    // Esperamos un poco para que el DOM se actualice, luego actualizamos el botón
+    setTimeout(() => {
+      this.updateUploadButton();
+    }, 10);
   }
 
   showUploadForm() {
@@ -134,7 +141,10 @@ class UploadController {
 
   updateUploadButton() {
     const uploadBtn = document.getElementById('uploadBtn');
-    if (!uploadBtn) return; // Safety check
+    if (!uploadBtn) {
+      console.log('Upload button not found - form may be hidden');
+      return; // Safety check
+    }
     
     const count = this.selectedFiles.length;
     
