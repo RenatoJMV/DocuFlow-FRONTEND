@@ -33,17 +33,6 @@
             cursor: pointer; 
             width: 100%; 
         }
-        .demo-buttons { 
-            margin: 20px 0; 
-            display: flex; 
-            gap: 10px; 
-        }
-        .demo-btn { 
-            background: #28a745; 
-            padding: 5px 10px; 
-            font-size: 12px; 
-            width: auto; 
-        }
         .notification {
             margin: 10px 0;
             padding: 10px;
@@ -72,18 +61,12 @@
         <button type="submit" id="loginBtn">Iniciar Sesión</button>
     </form>
     
-    <div class="demo-buttons">
-        <button class="demo-btn" data-demo-user="admin">Admin</button>
-        <button class="demo-btn" data-demo-user="user">Usuario</button>
-        <button class="demo-btn" data-demo-user="guest">Invitado</button>
-    </div>
-    
-    <p><strong>Credenciales de prueba:</strong></p>
+    <p><strong>Credenciales para desarrollo local:</strong></p>
     <ul>
-        <li>Admin: admin@docuflow.com / admin123</li>
-        <li>Usuario: user@docuflow.com / user123</li>
-        <li>Invitado: guest@docuflow.com / guest123</li>
+        <li>Usuario: estudiante</li>
+        <li>Contraseña: 123456</li>
     </ul>
+    <p><em>Para producción, usa las credenciales reales de tu base de datos PostgreSQL.</em></p>
 
     <script type="module">
         import { docuFlowAPI } from './shared/services/apiClient.js';
@@ -98,25 +81,6 @@
                 notification.style.display = 'none';
             }, duration);
         }
-
-        // Llenar credenciales demo
-        document.querySelectorAll('[data-demo-user]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const userType = e.target.dataset.demoUser;
-                const credentials = {
-                    admin: { username: 'admin@docuflow.com', password: 'admin123' },
-                    user: { username: 'user@docuflow.com', password: 'user123' },
-                    guest: { username: 'guest@docuflow.com', password: 'guest123' }
-                };
-                
-                const cred = credentials[userType];
-                if (cred) {
-                    document.getElementById('username').value = cred.username;
-                    document.getElementById('password').value = cred.password;
-                    showNotification(`Credenciales de ${userType} cargadas`, 'info', 2000);
-                }
-            });
-        });
 
         // Manejar login
         document.getElementById('loginForm').addEventListener('submit', async (e) => {

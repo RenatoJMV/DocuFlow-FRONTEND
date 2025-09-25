@@ -61,31 +61,6 @@ class LoginController {
 
       await this.handleLogin();
     });
-
-    // Handle demo login buttons
-    const demoButtons = document.querySelectorAll('[data-demo-user]');
-    demoButtons.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const userType = e.target.dataset.demoUser;
-        this.fillDemoCredentials(userType);
-      });
-    });
-  }
-
-  fillDemoCredentials(userType) {
-    const credentials = {
-      admin: { username: 'admin@docuflow.com', password: 'admin123' },
-      user: { username: 'user@docuflow.com', password: 'user123' },
-      guest: { username: 'guest@docuflow.com', password: 'guest123' }
-    };
-
-    const cred = credentials[userType];
-    if (cred) {
-      document.getElementById('username').value = cred.username;
-      document.getElementById('password').value = cred.password;
-      
-      showNotification(`Credenciales de ${userType} cargadas`, 'info');
-    }
   }
 
   async handleLogin() {
@@ -100,20 +75,31 @@ class LoginController {
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
 
+      console.log('🔐 Intentando login con:', { username, password: '***' });
+      console.log('📡 URL del endpoint:', window.location.hostname === 'localhost' ? 'http://localhost:8080/login' : 'https://docuflow-backend.onrender.com/login');
+
       // Call API for login
       const response = await docuFlowAPI.auth.login({ username, password });
 
-      if (response.success) {
+      console.log('✅ Respuesta del servidor:', response);
+
+      if (response.token) {
+        // Crear objeto de usuario básico
+        const userData = {
+          username: username,
+          role: 'colaborador' // Rol por defecto
+        };
+
         // Store user data
         store.setState('user', {
-          user: response.user,
+          user: userData,
           isAuthenticated: true,
           token: response.token
         });
 
         // Store token for API client
         localStorage.setItem('authToken', response.token);
-        localStorage.setItem('userData', JSON.stringify(response.user));
+        localStorage.setItem('userData', JSON.stringify(userData));
 
         showNotification('¡Inicio de sesión exitoso!', 'success');
 

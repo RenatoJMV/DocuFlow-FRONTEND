@@ -8,8 +8,8 @@ class ApiClient {
     const isLocalhost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
     
     this.baseUrl = isLocalhost 
-      ? 'http://localhost:3000/api'
-      : 'https://docuflow-backend.onrender.com/api';
+      ? 'http://localhost:8080'  // Puerto por defecto de Spring Boot
+      : 'https://docuflow-backend.onrender.com';
       
     this.offlineMode = false;
     
@@ -81,9 +81,19 @@ class ApiClient {
 
       config.signal = controller.signal;
 
+      // Log detallado para debugging
+      console.log('📤 Request details:', {
+        method: config.method,
+        url: `${this.baseUrl}${endpoint}`,
+        headers: config.headers,
+        body: config.body
+      });
+
       // Hacer el request
       const response = await fetch(`${this.baseUrl}${endpoint}`, config);
       clearTimeout(timeoutId);
+
+      console.log('📥 Response status:', response.status, response.statusText);
 
       // Ejecutar interceptores de response
       let processedResponse = response;
@@ -291,7 +301,30 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const error = new Error(data?.message || `HTTP ${response.status}: ${response.statusText}`);
+      // Log detallado del error para debugging
+      console.error('❌ HTTP Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        data: data
+      });
+
+      let errorMessage = `HTTP ${response.status}: `;
+      
+      // Mensajes específicos para códigos comunes
+      if (response.status === 403) {
+        errorMessage += data?.message || 'Acceso denegado. Verifica tus credenciales o permisos.';
+      } else if (response.status === 401) {
+        errorMessage += data?.message || 'No autorizado. Inicia sesión nuevamente.';
+      } else if (response.status === 404) {
+        errorMessage += data?.message || 'Endpoint no encontrado.';
+      } else if (response.status >= 500) {
+        errorMessage += data?.message || 'Error interno del servidor.';
+      } else {
+        errorMessage += data?.message || response.statusText;
+      }
+
+      const error = new Error(errorMessage);
       error.status = response.status;
       error.response = data;
       throw error;
@@ -343,7 +376,7 @@ apiClient.addRequestInterceptor((config, endpoint) => {
 export const docuFlowAPI = {
   // Autenticación
   auth: {
-    login: (credentials) => apiClient.post('/auth/login', credentials),
+    login: (credentials) => apiClient.post('/login', credentials),
     register: (userData) => apiClient.post('/auth/register', userData),
     logout: () => apiClient.post('/auth/logout', {}),
     refreshToken: () => apiClient.post('/auth/refresh', {})
@@ -351,30 +384,35 @@ export const docuFlowAPI = {
 
   // Archivos
   files: {
-    getAll: () => apiClient.get('/files'),
+    getAll: () => apiClient.get('/dashboard/files'),
     getById: (id) => apiClient.get(`/files/${id}`),
-    upload: (fileData) => apiClient.post('/files/upload', fileData),
+    upload: (fileData) => apiClient.post('/upload', fileData),
     delete: (id) => apiClient.delete(`/files/${id}`)
   },
 
   // Comentarios
   comments: {
-    getAll: () => apiClient.get('/comments'),
-    getByFileId: (fileId) => apiClient.get(`/comments/file/${fileId}`),
-    create: (comment) => apiClient.post('/comments', comment),
-    update: (id, comment) => apiClient.put(`/comments/${id}`, comment),
-    delete: (id) => apiClient.delete(`/comments/${id}`)
+    getAll: () => apiClient.get('/api/comments'),
+    getByFileId: (fileId) => apiClient.get(`/api/comments/document/${fileId}`),
+    create: (comment) => apiClient.post('/api/comments', comment),
+    update: (id, comment) => apiClient.put(`/api/comments/${id}`, comment),
+    delete: (id) => apiClient.delete(`/api/comments/${id}`)
   },
 
   // Dashboard
   dashboard: {
     getStats: () => apiClient.get('/dashboard/stats'),
-    getRecentActivity: () => apiClient.get('/dashboard/activity')
+    getRecentActivity: () => apiClient.get('/dashboard/activity'),
+    getUsers: () => apiClient.get('/dashboard/users'),
+    getComments: () => apiClient.get('/dashboard/comments'),
+    getLogs: () => apiClient.get('/dashboard/logs'),
+    getFiles: () => apiClient.get('/dashboard/files'),
+    getDownloadsToday: () => apiClient.get('/dashboard/downloads/today')
   },
 
   // Permisos
   permissions: {
-    getAll: () => apiClient.get('/permissions'),
+    getAll: () => apiClient.get('/users'),
     update: (userId, permissions) => apiClient.put(`/permissions/${userId}`, permissions)
   },
 
