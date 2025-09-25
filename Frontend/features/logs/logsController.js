@@ -1,4 +1,4 @@
-import { apiGetLogs } from '../../services/logService.js';
+import { apiGetLogs } from '../../shared/services/logService.js';
 
 let allLogs = [];
 let filteredLogs = [];
