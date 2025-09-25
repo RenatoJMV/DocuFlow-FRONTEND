@@ -1,5 +1,5 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
-import { appStore } from '../../shared/services/store.js';
+import { store } from '../../shared/services/store.js';
 import { createNavbar, showNotification, FormValidator } from '../../shared/utils/uiHelpers.js';
 
 class LoginController {
@@ -105,7 +105,7 @@ class LoginController {
 
       if (response.success) {
         // Store user data
-        appStore.setState({
+        store.setState('user', {
           user: response.user,
           isAuthenticated: true,
           token: response.token

@@ -1,6 +1,6 @@
 // Dashboard Controller moderno con store y API client
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
-import { appStore } from '../../shared/services/store.js';
+import { store } from '../../shared/services/store.js';
 import { initializeNavbar, showNotification, formatDate, formatRelativeTime } from '../../shared/utils/uiHelpers.js';
 
 class DashboardController {
@@ -35,7 +35,7 @@ class DashboardController {
 
   setupStoreSubscriptions() {
     // Suscribirse a cambios en las estadísticas del dashboard
-    const dashboardUnsubscriber = appStore.subscribe('dashboard', (dashboard) => {
+    const dashboardUnsubscriber = store.subscribe('dashboard', (dashboard) => {
       if (dashboard && dashboard.stats) {
         this.updateWidgets(dashboard.stats);
       }
@@ -45,16 +45,16 @@ class DashboardController {
     });
 
     // Suscribirse a cambios en archivos
-    const filesUnsubscriber = appStore.subscribe('files', (files) => {
+    const filesUnsubscriber = store.subscribe('files', (files) => {
       if (files && Array.isArray(files)) {
-        appStore.updateDashboardStats({ totalFiles: files.length });
+        store.updateDashboardStats({ totalFiles: files.length });
       }
     });
 
     // Suscribirse a cambios en comentarios
-    const commentsUnsubscriber = appStore.subscribe('comments', (comments) => {
+    const commentsUnsubscriber = store.subscribe('comments', (comments) => {
       if (comments && Array.isArray(comments)) {
-        appStore.updateDashboardStats({ totalComments: comments.length });
+        store.updateDashboardStats({ totalComments: comments.length });
       }
     });
 
@@ -63,7 +63,7 @@ class DashboardController {
 
   async loadDashboardData() {
     try {
-      appStore.setLoading(true);
+      store.setLoading(true);
 
       // Cargar estadísticas del dashboard
       const [statsResult, activityResult] = await Promise.allSettled([
@@ -72,15 +72,15 @@ class DashboardController {
       ]);
 
       if (statsResult.status === 'fulfilled' && statsResult.value && statsResult.value.success) {
-        appStore.updateDashboardStats(statsResult.value.data);
+        store.updateDashboardStats(statsResult.value.data);
       } else {
         // Datos de demostración si no hay backend
         this.loadDemoData();
       }
 
       if (activityResult.status === 'fulfilled' && activityResult.value && activityResult.value.success) {
-        const dashboard = appStore.getState('dashboard') || {};
-        appStore.setState('dashboard', {
+        const dashboard = store.getState('dashboard') || {};
+        store.setState('dashboard', {
           ...dashboard,
           recentActivity: activityResult.value.data
         });
@@ -92,7 +92,7 @@ class DashboardController {
       console.error('Error loading dashboard data:', error);
       this.loadDemoData();
     } finally {
-      appStore.setLoading(false);
+      store.setLoading(false);
     }
   }
 
@@ -108,7 +108,7 @@ class DashboardController {
       errors: 2
     };
     
-    appStore.updateDashboardStats(demoStats);
+    store.updateDashboardStats(demoStats);
     
     // Simular trends
     this.updateTrends({
@@ -150,8 +150,8 @@ class DashboardController {
       }
     ];
 
-    const dashboard = appStore.getState('dashboard') || {};
-    appStore.setState('dashboard', {
+    const dashboard = store.getState('dashboard') || {};
+    store.setState('dashboard', {
       ...dashboard,
       recentActivity: demoActivity
     });
@@ -282,7 +282,7 @@ class DashboardController {
 
   exportActivity() {
     try {
-      const dashboard = appStore.getState('dashboard');
+      const dashboard = store.getState('dashboard');
       const activities = dashboard ? dashboard.recentActivity : [];
       
       if (!activities || activities.length === 0) {

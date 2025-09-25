@@ -1,5 +1,5 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
-import { appStore } from '../../shared/services/store.js';
+import { store } from '../../shared/services/store.js';
 import { createNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
 
 class CommentsController {
