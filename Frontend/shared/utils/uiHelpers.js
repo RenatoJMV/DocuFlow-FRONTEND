@@ -95,7 +95,7 @@ export function createNavbar(currentPage = '') {
         <div class="collapse navbar-collapse" id="navbarNav">
           <div class="navbar-nav ms-auto gap-2">
             ${createNavItem('dashboard', 'Dashboard', 'speedometer2', currentPage)}
-            ${createNavItem('files', 'Archivos', 'cloud-arrow-up', currentPage)}
+            ${createNavItem('upload', 'Archivos', 'cloud-arrow-up', currentPage)}
             ${createNavItem('comments', 'Comentarios', 'chat-dots', currentPage)}
             ${createNavItem('permissions', 'Permisos', 'people', currentPage)}
             ${createNavItem('logs', 'Logs', 'clipboard-data', currentPage)}
@@ -121,7 +121,16 @@ export function createNavbar(currentPage = '') {
 
 function createNavItem(page, title, icon, currentPage) {
   const isActive = currentPage === page ? 'active' : '';
-  const href = page === 'dashboard' ? '../dashboard/dashboard.html' : `../${page}/${page}.html`;
+  
+  let href;
+  if (page === 'dashboard') {
+    href = '../dashboard/dashboard.html';
+  } else if (page === 'upload') {
+    href = '../files/upload.html'; // Caso especial: upload.html está en la carpeta files
+  } else {
+    href = `../${page}/${page}.html`;
+  }
+  
   return `
     <a class="nav-link ${isActive}" href="${href}">
       <i class="bi bi-${icon}"></i>

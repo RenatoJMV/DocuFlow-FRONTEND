@@ -145,19 +145,56 @@ class LogsController {
       // Show loading state
       this.showLoadingState();
       
-      // In a real app, this would be an API call
-      const response = await this.getDemoLogs();
-      this.allLogs = response;
-      this.applyFilters();
+      // Cargar logs reales de la base de datos
+      console.log('📋 Cargando logs desde la base de datos...');
+      const response = await docuFlowAPI.dashboard.getLogs();
       
+      if (Array.isArray(response)) {
+        // Convertir los logs del backend al formato esperado por el frontend
+        this.allLogs = response.map(log => ({
+          id: log.id,
+          timestamp: log.timestamp,
+          level: this.mapActionToLevel(log.action),
+          action: log.action,
+          user: log.username,
+          details: `${log.action} - Document ID: ${log.documentId || 'N/A'}`,
+          ip: 'N/A', // No disponible en el backend actual
+          userAgent: 'N/A' // No disponible en el backend actual
+        }));
+      } else {
+        this.allLogs = [];
+      }
+      
+      this.applyFilters();
       this.updateStats();
       
+      console.log(`✅ ${this.allLogs.length} logs cargados desde la base de datos`);
+      
     } catch (error) {
-      console.error('Error loading logs:', error);
+      console.error('❌ Error cargando logs:', error);
       showNotification('Error al cargar los registros', 'error');
-      this.allLogs = [];
+      
+      // Fallback a datos demo si hay error
+      console.log('🔄 Fallback a datos demo...');
+      this.allLogs = this.getDemoLogs();
       this.applyFilters();
+      this.updateStats();
     }
+  }
+
+  mapActionToLevel(action) {
+    // Mapear acciones del backend a niveles para el frontend
+    const actionLevelMap = {
+      'upload': 'info',
+      'download': 'info', 
+      'delete': 'warning',
+      'comment': 'info',
+      'login': 'success',
+      'logout': 'info',
+      'error': 'error'
+    };
+    
+    return actionLevelMap[action] || 'info';
   }
 
   getDemoLogs() {

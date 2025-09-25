@@ -19,7 +19,7 @@ class UploadController {
 
   initializeComponents() {
     // Create navbar
-    initializeNavbar('files');
+    initializeNavbar('upload');
     
     // Initialize drag & drop
     this.setupDragAndDrop();
@@ -199,6 +199,12 @@ class UploadController {
       for (const file of this.selectedFiles) {
         const formData = new FormData();
         formData.append('file', file);
+
+        console.log('📤 Subiendo archivo:', {
+          nombre: file.name,
+          tamaño: file.size,
+          tipo: file.type
+        });
 
         await docuFlowAPI.files.upload(formData);
         uploaded++;
