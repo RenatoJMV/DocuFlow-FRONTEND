@@ -7,7 +7,16 @@ class UploadController {
     this.selectedFiles = [];
     this.currentView = 'table'; // table or grid
     this.currentPage = 1;
-    this.itemsPerPage = 10;
+      const files = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.files)
+          ? response.files
+          : Array.isArray(response?.data)
+            ? response.data
+            : [];
+
+      this.allFiles = files;
+      console.log('📁 Total archivos detectados:', this.allFiles.length);
     this.allFiles = [];
     this.filteredFiles = [];
     
@@ -456,21 +465,22 @@ class UploadController {
       const statsResponse = await docuFlowAPI.files.getStats();
       console.log('📊 Estadísticas del servidor:', statsResponse);
       
-      if (statsResponse && statsResponse.totalFiles !== undefined) {
-        const totalFilesEl = document.getElementById('total-files');
-        const totalSizeEl = document.getElementById('total-size');
+      const totalFilesEl = document.getElementById('total-files');
+      const totalSizeEl = document.getElementById('total-size');
+
+      if (statsResponse && (statsResponse.totalFiles !== undefined || statsResponse.totalSizeBytes !== undefined)) {
+        const totalFiles = statsResponse.totalFiles ?? statsResponse.count ?? this.allFiles.length;
+        const totalSizeBytes = statsResponse.totalSizeBytes ?? statsResponse.totalSize ?? 0;
+        const formattedTotalSize = statsResponse.formattedTotalSize || this.formatFileSize(totalSizeBytes);
+
+        if (totalFilesEl) totalFilesEl.textContent = totalFiles;
+        if (totalSizeEl) totalSizeEl.textContent = formattedTotalSize;
         
-        if (totalFilesEl) totalFilesEl.textContent = statsResponse.totalFiles;
-        if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(statsResponse.totalSize);
-        
-        console.log(`📊 Estadísticas actualizadas: ${statsResponse.totalFiles} archivos, ${this.formatFileSize(statsResponse.totalSize)}`);
+        console.log(`📊 Estadísticas actualizadas: ${totalFiles} archivos, ${formattedTotalSize}`);
       } else {
         // Fallback: calcular desde los archivos cargados
         const totalFiles = this.allFiles.length;
         const totalSize = this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
-        
-        const totalFilesEl = document.getElementById('total-files');
-        const totalSizeEl = document.getElementById('total-size');
         
         if (totalFilesEl) totalFilesEl.textContent = totalFiles;
         if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);

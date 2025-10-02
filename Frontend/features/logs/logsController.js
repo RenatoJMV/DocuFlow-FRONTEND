@@ -148,10 +148,17 @@ class LogsController {
       // Cargar logs reales de la base de datos
       console.log('📋 Cargando logs desde la base de datos...');
       const response = await docuFlowAPI.dashboard.getLogs();
-      
-      if (Array.isArray(response)) {
+      const logs = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.logs)
+          ? response.logs
+          : Array.isArray(response?.data)
+            ? response.data
+            : [];
+
+      if (Array.isArray(logs) && logs.length > 0) {
         // Convertir los logs del backend al formato esperado por el frontend
-        this.allLogs = response.map(log => ({
+        this.allLogs = logs.map(log => ({
           id: log.id,
           timestamp: log.timestamp,
           level: this.mapActionToLevel(log.action),

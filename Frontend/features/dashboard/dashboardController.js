@@ -94,30 +94,35 @@ class DashboardController {
       };
 
       if (statsResult.status === 'fulfilled' && statsResult.value) {
-        const stats = statsResult.value;
+        const rawStats = statsResult.value;
+        const stats = rawStats?.data || rawStats;
         combinedStats = {
           ...combinedStats,
-          totalFiles: stats.totalFiles || 0,
-          totalUsers: stats.totalUsers || 0,
-          totalComments: stats.totalComments || 0,
-          totalStorage: this.formatFileSize(stats.totalStorageUsed || 0),
-          recentActivities: stats.recentActivities || 0
+          totalFiles: stats?.totalFiles ?? combinedStats.totalFiles,
+          totalUsers: stats?.totalUsers ?? 0,
+          totalComments: stats?.totalComments ?? 0,
+          totalStorage: this.formatFileSize(stats?.totalStorageUsed ?? 0),
+          recentActivities: stats?.recentActivities ?? 0
         };
       }
 
       if (fileStatsResult.status === 'fulfilled' && fileStatsResult.value) {
-        const fileStats = fileStatsResult.value;
-        combinedStats.totalFiles = fileStats.totalFiles || combinedStats.totalFiles;
-        combinedStats.totalStorage = this.formatFileSize(fileStats.totalSize || 0);
+        const rawFileStats = fileStatsResult.value;
+        const fileStats = rawFileStats?.data || rawFileStats;
+        combinedStats.totalFiles = fileStats?.totalFiles ?? combinedStats.totalFiles;
+        const totalSizeBytes = fileStats?.totalSizeBytes ?? fileStats?.totalSize ?? 0;
+        const formattedTotalSize = fileStats?.formattedTotalSize || this.formatFileSize(totalSizeBytes);
+        combinedStats.totalStorage = formattedTotalSize;
       }
 
       if (activityResult.status === 'fulfilled' && activityResult.value) {
-        const activity = activityResult.value;
+        const rawActivity = activityResult.value;
+        const activity = rawActivity?.data || rawActivity;
         combinedStats = {
           ...combinedStats,
-          uploadsToday: activity.uploadsToday || 0,
-          commentsToday: activity.commentsToday || 0,
-          downloadsToday: activity.downloadsToday || 0
+          uploadsToday: activity?.uploadsToday || 0,
+          commentsToday: activity?.commentsToday || 0,
+          downloadsToday: activity?.downloadsToday || 0
         };
       }
 

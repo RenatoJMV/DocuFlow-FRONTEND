@@ -1,7 +1,9 @@
 import { BACKEND_URL } from './config.js';
+
+const getAuthToken = () => localStorage.getItem("authToken") || localStorage.getItem("token");
 // Eliminar archivo
 export async function apiDeleteFile(fileId) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   try {
     const response = await fetch(`${BACKEND_URL}/files/${fileId}`, {
@@ -16,7 +18,7 @@ export async function apiDeleteFile(fileId) {
 }
 // 🔹 Archivos (Files)
 export async function apiGetFiles() {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false, files: [] };
   try {
     const response = await fetch(`${BACKEND_URL}/files`, {
@@ -35,14 +37,13 @@ export async function apiGetFiles() {
 }
 
 export async function apiUploadFile(file, metadata = {}) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   const formData = new FormData();
   formData.append("file", file);
   Object.entries(metadata).forEach(([key, value]) => formData.append(key, value));
   try {
-    // Cambia la URL aquí según tu backend real
-  const response = await fetch(`${BACKEND_URL}/upload`, {
+    const response = await fetch(`${BACKEND_URL}/files`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${token}` },
       body: formData
@@ -55,7 +56,7 @@ export async function apiUploadFile(file, metadata = {}) {
 }
 
 export async function apiDownloadFile(fileId, newName) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   try {
     const response = await fetch(`${BACKEND_URL}/files/${fileId}/download`, {
@@ -73,6 +74,51 @@ export async function apiDownloadFile(fileId, newName) {
     a.remove();
     window.URL.revokeObjectURL(url);
     return { success: true };
+  } catch {
+    return { success: false };
+  }
+}
+
+export async function apiGetFileStats() {
+  const token = getAuthToken();
+  if (!token) return { success: false };
+  try {
+    const response = await fetch(`${BACKEND_URL}/files/stats`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json().catch(() => null);
+    return response.ok ? { success: true, ...data } : { success: false, error: data?.error };
+  } catch {
+    return { success: false };
+  }
+}
+
+export async function apiGetFileCount() {
+  const token = getAuthToken();
+  if (!token) return { success: false };
+  try {
+    const response = await fetch(`${BACKEND_URL}/files/count`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json().catch(() => null);
+    return response.ok ? { success: true, ...data } : { success: false, error: data?.error };
+  } catch {
+    return { success: false };
+  }
+}
+
+export async function apiGetFileTotalSize() {
+  const token = getAuthToken();
+  if (!token) return { success: false };
+  try {
+    const response = await fetch(`${BACKEND_URL}/files/total-size`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json().catch(() => null);
+    return response.ok ? { success: true, ...data } : { success: false, error: data?.error };
   } catch {
     return { success: false };
   }

@@ -1,11 +1,13 @@
 import { BACKEND_URL } from './config.js';
 
+const getAuthToken = () => localStorage.getItem("authToken") || localStorage.getItem("token");
+
 // 🔹 Logs
 export async function apiGetLogs() {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false, logs: [] };
   try {
-    const response = await fetch(`${BACKEND_URL}/dashboard/logs`, {
+    const response = await fetch(`${BACKEND_URL}/api/dashboard/logs`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });

@@ -1,10 +1,12 @@
 import { BACKEND_URL } from './config.js';
 
+const getAuthToken = () => localStorage.getItem("authToken") || localStorage.getItem("token");
+
 // 🔹 Usuarios
 
 // Obtener roles disponibles
 export async function apiGetRoles() {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false, roles: [] };
   try {
     const response = await fetch(`${BACKEND_URL}/users/roles`, {
@@ -24,7 +26,7 @@ export async function apiGetRoles() {
 
 // Cambiar el rol de un usuario
 export async function apiSetUserRole(userId, role) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   try {
     const response = await fetch(`${BACKEND_URL}/users/${userId}/role`, {
@@ -48,7 +50,7 @@ export async function apiSetUserRole(userId, role) {
 
 // Obtener permisos de un usuario
 export async function apiGetUserPermissions(userId) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false, permissions: [] };
   try {
     const response = await fetch(`${BACKEND_URL}/users/${userId}/permissions`, {
@@ -68,7 +70,7 @@ export async function apiGetUserPermissions(userId) {
 
 // Actualizar permisos de un usuario
 export async function apiSetUserPermissions(userId, permissions) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   try {
     const response = await fetch(`${BACKEND_URL}/users/${userId}/permissions`, {
@@ -90,10 +92,10 @@ export async function apiSetUserPermissions(userId, permissions) {
   }
 }
 export async function apiGetUsers() {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false, users: [] };
   try {
-    const response = await fetch(`${BACKEND_URL}/dashboard/users`, {
+    const response = await fetch(`${BACKEND_URL}/users`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -118,6 +120,7 @@ export async function login(username, password) {
     const data = await response.json().catch(() => null);
     if (response.ok && data?.token) {
       localStorage.setItem("token", data.token);
+      localStorage.setItem("authToken", data.token);
       return { success: true, token: data.token };
     } else {
       return { success: false, error: data?.error || "Credenciales inválidas" };

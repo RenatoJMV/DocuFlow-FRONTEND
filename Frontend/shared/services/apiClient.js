@@ -22,9 +22,7 @@ class ApiClient {
     // Configuración por defecto
     this.defaults = {
       timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      headers: {}
     };
 
     // Log de configuración
@@ -68,6 +66,12 @@ class ApiClient {
       // Ejecutar interceptores de request
       for (const interceptor of this.interceptors.request) {
         config = await interceptor(config, endpoint);
+      }
+
+      // Ajustar cabeceras según el tipo de cuerpo
+      const isFormData = typeof FormData !== 'undefined' && config.body instanceof FormData;
+      if (isFormData && config.headers) {
+        delete config.headers['Content-Type'];
       }
 
       // Mostrar loading si está habilitado
@@ -207,7 +211,7 @@ class ApiClient {
     }
 
     // Dashboard activity
-    if (endpoint === '/dashboard/activity') {
+    if (endpoint === '/dashboard/activity' || endpoint === '/api/dashboard/activity') {
       return {
         success: true,
         data: [
@@ -348,18 +352,38 @@ class ApiClient {
   }
 
   post(endpoint, body, options = {}) {
+    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+    const headers = {
+      ...(options.headers || {})
+    };
+
+    if (!isFormData && headers['Content-Type'] === undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     return this.request(endpoint, {
       ...options,
       method: 'POST',
-      body: JSON.stringify(body)
+      headers,
+      body: isFormData ? body : JSON.stringify(body)
     });
   }
 
   put(endpoint, body, options = {}) {
+    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+    const headers = {
+      ...(options.headers || {})
+    };
+
+    if (!isFormData && headers['Content-Type'] === undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     return this.request(endpoint, {
       ...options,
       method: 'PUT',
-      body: JSON.stringify(body)
+      headers,
+      body: isFormData ? body : JSON.stringify(body)
     });
   }
 
@@ -374,7 +398,7 @@ const apiClient = new ApiClient();
 // Configurar interceptores básicos
 apiClient.addRequestInterceptor((config, endpoint) => {
   // Agregar token de autenticación si existe
-  const token = localStorage.getItem('authToken');
+  const token = localStorage.getItem('authToken') || localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -389,14 +413,6 @@ export const docuFlowAPI = {
     register: (userData) => apiClient.post('/auth/register', userData),
     logout: () => apiClient.post('/auth/logout', {}),
     refreshToken: () => apiClient.post('/auth/refresh', {})
-  },
-
-  // Archivos
-  files: {
-    getAll: () => apiClient.get('/dashboard/files'),
-    getById: (id) => apiClient.get(`/files/${id}`),
-    upload: (fileData) => apiClient.post('/upload', fileData),
-    delete: (id) => apiClient.delete(`/files/${id}`)
   },
 
   // Comentarios
@@ -416,17 +432,17 @@ export const docuFlowAPI = {
     getRecentFiles: (limit = 5) => apiClient.get(`/api/dashboard/recent-files?limit=${limit}`),
     getRecentActivities: (limit = 10) => apiClient.get(`/api/dashboard/recent-activities?limit=${limit}`),
     // Endpoints legacy para compatibilidad
-    getUsers: () => apiClient.get('/dashboard/users'),
-    getComments: () => apiClient.get('/dashboard/comments'),
-    getLogs: () => apiClient.get('/dashboard/logs'),
-    getFiles: () => apiClient.get('/dashboard/files'),
-    getDownloadsToday: () => apiClient.get('/dashboard/downloads/today')
+    getUsers: () => apiClient.get('/api/dashboard/users'),
+    getComments: () => apiClient.get('/api/dashboard/comments'),
+    getLogs: () => apiClient.get('/api/dashboard/logs'),
+    getFiles: () => apiClient.get('/api/dashboard/files'),
+    getDownloadsToday: () => apiClient.get('/api/dashboard/downloads/today')
   },
 
   // Permisos
   permissions: {
     getAll: () => apiClient.get('/users'),
-    update: (userId, permissions) => apiClient.put(`/permissions/${userId}`, permissions)
+    update: (userId, permissions) => apiClient.put(`/users/${userId}/permissions`, { permissions })
   },
 
   // Logs
@@ -440,19 +456,49 @@ export const docuFlowAPI = {
     getByUser: (username) => apiClient.get(`/api/logs/user/${username}`)
   },
 
-  // Files con endpoints mejorados
+  // Archivos
   files: {
-    getAll: () => apiClient.get('/files'),
-    upload: (formData) => apiClient.post('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }),
-    download: (id) => apiClient.get(`/files/${id}/download`, { responseType: 'blob' }),
-    delete: (id) => apiClient.delete(`/files/${id}`),
+    getAll: async () => {
+      const data = await apiClient.get('/files');
+      if (Array.isArray(data)) {
+        return { success: true, files: data };
+      }
+      if (Array.isArray(data?.files)) {
+        return { success: data.success ?? true, files: data.files };
+      }
+      if (Array.isArray(data?.data)) {
+        return { success: data.success ?? true, files: data.data };
+      }
+      return data;
+    },
     getById: (id) => apiClient.get(`/files/${id}`),
-    // Nuevos endpoints de estadísticas
-    getStats: () => apiClient.get('/files/stats'),
-    getCount: () => apiClient.get('/files/count'),
-    getTotalSize: () => apiClient.get('/files/total-size')
+    upload: (formData) => apiClient.request('/files', {
+      method: 'POST',
+      body: formData
+    }),
+    delete: (id) => apiClient.delete(`/files/${id}`),
+    download: (id) => apiClient.get(`/files/${id}/download`, { responseType: 'blob' }),
+    getStats: async () => {
+      const data = await apiClient.get('/files/stats');
+      if (data?.data) {
+        return { success: data.success ?? true, ...data.data };
+      }
+      return data;
+    },
+    getCount: async () => {
+      const data = await apiClient.get('/files/count');
+      if (data?.data) {
+        return { success: data.success ?? true, ...data.data };
+      }
+      return data;
+    },
+    getTotalSize: async () => {
+      const data = await apiClient.get('/files/total-size');
+      if (data?.data) {
+        return { success: data.success ?? true, ...data.data };
+      }
+      return data;
+    }
   }
 };
 

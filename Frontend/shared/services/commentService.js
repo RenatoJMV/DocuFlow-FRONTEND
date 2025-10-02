@@ -1,8 +1,10 @@
 import { BACKEND_URL } from './config.js';
 
+const getAuthToken = () => localStorage.getItem("authToken") || localStorage.getItem("token");
+
 // 🔹 Obtener comentarios/tareas por documento
 export async function apiGetCommentsByDocument(documentId) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false, comments: [] };
   try {
     const response = await fetch(`${BACKEND_URL}/api/comments/document/${documentId}`, {
@@ -22,7 +24,7 @@ export async function apiGetCommentsByDocument(documentId) {
 
 // 🔹 Crear comentario/tarea
 export async function apiCreateComment(comment) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   try {
     const response = await fetch(`${BACKEND_URL}/api/comments`, {
@@ -42,7 +44,7 @@ export async function apiCreateComment(comment) {
 
 // 🔹 Editar comentario/tarea
 export async function apiEditComment(id, comment) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   try {
     const response = await fetch(`${BACKEND_URL}/api/comments/${id}`, {
@@ -62,7 +64,7 @@ export async function apiEditComment(id, comment) {
 
 // 🔹 Asignar usuarios a comentario/tarea
 export async function apiAssignUsersToComment(id, assignees) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   try {
     const response = await fetch(`${BACKEND_URL}/api/comments/${id}/assign`, {
@@ -82,7 +84,7 @@ export async function apiAssignUsersToComment(id, assignees) {
 
 // 🔹 Eliminar comentario/tarea
 export async function apiDeleteComment(id) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false };
   try {
     const response = await fetch(`${BACKEND_URL}/api/comments/${id}`, {

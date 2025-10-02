@@ -1,10 +1,12 @@
 import { BACKEND_URL } from './config.js';
 
+const getAuthToken = () => localStorage.getItem("authToken") || localStorage.getItem("token");
+
 export async function apiGetDownloadsToday() {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return { success: false, count: 0 };
   try {
-    const response = await fetch(`${BACKEND_URL}/dashboard/downloads/today`, {
+    const response = await fetch(`${BACKEND_URL}/api/dashboard/downloads/today`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
     const data = await response.json().catch(() => null);
