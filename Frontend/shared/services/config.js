@@ -2,21 +2,21 @@
 export const CONFIG = {
   // URLs de API por entorno
   API_ENDPOINTS: {
-    development: 'http://localhost:3000/api',
-    production: 'https://docuflow-backend.onrender.com/api'
+    development: 'http://localhost:8080',
+    production: 'https://docuflow-backend.onrender.com'
   },
 
   // Configuraciones de la aplicación
   APP: {
     name: 'DocuFlow',
     version: '1.0.0',
-    timeout: 10000
+    timeout: 15000
   },
 
   // Configuraciones de autenticación
   AUTH: {
-    tokenKey: 'authToken',
-    userDataKey: 'userData',
+    tokenKey: 'token',
+    userDataKey: 'user',
     sessionTimeout: 24 * 60 * 60 * 1000 // 24 horas
   }
 };
@@ -33,6 +33,11 @@ export const BACKEND_URL = isLocalhost
 export const API_URL = isLocalhost
   ? CONFIG.API_ENDPOINTS.development
   : CONFIG.API_ENDPOINTS.production;
+
+// Modo offline forzado - DESHABILITADO para conectar al backend real
+export const FORCE_OFFLINE = false;
+
+console.log(`🌐 Configuración API: ${BACKEND_URL} (${isLocalhost ? 'desarrollo' : 'producción'})`);
 
 // Función para obtener configuración actual
 export function getCurrentConfig() {

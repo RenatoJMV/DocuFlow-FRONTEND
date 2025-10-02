@@ -5,7 +5,7 @@ import { showNotification, showLoading } from '../utils/uiHelpers.js';
 
 class ApiClient {
   constructor(baseUrl) {
-    this.baseUrl = baseUrl || 'http://localhost:3000/api';
+    this.baseUrl = baseUrl || 'http://localhost:8080';
     this.offlineMode = false;
     this.interceptors = {
       request: [],
@@ -15,7 +15,7 @@ class ApiClient {
     
     // Configuración por defecto
     this.defaults = {
-      timeout: 10000,
+      timeout: 15000,
       headers: {
         'Content-Type': 'application/json'
       }
@@ -23,7 +23,7 @@ class ApiClient {
 
     // Detectar si estamos en producción
     if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      this.baseUrl = 'https://your-render-app.onrender.com/api'; // Cambiar por tu URL de Render
+      this.baseUrl = 'https://docuflow-backend.onrender.com';
     }
   }
 
@@ -557,6 +557,7 @@ const docuFlowAPI = {
   // Autenticación
   auth: {
     login: (credentials) => apiClient.post('/auth/login', credentials, {
+      _skipAuthRetry: true,
       successMessage: '¡Bienvenido de vuelta!',
       showErrorNotification: true
     }),
@@ -576,33 +577,34 @@ const docuFlowAPI = {
 
   // Archivos
   files: {
-    getAll: () => apiClient.get('/files'),
+    getAll: async () => {
+      const data = await apiClient.get('/files');
+      return docuFlowAPI.normalizeFilesResponse(data);
+    },
     getById: (id) => apiClient.get(`/files/${id}`),
-    upload: (file, metadata = {}) => apiClient.upload('/files/upload', file, {
-      fields: metadata,
-      onProgress: (percent) => {
-        console.log(`Upload progress: ${percent.toFixed(1)}%`);
-      },
-      successMessage: 'Archivo subido exitosamente'
+    upload: (formData) => apiClient.request('/files', {
+      method: 'POST',
+      body: formData,
+      headers: {}
     }),
-    download: (id, filename) => apiClient.download(`/files/${id}/download`, {
-      filename,
-      successMessage: 'Descarga iniciada'
-    }),
-    delete: (id) => apiClient.delete(`/files/${id}`, {
-      successMessage: 'Archivo eliminado exitosamente'
-    })
+    delete: (id) => apiClient.delete(`/files/${id}`),
+    download: (id) => apiClient.get(`/files/${id}/download`, { responseType: 'blob' }),
+    getStats: () => apiClient.get('/files/stats'),
+    getCount: () => apiClient.get('/files/count'),
+    getTotalSize: () => apiClient.get('/files/total-size')
   },
 
   // Comentarios
   comments: {
-    getAll: () => apiClient.get('/comments'),
-    getByFileId: (fileId) => apiClient.get(`/comments/file/${fileId}`),
-    create: (comment) => apiClient.post('/comments', comment, {
+    getAll: () => apiClient.get('/api/comments'),
+    getByFileId: (fileId) => apiClient.get(`/api/comments/document/${fileId}`),
+    create: (comment) => apiClient.post('/api/comments', comment, {
       successMessage: 'Comentario agregado'
     }),
-    update: (id, comment) => apiClient.put(`/comments/${id}`, comment),
-    delete: (id) => apiClient.delete(`/comments/${id}`, {
+    update: (id, comment) => apiClient.put(`/api/comments/${id}`, comment),
+    assign: (id, assignees) => apiClient.put(`/api/comments/${id}/assign`, { assignees }),
+    complete: (id) => apiClient.put(`/api/comments/${id}/complete`),
+    delete: (id) => apiClient.delete(`/api/comments/${id}`, {
       successMessage: 'Comentario eliminado'
     })
   },
@@ -625,8 +627,58 @@ const docuFlowAPI = {
   logs: {
     getAll: (params = {}) => {
       const queryString = new URLSearchParams(params).toString();
-      return apiClient.get(`/logs${queryString ? `?${queryString}` : ''}`);
+      return apiClient.get(`/api/logs${queryString ? `?${queryString}` : ''}`);
+    },
+    getRecent: (limit = 10) => apiClient.get(`/api/logs/recent?limit=${limit}`),
+    getCount: () => apiClient.get('/api/logs/count'),
+    getByUser: (username) => apiClient.get(`/api/logs/user/${username}`)
+  },
+
+  // Dashboard
+  dashboard: {
+    getStats: () => apiClient.get('/api/dashboard/stats'),
+    getFileStats: () => apiClient.get('/api/dashboard/files/stats'),
+    getRecentFiles: (limit = 5) => apiClient.get(`/api/dashboard/recent-files?limit=${limit}`),
+    getRecentActivities: (limit = 10) => apiClient.get(`/api/dashboard/recent-activities?limit=${limit}`),
+    getDownloadsToday: () => apiClient.get('/api/dashboard/downloads/today'),
+    getUsers: () => apiClient.get('/api/dashboard/users'),
+    getComments: () => apiClient.get('/api/dashboard/comments'),
+    getLogs: () => apiClient.get('/api/dashboard/logs'),
+    getFiles: () => apiClient.get('/api/dashboard/files')
+  },
+
+  // Health
+  health: {
+    getGeneral: () => apiClient.get('/health'),
+    getDatabase: () => apiClient.get('/health/db'),
+    getSimple: () => apiClient.get('/health/simple')
+  },
+
+  // Notifications
+  notifications: {
+    getAll: () => apiClient.get('/notifications'),
+    getAllAdmin: () => apiClient.get('/notifications/admin/all'),
+    create: (data) => apiClient.post('/notifications', data),
+    getTypes: () => apiClient.get('/notifications/types'),
+    getPriorities: () => apiClient.get('/notifications/priorities'),
+    getByType: (type) => apiClient.get(`/notifications/type/${type}`),
+    getById: (id) => apiClient.get(`/notifications/${id}`),
+    deactivate: (id) => apiClient.put(`/notifications/${id}/deactivate`),
+    getStats: () => apiClient.get('/notifications/stats')
+  },
+
+  // Función helper para normalizar respuestas
+  normalizeFilesResponse(data) {
+    if (Array.isArray(data)) {
+      return { success: true, files: data };
     }
+    if (Array.isArray(data?.files)) {
+      return { success: data.success ?? true, files: data.files };
+    }
+    if (Array.isArray(data?.data)) {
+      return { success: data.success ?? true, files: data.data };
+    }
+    return data;
   }
 };
 

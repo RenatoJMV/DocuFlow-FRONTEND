@@ -28,11 +28,17 @@ export const authService = {
     try {
       const response = await docuFlowAPI.auth.login(payload);
       if (response?.token) {
-        persistAuthTokens({
-          token: response.token,
-          refreshToken: response.refreshToken,
-          expiresIn: response.expiresIn
-        });
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        
+        if (response.refreshToken) {
+          localStorage.setItem('refreshToken', response.refreshToken);
+        }
+        
+        if (response.expiresIn) {
+          const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
+          localStorage.setItem('tokenExpiresAt', expiresAt.toISOString());
+        }
 
         const user = response.user || { username: normalizedUsername, name: normalizedUsername };
         persistUser(user);

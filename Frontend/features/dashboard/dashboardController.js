@@ -90,31 +90,118 @@ class DashboardController {
   async loadDashboardData() {
     try {
       store.setLoading(true);
+      
+      console.log('🔄 Cargando datos del dashboard...');
+      console.log('🌐 Backend URL:', docuFlowAPI.baseUrl || 'http://localhost:8080');
 
-      // Cargar datos usando endpoints reales del backend Spring Boot
-      const [statsResult, usersResult, filesResult, commentsResult, logsResult] = await Promise.allSettled([
-        docuFlowAPI.get('/api/dashboard/stats'),    // Estadísticas generales del dashboard
-        docuFlowAPI.get('/users'),                 // Lista de usuarios para contar total
-        docuFlowAPI.get('/files'),                 // Archivos para estadísticas de almacenamiento
-        docuFlowAPI.get('/api/comments'),          // Comentarios totales
-        docuFlowAPI.get('/api/logs')               // Logs para actividad reciente
+      // Test de conexión básica
+      const [
+        statsResult,
+        healthResult,
+        filesResult,
+        notificationsResult
+      ] = await Promise.allSettled([
+        docuFlowAPI.dashboard.getStats(),
+        docuFlowAPI.health.getGeneral(),
+        docuFlowAPI.files.getAll(),
+        docuFlowAPI.notifications.getAll()
       ]);
 
-      // Procesar datos de cada endpoint
-      let combinedStats = {
-        totalFiles: 0,
-        totalUsers: 0,
-        totalComments: 0,
-        totalStorage: '0 B',
-        downloadsToday: 0,
-        uploadsToday: 0,
-        commentsToday: 0,
-        recentActivities: [],
-        storageUsed: '0 B',
-        storageLimit: '10 GB'
-      };
+      console.log('📊 Resultados de carga:', {
+        stats: statsResult.status,
+        health: healthResult.status,
+        files: filesResult.status,
+        notifications: notificationsResult.status
+      });
 
-      // Procesar estadísticas del dashboard (si existe el endpoint)
+      // Procesar estadísticas
+      if (statsResult.status === 'fulfilled' && statsResult.value) {
+        const stats = statsResult.value;
+        this.updateWidgets(stats);
+        console.log('✅ Estadísticas cargadas:', stats);
+      } else {
+        console.warn('⚠️ No se pudieron cargar estadísticas, usando datos demo');
+        this.loadDemoData();
+      }
+
+      // Inicializar controladores de sistema
+      if (!this.healthController) {
+        this.healthController = new SystemHealthController();
+      }
+      
+      if (!this.notificationController) {
+        this.notificationController = new NotificationController();
+        await this.notificationController.init();
+      }
+
+      showNotification('Dashboard cargado correctamente', 'success', 2000);
+
+    } catch (error) {
+      console.error('❌ Error cargando datos del dashboard:', error);
+      showNotification('Error de conexión con el servidor', 'error');
+      this.loadDemoData();
+    } finally {
+      store.setLoading(false);
+    }
+  }
+
+  updateWidgets(stats) {
+    // Actualizar widgets con datos reales
+    if (document.getElementById('widget-files')) {
+      document.getElementById('widget-files').textContent = stats.totalFiles || 0;
+    }
+    if (document.getElementById('widget-users')) {
+      document.getElementById('widget-users').textContent = stats.totalUsers || 0;
+    }
+    if (document.getElementById('widget-comments')) {
+      document.getElementById('widget-comments').textContent = stats.totalComments || 0;
+    }
+    if (document.getElementById('widget-downloads')) {
+      document.getElementById('widget-downloads').textContent = stats.downloadsToday || 0;
+    }
+
+    // Actualizar trends si existen
+    this.updateTrends(stats);
+  }
+
+  updateTrends(stats) {
+    const trends = {
+      'files-trend': stats.filesTrend || '+0%',
+      'users-trend': stats.usersTrend || '+0%',
+      'comments-trend': stats.commentsTrend || '+0%',
+      'downloads-trend': stats.downloadsTrend || '+0%'
+    };
+
+    Object.entries(trends).forEach(([id, value]) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = value;
+        element.className = value.startsWith('+') ? 'trend-up' : 
+                           value.startsWith('-') ? 'trend-down' : 'trend-neutral';
+      }
+    });
+  }
+
+  loadDemoData() {
+    // Datos demo para desarrollo
+    const demoStats = {
+      totalFiles: 156,
+      totalUsers: 23,
+      totalComments: 89,
+      totalStorage: '2.4 GB',
+      downloadsToday: 12,
+      uploadsToday: 8,
+      commentsToday: 15
+    };
+
+    this.updateWidgets(demoStats);
+    
+    // Actualizar también las estadísticas de la barra lateral
+    this.updateWidgetValue('stat-documents', demoStats.totalFiles);
+    this.updateWidgetValue('stat-users', demoStats.totalUsers);
+    this.updateWidgetValue('stat-storage', '2.4 GB');
+    this.updateWidgetValue('stat-downloads', demoStats.downloadsToday);
+  }
       if (statsResult.status === 'fulfilled' && statsResult.value) {
         const stats = statsResult.value.data || statsResult.value;
         combinedStats = {
