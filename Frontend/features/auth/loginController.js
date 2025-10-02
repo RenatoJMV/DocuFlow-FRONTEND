@@ -69,6 +69,12 @@ class LoginController {
 
       await this.handleLogin();
     });
+
+    // Agregar manejador para botón de registro
+    const registerBtn = document.getElementById('registerBtn');
+    if (registerBtn) {
+      registerBtn.addEventListener('click', () => this.showRegisterModal());
+    }
   }
 
   isValidUsername(value = '') {
@@ -132,6 +138,81 @@ class LoginController {
   showForgotPassword() {
     showNotification('Función de recuperación de contraseña próximamente', 'info');
     // Aquí podrías implementar un modal de recuperación de contraseña
+  }
+
+  showRegisterModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'registerModal';
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Registro de Usuario</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="registerForm">
+              <div class="mb-3">
+                <label class="form-label">Nombre completo</label>
+                <input type="text" class="form-control" id="registerName" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" id="registerEmail" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Contraseña</label>
+                <input type="password" class="form-control" id="registerPassword" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Confirmar contraseña</label>
+                <input type="password" class="form-control" id="registerPasswordConfirm" required>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="registerSubmitBtn">Registrarse</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bootstrapModal = new bootstrap.Modal(modal);
+    
+    // Agregar event listener al botón de submit
+    const submitBtn = modal.querySelector('#registerSubmitBtn');
+    submitBtn.addEventListener('click', () => this.handleRegister(bootstrapModal, modal));
+    
+    bootstrapModal.show();
+  }
+
+  async handleRegister(modalInstance, modalElement) {
+    const name = document.getElementById('registerName').value;
+    const email = document.getElementById('registerEmail').value;
+    const password = document.getElementById('registerPassword').value;
+    const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+
+    if (password !== passwordConfirm) {
+      showNotification('Las contraseñas no coinciden', 'error');
+      return;
+    }
+
+    try {
+      const response = await authService.register({ name, email, password });
+      if (response.success) {
+        showNotification('Usuario registrado exitosamente', 'success');
+        modalInstance.hide();
+        // Limpiar modal del DOM después de cerrar
+        setTimeout(() => modalElement.remove(), 300);
+      } else {
+        showNotification(response.error || 'Error al registrar usuario', 'error');
+      }
+    } catch (error) {
+      showNotification('Error al registrar usuario', 'error');
+    }
   }
 }
 

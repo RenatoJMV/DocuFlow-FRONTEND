@@ -154,41 +154,40 @@ class LogsController {
       // Show loading state
       this.showLoadingState();
       
-      // Cargar logs reales de la base de datos
-      console.log('📋 Cargando logs desde la base de datos...');
-      const response = await docuFlowAPI.dashboard.getLogs();
-      const logs = Array.isArray(response)
-        ? response
-        : Array.isArray(response?.logs)
-          ? response.logs
-          : Array.isArray(response?.data)
-            ? response.data
-            : [];
+      // Cargar logs del endpoint real del backend Spring Boot
+      console.log('📋 Cargando logs desde el endpoint /api/logs...');
+      const response = await docuFlowAPI.get('/api/logs');
+      
+      // Extraer logs del response
+      const logs = response?.logs || response?.data || response || [];
 
       if (Array.isArray(logs) && logs.length > 0) {
         // Convertir los logs del backend al formato esperado por el frontend
         this.allLogs = logs.map(log => ({
-          id: log.id,
-          timestamp: log.timestamp,
-          level: this.mapActionToLevel(log.action),
-          action: log.action,
-          user: log.username,
-          details: `${log.action} - Document ID: ${log.documentId || 'N/A'}`,
-          ip: 'N/A', // No disponible en el backend actual
-          userAgent: 'N/A' // No disponible en el backend actual
+          id: log.id || Date.now() + Math.random(),
+          timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
+          level: this.mapActionToLevel(log.action || 'INFO'),
+          action: log.action || 'UNKNOWN',
+          user: log.user || log.username || 'Sistema',
+          details: log.details || `${log.action} - ${log.message || 'Sin detalles'}`,
+          ip: log.ip || log.ipAddress || 'N/A',
+          userAgent: log.userAgent || 'N/A'
         }));
+
+        console.log(`✅ ${this.allLogs.length} logs cargados desde el backend`);
+        showNotification(`${this.allLogs.length} registros cargados del servidor`, 'success', 2000);
       } else {
+        console.log('⚠️ No se encontraron logs en el servidor');
         this.allLogs = [];
+        showNotification('No se encontraron registros en el servidor', 'info', 2000);
       }
       
       this.applyFilters();
       this.updateStats();
       
-      console.log(`✅ ${this.allLogs.length} logs cargados desde la base de datos`);
-      
     } catch (error) {
-      console.error('❌ Error cargando logs:', error);
-      showNotification('Error al cargar los registros', 'error');
+      console.error('❌ Error cargando logs del backend:', error);
+      showNotification('Error al cargar registros, usando datos demo', 'warning');
       
       // Fallback a datos demo si hay error
       console.log('🔄 Fallback a datos demo...');

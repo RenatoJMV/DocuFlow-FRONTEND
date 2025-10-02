@@ -395,3 +395,218 @@ body {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* Sistema de Salud del Sistema */
+.system-health-card {
+  border-left: 4px solid var(--primary-color);
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.system-health-card .card-header {
+  background: transparent;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.health-summary {
+  font-size: 0.9rem;
+}
+
+.health-header {
+  margin-bottom: 0.75rem;
+}
+
+.health-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.health-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.health-item:last-child {
+  border-bottom: none;
+}
+
+.health-footer {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+.status-indicator {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-indicator.status-up {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-indicator.status-down {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-indicator.status-degraded {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+/* Indicadores de estado en navbar */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+}
+
+.status-dot.status-up {
+  background-color: #28a745;
+  animation: pulse-green 2s infinite;
+}
+
+.status-dot.status-down {
+  background-color: #dc3545;
+  animation: pulse-red 2s infinite;
+}
+
+.status-dot.status-degraded {
+  background-color: #ffc107;
+  animation: pulse-yellow 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+@keyframes pulse-yellow {
+  0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+
+/* Acciones Rápidas */
+.quick-actions-card {
+  border-left: 4px solid var(--warning-color);
+  background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
+}
+
+.quick-actions-card .card-header {
+  background: transparent;
+  border-bottom: 1px solid #dee2e6;
+}
+
+/* Dropdown de notificaciones */
+.notification-dropdown {
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notification-list {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.notification-list .dropdown-item-text {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+/* Modales de sistema */
+.modal-lg .health-details .card {
+  border: 1px solid #dee2e6;
+  margin-bottom: 1rem;
+}
+
+.modal-lg .health-details .card:last-child {
+  margin-bottom: 0;
+}
+
+.modal-lg .metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.modal-lg .metric-row:last-child {
+  border-bottom: none;
+}
+
+/* Estilos para notificaciones */
+.notifications-card {
+  min-height: 280px;
+}
+
+.notification-item-mini {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+}
+
+.notification-item-mini:hover {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+}
+
+.notification-item-mini.unread {
+  background-color: #fff3e0;
+  border-left: 3px solid #ff9800;
+}
+
+.notification-title-mini {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0;
+  color: #495057;
+}
+
+.notification-message-mini {
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.notification-item-full {
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s ease;
+}
+
+.notification-item-full:hover {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+}
+
+.notification-item-full.unread {
+  background-color: #fff3e0;
+  border-left: 4px solid #ff9800;
+}

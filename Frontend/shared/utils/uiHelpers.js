@@ -93,12 +93,38 @@ export function createNavbar(currentPage = '') {
         </button>
         
         <div class="collapse navbar-collapse" id="navbarNav">
-          <div class="navbar-nav ms-auto gap-2">
+          <div class="navbar-nav ms-auto gap-2 d-flex flex-row align-items-center">
             ${createNavItem('dashboard', 'Dashboard', 'speedometer2', currentPage)}
             ${createNavItem('upload', 'Archivos', 'cloud-arrow-up', currentPage)}
             ${createNavItem('comments', 'Comentarios', 'chat-dots', currentPage)}
             ${createNavItem('permissions', 'Permisos', 'people', currentPage)}
             ${createNavItem('logs', 'Logs', 'clipboard-data', currentPage)}
+            
+            <!-- Widget de Estado del Sistema -->
+            <div class="nav-item">
+              <a class="nav-link position-relative d-flex align-items-center" href="#" onclick="showSystemHealth()" title="Estado del sistema">
+                <i class="bi bi-heart-pulse"></i>
+                <span class="status-dot status-down" id="system-status-indicator"></span>
+              </a>
+            </div>
+
+            <!-- Widget de Notificaciones -->
+            <div class="nav-item dropdown">
+              <a class="nav-link position-relative d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown" title="Notificaciones">
+                <i class="bi bi-bell"></i>
+                <span class="badge bg-danger position-absolute top-0 start-100 translate-middle" 
+                      id="notification-badge" style="display: none;">0</span>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end notification-dropdown">
+                <li><h6 class="dropdown-header">Notificaciones</h6></li>
+                <div id="navbar-notifications" class="notification-list">
+                  <li class="dropdown-item-text text-muted">No hay notificaciones</li>
+                </div>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="../notifications/notifications.html">Ver todas</a></li>
+              </ul>
+            </div>
+            
             <div class="nav-item dropdown">
               <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">
                 <i class="bi bi-person-circle"></i>
@@ -106,7 +132,7 @@ export function createNavbar(currentPage = '') {
               </a>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li><h6 class="dropdown-header">Mi Cuenta</h6></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>Perfil</a></li>
+                <li><a class="dropdown-item" href="../profile/profile.html"><i class="bi bi-person me-2"></i>Perfil</a></li>
                 <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Configuración</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item text-danger" href="#" onclick="logout()"><i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión</a></li>

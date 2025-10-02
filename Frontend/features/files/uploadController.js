@@ -593,13 +593,53 @@ class UploadController {
     this.loadFiles();
   }
 
-  downloadAllSelected() {
-    const selected = Array.from(document.querySelectorAll('.file-checkbox:checked'));
-    if (selected.length === 0) {
+  async downloadAllSelected() {
+    const selectedCheckboxes = Array.from(document.querySelectorAll('.file-checkbox:checked'));
+    if (selectedCheckboxes.length === 0) {
       showNotification('Selecciona al menos un archivo para descargar', 'info');
       return;
     }
-    showNotification('Descarga múltiple disponible próximamente', 'info');
+
+    try {
+      showNotification(`Descargando ${selectedCheckboxes.length} archivos...`, 'info');
+      
+      // Extraer IDs y nombres de los archivos seleccionados
+      const selectedFiles = selectedCheckboxes.map(checkbox => {
+        const fileId = checkbox.dataset.fileId;
+        const row = checkbox.closest('tr');
+        const filename = row.querySelector('.file-name')?.textContent || `archivo_${fileId}`;
+        return { fileId, filename };
+      });
+
+      // Descargar archivos uno por uno (para evitar saturar el servidor)
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const file of selectedFiles) {
+        try {
+          await this.downloadFile(file.fileId, file.filename);
+          successCount++;
+          // Pequeña pausa entre descargas
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(`Error descargando ${file.filename}:`, error);
+          errorCount++;
+        }
+      }
+
+      // Mostrar resumen
+      if (successCount > 0 && errorCount === 0) {
+        showNotification(`${successCount} archivos descargados exitosamente`, 'success');
+      } else if (successCount > 0 && errorCount > 0) {
+        showNotification(`${successCount} descargados, ${errorCount} con errores`, 'warning');
+      } else {
+        showNotification('Error en todas las descargas', 'error');
+      }
+
+    } catch (error) {
+      console.error('Error en descarga múltiple:', error);
+      showNotification('Error al procesar las descargas', 'error');
+    }
   }
 
   showFileStatsModal() {
@@ -609,24 +649,53 @@ class UploadController {
 
   async downloadFile(fileId, filename) {
     try {
-      const response = await docuFlowAPI.files.download(fileId);
+      showNotification('Iniciando descarga...', 'info', 1000);
       
-      // Create download link
-      const url = window.URL.createObjectURL(response);
+      // Usar endpoint real del backend Spring Boot para descarga
+      const response = await docuFlowAPI.get(`/files/${fileId}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      // Si el response es un blob, usarlo directamente
+      let blob;
+      if (response instanceof Blob) {
+        blob = response;
+      } else {
+        // Si es otro tipo de respuesta, intentar convertir
+        const arrayBuffer = response.arrayBuffer ? await response.arrayBuffer() : response;
+        blob = new Blob([arrayBuffer]);
+      }
+      
+      // Crear enlace de descarga
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
+      a.download = filename || 'archivo_descargado';
       document.body.appendChild(a);
       a.click();
       
-      // Cleanup
+      // Limpiar recursos
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      showNotification('Archivo descargado', 'success');
+      showNotification(`Archivo "${filename}" descargado exitosamente`, 'success');
+      
+      // Registrar descarga en logs si es necesario
+      console.log(`✅ Archivo descargado: ${filename} (ID: ${fileId})`);
+      
     } catch (error) {
-      console.error('Download error:', error);
-      showNotification('Error al descargar archivo', 'error');
+      console.error('Error descargando archivo:', error);
+      
+      if (error.status === 404) {
+        showNotification('Archivo no encontrado en el servidor', 'error');
+      } else if (error.status === 403) {
+        showNotification('Sin permisos para descargar este archivo', 'error');
+      } else {
+        showNotification('Error al descargar archivo. Intente nuevamente.', 'error');
+      }
     }
   }
 

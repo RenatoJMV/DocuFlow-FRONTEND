@@ -186,13 +186,44 @@ class CommentsController {
 
   async loadComments() {
     try {
-      // In a real app, you'd pass a document ID
-      // For now, we'll load all comments or use demo data
-      const response = await this.getDemoComments();
-      this.comments = response;
+      // Cargar comentarios del endpoint real del backend
+      console.log('📝 Cargando comentarios desde /api/comments...');
+      const response = await docuFlowAPI.get('/api/comments');
+      
+      // Extraer comentarios del response
+      const comments = response?.comments || response?.data || response || [];
+      
+      if (Array.isArray(comments) && comments.length > 0) {
+        // Convertir comentarios del backend al formato del frontend
+        this.comments = comments.map(comment => ({
+          id: comment.id || Date.now() + Math.random(),
+          content: comment.content || comment.text || 'Sin contenido',
+          type: comment.type || 'comment',
+          author: comment.author || comment.user || 'Usuario desconocido',
+          createdAt: comment.createdAt || comment.timestamp || new Date().toISOString(),
+          status: comment.status || comment.resolved ? 'resolved' : 'pending',
+          fileId: comment.fileId || null,
+          // Campos adicionales si existen
+          priority: comment.priority || 'normal',
+          assignees: comment.assignees || [],
+          dueDate: comment.dueDate || null
+        }));
+        
+        console.log(`✅ ${this.comments.length} comentarios cargados desde el backend`);
+        showNotification(`${this.comments.length} comentarios cargados del servidor`, 'success', 2000);
+      } else {
+        console.log('⚠️ No se encontraron comentarios en el servidor');
+        this.comments = [];
+        showNotification('No se encontraron comentarios en el servidor', 'info', 2000);
+      }
+      
       this.filterComments();
+      
     } catch (error) {
-      console.error('Error loading comments:', error);
+      console.error('❌ Error cargando comentarios del backend:', error);
+      showNotification('Error al cargar comentarios, usando datos demo', 'warning');
+      
+      // Fallback a datos demo
       this.comments = this.getDemoComments();
       this.filterComments();
     }

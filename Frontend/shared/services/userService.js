@@ -1,4 +1,5 @@
 import { BACKEND_URL } from './config.js';
+import { apiClient } from './apiClient.js';
 
 const getAuthToken = () => localStorage.getItem("authToken") || localStorage.getItem("token");
 
@@ -6,45 +7,33 @@ const getAuthToken = () => localStorage.getItem("authToken") || localStorage.get
 
 // Obtener roles disponibles
 export async function apiGetRoles() {
-  const token = getAuthToken();
-  if (!token) return { success: false, roles: [] };
   try {
-    const response = await fetch(`${BACKEND_URL}/users/roles`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    const data = await response.json().catch(() => null);
-    if (response.ok && data) {
-      return { success: true, roles: data };
-    } else {
-      return { success: false, roles: [], error: data?.error };
-    }
-  } catch {
-    return { success: false, roles: [] };
+    const response = await apiClient.get('/users/roles');
+    return { 
+      success: true, 
+      roles: response.roles || response.data || response || [] 
+    };
+  } catch (error) {
+    console.error('Error obteniendo roles:', error);
+    return { 
+      success: false, 
+      roles: [], 
+      error: error.message || 'Error al obtener roles'
+    };
   }
 }
 
 // Cambiar el rol de un usuario
 export async function apiSetUserRole(userId, role) {
-  const token = getAuthToken();
-  if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/users/${userId}/role`, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ role })
-    });
-    if (response.ok) {
-      return { success: true };
-    } else {
-      const data = await response.json().catch(() => null);
-      return { success: false, error: data?.error };
-    }
-  } catch {
-    return { success: false };
+    await apiClient.put(`/users/${userId}/role`, { role });
+    return { success: true };
+  } catch (error) {
+    console.error('Error cambiando rol de usuario:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Error al cambiar el rol del usuario'
+    };
   }
 }
 
@@ -91,22 +80,71 @@ export async function apiSetUserPermissions(userId, permissions) {
     return { success: false };
   }
 }
+// Obtener lista de usuarios
 export async function apiGetUsers() {
-  const token = getAuthToken();
-  if (!token) return { success: false, users: [] };
   try {
-    const response = await fetch(`${BACKEND_URL}/users`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    const data = await response.json().catch(() => null);
-    if (response.ok && data) {
-      return { success: true, users: Array.isArray(data) ? data : (data.users || []) };
-    } else {
-      return { success: false, users: [], error: data?.error };
-    }
-  } catch {
-    return { success: false, users: [] };
+    const response = await apiClient.get('/users');
+    const users = response.users || response.data || response;
+    
+    return { 
+      success: true, 
+      users: Array.isArray(users) ? users : [] 
+    };
+  } catch (error) {
+    console.error('Error obteniendo usuarios:', error);
+    return { 
+      success: false, 
+      users: [], 
+      error: error.message || 'Error al obtener usuarios'
+    };
+  }
+}
+
+// Crear nuevo usuario
+export async function apiCreateUser(userData) {
+  try {
+    const response = await apiClient.post('/auth/register', userData);
+    return { 
+      success: true, 
+      user: response.user || response.data || response 
+    };
+  } catch (error) {
+    console.error('Error creando usuario:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Error al crear usuario'
+    };
+  }
+}
+
+// Actualizar usuario existente
+export async function apiUpdateUser(userId, userData) {
+  try {
+    const response = await apiClient.put(`/users/${userId}`, userData);
+    return { 
+      success: true, 
+      user: response.user || response.data || response 
+    };
+  } catch (error) {
+    console.error('Error actualizando usuario:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Error al actualizar usuario'
+    };
+  }
+}
+
+// Eliminar usuario
+export async function apiDeleteUser(userId) {
+  try {
+    await apiClient.delete(`/users/${userId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error eliminando usuario:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Error al eliminar usuario'
+    };
   }
 }
 

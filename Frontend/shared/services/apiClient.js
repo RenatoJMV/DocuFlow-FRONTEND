@@ -1,55 +1,11 @@
-// Cliente API moderno con fallback offline para DocuFlow
+// Cliente API moderno con interceptores para DocuFlow
 import { store } from './store.js';
-import { showNotification } from '../utils/uiHelpers.js';
-
-const ACCESS_TOKEN_KEY = 'authToken';
-const LEGACY_TOKEN_KEY = 'token';
-const REFRESH_TOKEN_KEY = 'refreshToken';
-const TOKEN_EXPIRATION_KEY = 'tokenExpiresAt';
-
-export function getStoredAccessToken() {
-  return localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY);
-}
-
-export function getStoredRefreshToken() {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
-
-export function persistAuthTokens({ token, refreshToken, expiresIn } = {}) {
-  if (token) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, token);
-    localStorage.setItem(LEGACY_TOKEN_KEY, token);
-  }
-
-  if (refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  }
-
-  if (typeof expiresIn === 'number' && !Number.isNaN(expiresIn)) {
-    const expiresAt = Date.now() + expiresIn * 1000;
-    localStorage.setItem(TOKEN_EXPIRATION_KEY, expiresAt.toString());
-  }
-}
-
-export function clearAuthTokens() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(LEGACY_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(TOKEN_EXPIRATION_KEY);
-}
+import { showNotification, showLoading } from '../utils/uiHelpers.js';
 
 class ApiClient {
-  constructor() {
-    // Configuración simplificada sin dependencia externa
-    const isLocalhost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
-    
-    this.baseUrl = isLocalhost 
-      ? 'http://localhost:8080'  // Puerto por defecto de Spring Boot
-      : 'https://docuflow-backend.onrender.com';
-      
-  this.offlineMode = false;
-  this.refreshPromise = null;
-    
+  constructor(baseUrl) {
+    this.baseUrl = baseUrl || 'http://localhost:3000/api';
+    this.offlineMode = false;
     this.interceptors = {
       request: [],
       response: [],
@@ -59,11 +15,15 @@ class ApiClient {
     // Configuración por defecto
     this.defaults = {
       timeout: 10000,
-      headers: {}
+      headers: {
+        'Content-Type': 'application/json'
+      }
     };
 
-    // Log de configuración
-    console.log(`🌐 DocuFlow API configurada: ${this.baseUrl}`);
+    // Detectar si estamos en producción
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      this.baseUrl = 'https://your-render-app.onrender.com/api'; // Cambiar por tu URL de Render
+    }
   }
 
   // Agregar interceptores
@@ -84,25 +44,20 @@ class ApiClient {
 
   // Método principal para hacer requests
   async request(endpoint, options = {}) {
-    const { _retry, _skipAuthRetry, ...requestOptions } = options;
-    const hasRetried = Boolean(_retry);
-    const skipAuthRetry = Boolean(_skipAuthRetry);
-    const { showLoading: showLoadingOption = true, ...fetchOptions } = requestOptions;
-
     try {
       // Si ya estamos en modo offline, usar datos de demostración directamente
       if (this.offlineMode) {
-        return await this.getDemoResponse(endpoint, requestOptions);
+        return await this.getDemoResponse(endpoint, options);
       }
 
       // Configurar request base
       let config = {
-        method: fetchOptions.method || 'GET',
+        method: options.method || 'GET',
         headers: {
           ...this.defaults.headers,
-          ...(fetchOptions.headers || {})
+          ...options.headers
         },
-        ...fetchOptions
+        ...options
       };
 
       // Ejecutar interceptores de request
@@ -110,14 +65,8 @@ class ApiClient {
         config = await interceptor(config, endpoint);
       }
 
-      // Ajustar cabeceras según el tipo de cuerpo
-      const isFormData = typeof FormData !== 'undefined' && config.body instanceof FormData;
-      if (isFormData && config.headers) {
-        delete config.headers['Content-Type'];
-      }
-
       // Mostrar loading si está habilitado
-      if (showLoadingOption !== false) {
+      if (options.showLoading !== false) {
         store.setLoading(true);
       }
 
@@ -127,19 +76,9 @@ class ApiClient {
 
       config.signal = controller.signal;
 
-      // Log detallado para debugging
-      console.log('📤 Request details:', {
-        method: config.method,
-        url: `${this.baseUrl}${endpoint}`,
-        headers: config.headers,
-        body: config.body
-      });
-
       // Hacer el request
       const response = await fetch(`${this.baseUrl}${endpoint}`, config);
       clearTimeout(timeoutId);
-
-      console.log('📥 Response status:', response.status, response.statusText);
 
       // Ejecutar interceptores de response
       let processedResponse = response;
@@ -150,44 +89,21 @@ class ApiClient {
       return await this.handleResponse(processedResponse, options);
 
     } catch (error) {
-      if (error && error.status === 401 && !hasRetried && !skipAuthRetry) {
-        try {
-          const refreshResult = await this.refreshAccessToken();
-          const refreshedToken = refreshResult?.token || refreshResult;
-          if (refreshResult && refreshedToken) {
-            console.log('🔁 Token renovado, reintentando solicitud original');
-            return await this.request(endpoint, {
-              ...requestOptions,
-              showLoading: false,
-              _retry: true
-            });
-          }
-        } catch (refreshError) {
-          console.warn('⚠️ Error al refrescar token:', refreshError);
-        }
-      }
-
       // Si hay error de conexión, activar modo offline y usar datos demo
-      const isConnectionError = error.name === 'AbortError' || 
-                               error.name === 'TypeError' ||
-                               error.message?.includes('Failed to fetch') || 
-                               error.message?.includes('ERR_CONNECTION_REFUSED') || 
-                               error.message?.includes('NetworkError') ||
-                               error.message?.includes('net::ERR_');
-      
-      if (isConnectionError) {
+      if (error.name === 'AbortError' || error.message.includes('Failed to fetch') || 
+          error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('NetworkError')) {
+        
         if (!this.offlineMode) {
-          console.warn('🔌 Servidor no disponible, activando modo offline');
-          console.info(`📡 Intentaba conectar a: ${this.baseUrl}${endpoint}`);
+          console.warn('🔌 Servidor no disponible, activando modo offline con datos de demostración');
           this.offlineMode = true;
           
-          // Mostrar notificación de modo offline
+          // Mostrar notificación de modo offline (opcional, se puede comentar)
           if (typeof showNotification === 'function') {
-            showNotification('Modo offline - usando datos de demostración', 'info', 3000);
+            showNotification('Modo offline activado - usando datos de demostración', 'warning', 3000);
           }
         }
         
-        return await this.getDemoResponse(endpoint, requestOptions);
+        return await this.getDemoResponse(endpoint, options);
       }
 
       // Ejecutar interceptores de error para otros tipos de error
@@ -199,7 +115,7 @@ class ApiClient {
 
     } finally {
       // Ocultar loading
-      if (showLoadingOption !== false) {
+      if (options.showLoading !== false) {
         store.setLoading(false);
       }
     }
@@ -244,33 +160,24 @@ class ApiClient {
     }
 
     // Dashboard stats
-    if (endpoint === '/api/dashboard/stats') {
+    if (endpoint === '/dashboard/stats') {
       return {
         success: true,
         data: {
           totalFiles: 156,
-          totalStorageUsed: 2147483648, // 2GB en bytes
           totalUsers: 23,
           totalComments: 89,
-          recentActivities: 45
-        }
-      };
-    }
-
-    // File stats
-    if (endpoint === '/files/stats') {
-      return {
-        success: true,
-        data: {
-          totalFiles: 156,
-          totalSize: 2147483648,
-          fileTypes: { pdf: 45, docx: 32, xlsx: 79 }
+          downloadsToday: 45,
+          documents: 156,
+          processed: 142,
+          pending: 12,
+          errors: 2
         }
       };
     }
 
     // Dashboard activity
-    if (endpoint === '/dashboard/activity' || endpoint === '/api/dashboard/activity') {
+    if (endpoint === '/dashboard/activity') {
       return {
         success: true,
         data: [
@@ -291,15 +198,6 @@ class ApiClient {
             user: 'María García',
             timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
             status: 'info'
-          },
-          {
-            id: 3,
-            type: 'file_download',
-            file: 'Informe_Anual.xlsx',
-            action: 'Descarga',
-            user: 'Carlos López',
-            timestamp: new Date(Date.now() - 45 * 60000).toISOString(),
-            status: 'success'
           }
         ]
       };
@@ -317,30 +215,6 @@ class ApiClient {
             type: 'pdf',
             uploadedBy: 'Juan Pérez',
             uploadDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: 2,
-            name: 'Presentación_Q4.pptx',
-            size: 5242880,
-            type: 'pptx',
-            uploadedBy: 'María García',
-            uploadDate: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
-          }
-        ]
-      };
-    }
-
-    // Comments
-    if (endpoint.includes('/comments')) {
-      return {
-        success: true,
-        data: [
-          {
-            id: 1,
-            fileId: 1,
-            content: 'Este documento necesita revisión',
-            author: 'Juan Pérez',
-            createdAt: new Date(Date.now() - 60 * 60000).toISOString()
           }
         ]
       };
@@ -352,56 +226,6 @@ class ApiClient {
       data: [],
       message: 'Respuesta de demostración'
     };
-  }
-
-  async refreshAccessToken() {
-    const refreshToken = getStoredRefreshToken();
-    if (!refreshToken) {
-      return null;
-    }
-
-    if (this.refreshPromise) {
-      return this.refreshPromise;
-    }
-
-    this.refreshPromise = (async () => {
-      try {
-        console.log('🔄 Intentando refrescar token de acceso...');
-        const response = await this.request('/auth/refresh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ refreshToken }),
-          showLoading: false,
-          _skipAuthRetry: true
-        });
-
-        if (response?.token) {
-          persistAuthTokens({
-            token: response.token,
-            refreshToken: response.refreshToken,
-            expiresIn: response.expiresIn
-          });
-          return response;
-        }
-
-        clearAuthTokens();
-        return null;
-      } catch (error) {
-        clearAuthTokens();
-        throw error;
-      } finally {
-        this.refreshPromise = null;
-      }
-    })();
-
-    try {
-      return await this.refreshPromise;
-    } catch (error) {
-      console.warn('❌ No se pudo refrescar el token:', error);
-      return null;
-    }
   }
 
   // Procesar respuesta
@@ -417,211 +241,393 @@ class ApiClient {
       } else {
         data = await response.blob();
       }
-    } catch (error) {
-      console.warn('Error parsing response:', error);
+    } catch (parseError) {
+      console.warn('Could not parse response:', parseError);
       data = null;
     }
 
-    if (!response.ok) {
-      // Log detallado del error para debugging
-      console.error('❌ HTTP Error Details:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data: data
-      });
-
-      let errorMessage = `HTTP ${response.status}: `;
-      
-      // Mensajes específicos para códigos comunes
-      if (response.status === 403) {
-        errorMessage += data?.message || 'Acceso denegado. Verifica tus credenciales o permisos.';
-      } else if (response.status === 401) {
-        errorMessage += data?.message || 'No autorizado. Inicia sesión nuevamente.';
-      } else if (response.status === 404) {
-        errorMessage += data?.message || 'Endpoint no encontrado.';
-      } else if (response.status >= 500) {
-        errorMessage += data?.message || 'Error interno del servidor.';
-      } else {
-        errorMessage += data?.message || response.statusText;
+    if (response.ok) {
+      // Mostrar notificación de éxito si está configurada
+      if (options.successMessage) {
+        showNotification(options.successMessage, 'success');
       }
 
-      const error = new Error(errorMessage);
-      error.status = response.status;
-      error.response = data;
+      return {
+        success: true,
+        data,
+        status: response.status,
+        headers: response.headers,
+        response
+      };
+    } else {
+      const error = new ApiError(
+        data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`,
+        response.status,
+        data,
+        response
+      );
+
+      // Mostrar notificación de error si está configurada
+      if (options.showErrorNotification !== false) {
+        const errorMessage = error.message || 'Error en la petición';
+        showNotification(errorMessage, 'error');
+      }
+
       throw error;
     }
-
-    return data;
   }
 
-  // Métodos HTTP
+  // Métodos de conveniencia
   get(endpoint, options = {}) {
     return this.request(endpoint, { ...options, method: 'GET' });
   }
 
   post(endpoint, body, options = {}) {
-    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
-    const headers = {
-      ...(options.headers || {})
-    };
-
-    if (!isFormData && body !== undefined && headers['Content-Type'] === undefined) {
-      headers['Content-Type'] = 'application/json';
+    const config = { ...options, method: 'POST' };
+    if (body) {
+      if (body instanceof FormData) {
+        // No establecer Content-Type para FormData (el browser lo hace automáticamente)
+        delete config.headers['Content-Type'];
+        config.body = body;
+      } else {
+        config.body = JSON.stringify(body);
+      }
     }
-
-    const payload = isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined);
-    const requestOptions = {
-      ...options,
-      method: 'POST',
-      headers
-    };
-
-    if (payload !== undefined) {
-      requestOptions.body = payload;
-    }
-
-    return this.request(endpoint, requestOptions);
+    return this.request(endpoint, config);
   }
 
   put(endpoint, body, options = {}) {
-    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
-    const headers = {
-      ...(options.headers || {})
-    };
-
-    if (!isFormData && body !== undefined && headers['Content-Type'] === undefined) {
-      headers['Content-Type'] = 'application/json';
+    const config = { ...options, method: 'PUT' };
+    if (body) {
+      if (body instanceof FormData) {
+        delete config.headers['Content-Type'];
+        config.body = body;
+      } else {
+        config.body = JSON.stringify(body);
+      }
     }
+    return this.request(endpoint, config);
+  }
 
-    const payload = isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined);
-    const requestOptions = {
-      ...options,
-      method: 'PUT',
-      headers
-    };
-
-    if (payload !== undefined) {
-      requestOptions.body = payload;
+  patch(endpoint, body, options = {}) {
+    const config = { ...options, method: 'PATCH' };
+    if (body) {
+      config.body = JSON.stringify(body);
     }
-
-    return this.request(endpoint, requestOptions);
+    return this.request(endpoint, config);
   }
 
   delete(endpoint, options = {}) {
     return this.request(endpoint, { ...options, method: 'DELETE' });
+  }
+
+  // Subida de archivos con progreso
+  async upload(endpoint, file, options = {}) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      
+      formData.append('file', file);
+      
+      // Agregar campos adicionales
+      if (options.fields) {
+        Object.entries(options.fields).forEach(([key, value]) => {
+          formData.append(key, value);
+        });
+      }
+
+      // Configurar eventos
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && options.onProgress) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          options.onProgress(percentComplete, event);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            resolve({
+              success: true,
+              data,
+              status: xhr.status
+            });
+          } catch (error) {
+            resolve({
+              success: true,
+              data: xhr.responseText,
+              status: xhr.status
+            });
+          }
+        } else {
+          reject(new ApiError(
+            `Upload failed: ${xhr.statusText}`,
+            xhr.status,
+            xhr.responseText
+          ));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new ApiError('Network error during upload', 0));
+      };
+
+      xhr.ontimeout = () => {
+        reject(new ApiError('Upload timeout', 0));
+      };
+
+      // Configurar request
+      xhr.open('POST', `${this.baseUrl}${endpoint}`);
+      
+      // Agregar headers de autenticación
+      const token = localStorage.getItem('token');
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
+      xhr.timeout = options.timeout || 30000;
+      xhr.send(formData);
+    });
+  }
+
+  // Descarga de archivos
+  async download(endpoint, options = {}) {
+    try {
+      const response = await this.request(endpoint, {
+        ...options,
+        showLoading: options.showLoading !== false
+      });
+
+      if (response.success) {
+        const blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
+        
+        // Crear URL temporal para descarga
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Intentar obtener el nombre del archivo desde los headers
+        const disposition = response.headers.get('content-disposition');
+        let filename = options.filename || 'download';
+        
+        if (disposition && disposition.includes('filename=')) {
+          const matches = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (matches && matches[1]) {
+            filename = matches[1].replace(/['"]/g, '');
+          }
+        }
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Limpiar URL temporal
+        window.URL.revokeObjectURL(url);
+        
+        if (options.successMessage) {
+          showNotification(options.successMessage, 'success');
+        }
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      if (options.showErrorNotification !== false) {
+        showNotification('Error al descargar el archivo', 'error');
+      }
+      throw error;
+    }
+  }
+
+  // Configurar timeout
+  setTimeout(timeout) {
+    this.defaults.timeout = timeout;
+    return this;
+  }
+
+  // Configurar headers por defecto
+  setDefaultHeaders(headers) {
+    this.defaults.headers = { ...this.defaults.headers, ...headers };
+    return this;
+  }
+
+  // Configurar base URL
+  setBaseUrl(baseUrl) {
+    this.baseUrl = baseUrl;
+    return this;
+  }
+}
+
+// Clase de error personalizada
+class ApiError extends Error {
+  constructor(message, status = 0, data = null, response = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+    this.response = response;
+  }
+
+  get isNetworkError() {
+    return this.status === 0;
+  }
+
+  get isClientError() {
+    return this.status >= 400 && this.status < 500;
+  }
+
+  get isServerError() {
+    return this.status >= 500;
+  }
+
+  get isAuthError() {
+    return this.status === 401 || this.status === 403;
   }
 }
 
 // Crear instancia del cliente API
 const apiClient = new ApiClient();
 
-// Configurar interceptores básicos
+// Interceptor de autenticación
 apiClient.addRequestInterceptor((config, endpoint) => {
-  // Agregar token de autenticación si existe
-  const token = getStoredAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const token = localStorage.getItem('token');
+  if (token && !config.headers['Authorization']) {
+    config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;
 });
+
+// Interceptor para manejar respuestas de autenticación
+apiClient.addResponseInterceptor((response, config, endpoint) => {
+  // Si recibimos un nuevo token en los headers, guardarlo
+  const newToken = response.headers.get('x-new-token');
+  if (newToken) {
+    localStorage.setItem('token', newToken);
+  }
+  return response;
+});
+
+// Interceptor para manejar errores de autenticación
+apiClient.addErrorInterceptor((error, endpoint, options) => {
+  if (error.isAuthError && !endpoint.includes('/auth/')) {
+    // Token expirado o inválido
+    localStorage.removeItem('token');
+    store.logout();
+    
+    // Redirigir al login solo si no estamos ya ahí
+    if (!window.location.pathname.includes('login.html')) {
+      showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
+      setTimeout(() => {
+        window.location.href = '../auth/login.html';
+      }, 1500);
+    }
+  }
+  
+  // Almacenar error en el store
+  store.setError(error);
+  
+  return error;
+});
+
+// Interceptor para logging en desarrollo
+if (window.location.hostname === 'localhost' || window.location.search.includes('debug=true')) {
+  apiClient.addRequestInterceptor((config, endpoint) => {
+    console.log(`🚀 API Request: ${config.method} ${endpoint}`, config);
+    return config;
+  });
+
+  apiClient.addResponseInterceptor((response, config, endpoint) => {
+    console.log(`✅ API Response: ${config.method} ${endpoint}`, {
+      status: response.status,
+      headers: response.headers,
+      response
+    });
+    return response;
+  });
+
+  apiClient.addErrorInterceptor((error, endpoint, options) => {
+    console.error(`❌ API Error: ${endpoint}`, error);
+    return error;
+  });
+}
 
 // Métodos específicos para la API de DocuFlow
 export const docuFlowAPI = {
   // Autenticación
   auth: {
-    login: (credentials) => apiClient.post('/auth/login', credentials, { _skipAuthRetry: true }),
-    register: (userData) => apiClient.post('/auth/register', userData, { _skipAuthRetry: true }),
-    logout: () => apiClient.post('/auth/logout', undefined, { showLoading: false }),
-    refreshToken: () => apiClient.refreshAccessToken()
+    login: (credentials) => apiClient.post('/auth/login', credentials, {
+      successMessage: '¡Bienvenido de vuelta!',
+      showErrorNotification: true
+    }),
+    register: (userData) => apiClient.post('/auth/register', userData, {
+      successMessage: 'Cuenta creada exitosamente',
+      showErrorNotification: true
+    }),
+    logout: () => apiClient.post('/auth/logout', {}, {
+      showLoading: false,
+      showErrorNotification: false
+    }),
+    refreshToken: () => apiClient.post('/auth/refresh', {}, {
+      showLoading: false,
+      showErrorNotification: false
+    })
+  },
+
+  // Archivos
+  files: {
+    getAll: () => apiClient.get('/files'),
+    getById: (id) => apiClient.get(`/files/${id}`),
+    upload: (file, metadata = {}) => apiClient.upload('/files/upload', file, {
+      fields: metadata,
+      onProgress: (percent) => {
+        console.log(`Upload progress: ${percent.toFixed(1)}%`);
+      },
+      successMessage: 'Archivo subido exitosamente'
+    }),
+    download: (id, filename) => apiClient.download(`/files/${id}/download`, {
+      filename,
+      successMessage: 'Descarga iniciada'
+    }),
+    delete: (id) => apiClient.delete(`/files/${id}`, {
+      successMessage: 'Archivo eliminado exitosamente'
+    })
   },
 
   // Comentarios
   comments: {
-    getAll: () => apiClient.get('/api/comments'),
-    getByFileId: (fileId) => apiClient.get(`/api/comments/document/${fileId}`),
-    create: (comment) => apiClient.post('/api/comments', comment),
-    update: (id, comment) => apiClient.put(`/api/comments/${id}`, comment),
-    delete: (id) => apiClient.delete(`/api/comments/${id}`)
+    getAll: () => apiClient.get('/comments'),
+    getByFileId: (fileId) => apiClient.get(`/comments/file/${fileId}`),
+    create: (comment) => apiClient.post('/comments', comment, {
+      successMessage: 'Comentario agregado'
+    }),
+    update: (id, comment) => apiClient.put(`/comments/${id}`, comment),
+    delete: (id) => apiClient.delete(`/comments/${id}`, {
+      successMessage: 'Comentario eliminado'
+    })
   },
 
   // Dashboard
   dashboard: {
-    getStats: () => apiClient.get('/api/dashboard/stats'),
-    getFileStats: () => apiClient.get('/api/dashboard/files/stats'),
-    getActivity: () => apiClient.get('/api/dashboard/activity'),
-    getRecentFiles: (limit = 5) => apiClient.get(`/api/dashboard/recent-files?limit=${limit}`),
-    getRecentActivities: (limit = 10) => apiClient.get(`/api/dashboard/recent-activities?limit=${limit}`),
-    // Endpoints legacy para compatibilidad
-    getUsers: () => apiClient.get('/api/dashboard/users'),
-    getComments: () => apiClient.get('/api/dashboard/comments'),
-    getLogs: () => apiClient.get('/api/dashboard/logs'),
-    getFiles: () => apiClient.get('/api/dashboard/files'),
-    getDownloadsToday: () => apiClient.get('/api/dashboard/downloads/today')
+    getStats: () => apiClient.get('/dashboard/stats'),
+    getRecentActivity: () => apiClient.get('/dashboard/activity')
   },
 
   // Permisos
   permissions: {
-    getAll: () => apiClient.get('/users'),
-    update: (userId, permissions) => apiClient.put(`/users/${userId}/permissions`, { permissions })
+    getAll: () => apiClient.get('/permissions'),
+    update: (userId, permissions) => apiClient.put(`/permissions/${userId}`, permissions, {
+      successMessage: 'Permisos actualizados'
+    })
   },
 
   // Logs
   logs: {
     getAll: (params = {}) => {
       const queryString = new URLSearchParams(params).toString();
-      return apiClient.get(`/api/logs${queryString ? `?${queryString}` : ''}`);
-    },
-    getRecent: (limit = 10) => apiClient.get(`/api/logs/recent?limit=${limit}`),
-    getCount: () => apiClient.get('/api/logs/count'),
-    getByUser: (username) => apiClient.get(`/api/logs/user/${username}`)
-  },
-
-  // Archivos
-  files: {
-    getAll: async () => {
-      const data = await apiClient.get('/files');
-      if (Array.isArray(data)) {
-        return { success: true, files: data };
-      }
-      if (Array.isArray(data?.files)) {
-        return { success: data.success ?? true, files: data.files };
-      }
-      if (Array.isArray(data?.data)) {
-        return { success: data.success ?? true, files: data.data };
-      }
-      return data;
-    },
-    getById: (id) => apiClient.get(`/files/${id}`),
-    upload: (formData) => apiClient.request('/files', {
-      method: 'POST',
-      body: formData
-    }),
-    delete: (id) => apiClient.delete(`/files/${id}`),
-    download: (id) => apiClient.get(`/files/${id}/download`, { responseType: 'blob' }),
-    getStats: async () => {
-      const data = await apiClient.get('/files/stats');
-      if (data?.data) {
-        return { success: data.success ?? true, ...data.data };
-      }
-      return data;
-    },
-    getCount: async () => {
-      const data = await apiClient.get('/files/count');
-      if (data?.data) {
-        return { success: data.success ?? true, ...data.data };
-      }
-      return data;
-    },
-    getTotalSize: async () => {
-      const data = await apiClient.get('/files/total-size');
-      if (data?.data) {
-        return { success: data.success ?? true, ...data.data };
-      }
-      return data;
+      return apiClient.get(`/logs${queryString ? `?${queryString}` : ''}`);
     }
   }
 };
 
-export { ApiClient, apiClient };
+export { ApiClient, ApiError, apiClient };
 export default apiClient;
