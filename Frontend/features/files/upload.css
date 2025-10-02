@@ -357,6 +357,38 @@
   box-shadow: var(--shadow-lg);
 }
 
+.file-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.file-card-header i {
+  font-size: 1.5rem;
+  color: var(--primary-blue);
+}
+
+.file-card-title h6 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.file-card-title small {
+  color: var(--gray-500);
+}
+
+.file-card-body {
+  font-size: var(--font-size-sm);
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-md);
+}
+
+.file-card-actions .btn {
+  font-size: var(--font-size-xs);
+}
+
 .file-card .file-icon {
   width: 64px;
   height: 64px;

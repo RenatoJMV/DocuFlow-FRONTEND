@@ -11,7 +11,7 @@
 </head>
 <body>
   <!-- Navbar Container -->
-  <div id="navbar-container" style="margin: 2rem;"></div>
+  <div id="navbar-container" class="container-fluid mt-4 mb-4"></div>
 
   <div class="files-container">
     <!-- Header Section -->
@@ -97,13 +97,13 @@
           <div class="quick-actions mt-4">
             <h6>Acciones Rápidas</h6>
             <div class="d-grid gap-2">
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="refreshFiles()">
+              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.refreshFileList?.()">
                 <i class="bi bi-arrow-clockwise me-2"></i>Actualizar Lista
               </button>
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="downloadAll()">
+              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.downloadAllSelected?.()">
                 <i class="bi bi-download me-2"></i>Descargar Todo
               </button>
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="showFileStats()">
+              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.showFileStatsModal?.()">
                 <i class="bi bi-bar-chart me-2"></i>Ver Estadísticas
               </button>
             </div>
@@ -121,10 +121,10 @@
                 <input type="text" class="form-control form-control-sm" id="searchFiles" placeholder="Buscar archivos...">
               </div>
               <div class="view-toggle btn-group" role="group">
-                <button type="button" class="btn btn-outline-secondary btn-sm active" id="listView">
+                <button type="button" class="btn btn-outline-secondary btn-sm active" id="listViewButton" data-view="table">
                   <i class="bi bi-list"></i>
                 </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="gridView">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="gridViewButton" data-view="grid">
                   <i class="bi bi-grid"></i>
                 </button>
               </div>
@@ -161,7 +161,7 @@
           </div>
 
           <!-- Grid View -->
-          <div class="files-grid" id="gridView" style="display: none;">
+          <div class="files-grid" id="gridViewContainer" style="display: none;">
             <div class="row" id="filesGrid">
               <!-- Los archivos se cargarán aquí -->
             </div>

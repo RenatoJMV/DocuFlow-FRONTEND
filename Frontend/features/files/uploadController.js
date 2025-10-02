@@ -7,18 +7,18 @@ class UploadController {
     this.selectedFiles = [];
     this.currentView = 'table'; // table or grid
     this.currentPage = 1;
-      const files = Array.isArray(response)
-        ? response
-        : Array.isArray(response?.files)
-          ? response.files
-          : Array.isArray(response?.data)
-            ? response.data
-            : [];
-
-      this.allFiles = files;
-      console.log('📁 Total archivos detectados:', this.allFiles.length);
+    this.itemsPerPage = 10;
     this.allFiles = [];
     this.filteredFiles = [];
+    this.pagination = new Pagination('paginationContainer', {
+      itemsPerPage: this.itemsPerPage,
+      onPageChange: (page) => {
+        this.currentPage = page;
+        this.renderFiles();
+        this.updateShowingCount();
+      }
+    });
+    this.itemsPerPage = this.pagination.getItemsPerPage();
     
     this.initializeComponents();
     this.setupEventListeners();
@@ -201,7 +201,9 @@ class UploadController {
     // View toggle
     document.querySelectorAll('.view-toggle .btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        this.currentView = e.target.dataset.view;
+        e.preventDefault();
+        const target = e.currentTarget || btn;
+        this.currentView = target.dataset.view || target.getAttribute('data-view') || 'table';
         this.updateViewToggle();
         this.renderFiles();
       });
@@ -285,10 +287,20 @@ class UploadController {
     try {
       const response = await docuFlowAPI.files.getAll();
       console.log('📁 Respuesta del servidor (archivos):', response);
-      console.log('📁 Tipo de respuesta:', typeof response);
-      console.log('📁 Es array:', Array.isArray(response));
-      
-      this.allFiles = Array.isArray(response) ? response : [];
+
+      const files = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.files)
+          ? response.files
+          : Array.isArray(response?.data)
+            ? response.data
+            : Array.isArray(response?.content)
+              ? response.content
+              : [];
+
+      this.allFiles = files
+        .map(file => this.normalizeFile(file))
+        .filter(Boolean);
       console.log('📁 Archivos cargados:', this.allFiles.length);
       
       this.filterFiles();
@@ -304,7 +316,7 @@ class UploadController {
     const searchTerm = document.getElementById('searchFiles')?.value.toLowerCase() || '';
     
     this.filteredFiles = this.allFiles.filter(file => 
-      file.filename.toLowerCase().includes(searchTerm)
+      (file.filename || '').toLowerCase().includes(searchTerm)
     );
 
     this.currentPage = 1;
@@ -314,8 +326,9 @@ class UploadController {
   }
 
   renderFiles() {
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
+    const itemsPerPage = this.getItemsPerPage();
+    const startIndex = (this.currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
     const filesToShow = this.filteredFiles.slice(startIndex, endIndex);
 
     if (this.currentView === 'table') {
@@ -325,11 +338,22 @@ class UploadController {
     }
 
     this.updateShowingCount();
+    if (this.pagination) {
+      this.pagination.currentPage = this.currentPage;
+      this.pagination.render(this.filteredFiles.length);
+    }
+  }
+
+  getItemsPerPage() {
+    if (this.pagination && typeof this.pagination.getItemsPerPage === 'function') {
+      return this.pagination.getItemsPerPage();
+    }
+    return this.itemsPerPage || 10;
   }
 
   renderTableView(files) {
     const tableContainer = document.getElementById('tableView');
-    const gridContainer = document.getElementById('gridView'); // Nota: probablemente no existe
+    const gridContainer = document.getElementById('gridViewContainer');
     
     if (tableContainer) tableContainer.style.display = 'block';
     if (gridContainer) gridContainer.style.display = 'none';
@@ -389,10 +413,64 @@ class UploadController {
   }
 
   renderGridView(files) {
-    // Por ahora, la vista de grid no está implementada en el HTML
-    // Redirigir a la vista de tabla
-    console.log('Grid view no implementada, usando vista de tabla');
-    this.renderTableView(files);
+    const tableContainer = document.getElementById('tableView');
+    const gridContainer = document.getElementById('gridViewContainer');
+    const grid = document.getElementById('filesGrid');
+
+    if (!gridContainer || !grid) {
+      this.renderTableView(files);
+      return;
+    }
+
+    if (tableContainer) tableContainer.style.display = 'none';
+    gridContainer.style.display = 'block';
+
+    grid.innerHTML = '';
+
+    if (files.length === 0) {
+      grid.innerHTML = `
+        <div class="col-12">
+          <div class="empty-state text-center py-5">
+            <i class="bi bi-folder-x display-4 text-muted mb-3"></i>
+            <h5 class="text-muted">No hay archivos</h5>
+            <p class="text-muted">Sube tu primer archivo para comenzar</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    files.forEach(file => {
+      const card = document.createElement('div');
+      card.className = 'col-md-6 col-xl-4 mb-3';
+      card.innerHTML = `
+        <div class="file-card card-modern h-100">
+          <div class="file-card-header d-flex align-items-center gap-2">
+            <i class="${this.getFileIconClass(file.filename)}"></i>
+            <div class="file-card-title">
+              <h6 class="mb-0">${file.filename}</h6>
+              <small class="text-muted">${this.formatFileSize(file.size || 0)}</small>
+            </div>
+          </div>
+          <div class="file-card-body">
+            <p class="mb-1"><i class="bi bi-person me-2"></i>${file.uploader || 'Usuario'}</p>
+            <p class="mb-1"><i class="bi bi-calendar me-2"></i>${new Date(file.uploadDate || Date.now()).toLocaleDateString()}</p>
+          </div>
+          <div class="file-card-actions d-flex gap-2">
+            <button class="btn btn-sm btn-outline-modern flex-fill" onclick="uploadController.downloadFile('${file.id}', '${file.filename}')">
+              <i class="bi bi-download"></i> Descargar
+            </button>
+            <button class="btn btn-sm btn-outline-modern flex-fill" onclick="uploadController.previewFile('${file.id}')">
+              <i class="bi bi-eye"></i> Vista previa
+            </button>
+            <button class="btn btn-sm btn-outline-danger flex-fill" onclick="uploadController.deleteFile('${file.id}')">
+              <i class="bi bi-trash"></i> Eliminar
+            </button>
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
   }
 
   getFileIconClass(filename) {
@@ -415,6 +493,23 @@ class UploadController {
     return iconMap[ext] || 'bi bi-file-earmark text-muted';
   }
 
+  normalizeFile(file) {
+    if (!file) return null;
+
+    const filename = file.filename || file.name || file.originalFilename || 'archivo_sin_nombre';
+    const uploadDate = file.uploadDate || file.createdAt || file.updatedAt || file.timestamp;
+    const uploader = file.uploader || file.uploadedBy || file.owner || file.user || 'Usuario';
+
+    return {
+      ...file,
+      id: file.id ?? file.fileId ?? file.uuid ?? filename,
+      filename,
+      size: file.size ?? file.fileSize ?? file.bytes ?? 0,
+      uploadDate,
+      uploader
+    };
+  }
+
   updateViewToggle() {
     document.querySelectorAll('.view-toggle .btn').forEach(btn => {
       btn.classList.remove('active');
@@ -425,25 +520,16 @@ class UploadController {
   }
 
   updatePagination() {
-    const totalItems = this.filteredFiles.length;
-    const totalPages = Math.ceil(totalItems / this.itemsPerPage);
-    
-    const paginationContainer = document.getElementById('paginationContainer');
-    if (!paginationContainer) return;
+    if (!this.pagination) return;
 
-    if (totalPages <= 1) {
-      paginationContainer.innerHTML = '';
-      return;
-    }
+    this.pagination.itemsPerPage = this.getItemsPerPage();
+    this.pagination.currentPage = this.currentPage;
+    this.pagination.onPageChange = (page) => {
+      this.currentPage = page;
+      this.renderFiles();
+    };
 
-    const pagination = new Pagination(paginationContainer, {
-      currentPage: this.currentPage,
-      totalPages: totalPages,
-      onPageChange: (page) => {
-        this.currentPage = page;
-        this.renderFiles();
-      }
-    });
+    this.pagination.render(this.filteredFiles.length);
   }
 
   updateShowingCount() {
@@ -451,8 +537,9 @@ class UploadController {
     const totalElement = document.getElementById('totalCount');
     
     if (showingElement && totalElement) {
-      const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-      const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredFiles.length);
+      const itemsPerPage = this.getItemsPerPage();
+      const startIndex = (this.currentPage - 1) * itemsPerPage;
+      const endIndex = Math.min(startIndex + itemsPerPage, this.filteredFiles.length);
       
       showingElement.textContent = this.filteredFiles.length > 0 ? `${startIndex + 1}-${endIndex}` : '0';
       totalElement.textContent = this.filteredFiles.length;
@@ -500,6 +587,24 @@ class UploadController {
       if (totalFilesEl) totalFilesEl.textContent = totalFiles;
       if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);
     }
+  }
+
+  refreshFileList() {
+    this.loadFiles();
+  }
+
+  downloadAllSelected() {
+    const selected = Array.from(document.querySelectorAll('.file-checkbox:checked'));
+    if (selected.length === 0) {
+      showNotification('Selecciona al menos un archivo para descargar', 'info');
+      return;
+    }
+    showNotification('Descarga múltiple disponible próximamente', 'info');
+  }
+
+  showFileStatsModal() {
+    this.updateStats();
+    showNotification('Estadísticas actualizadas', 'success');
   }
 
   async downloadFile(fileId, filename) {
@@ -556,6 +661,8 @@ document.addEventListener('DOMContentLoaded', () => {
     deleteFile: (fileId) => uploadController.deleteFile(fileId),
     openPreviewModal: (fileId) => uploadController.previewFile(fileId),
     removeFile: (index) => uploadController.removeFile(index),
-    refreshFileList: () => uploadController.loadFiles()
+    refreshFileList: () => uploadController.refreshFileList(),
+    downloadAllSelected: () => uploadController.downloadAllSelected(),
+    showFileStatsModal: () => uploadController.showFileStatsModal()
   };
 });

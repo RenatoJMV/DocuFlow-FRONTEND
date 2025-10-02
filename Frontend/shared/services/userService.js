@@ -112,7 +112,7 @@ export async function apiGetUsers() {
 
 export async function login(username, password) {
   try {
-    const response = await fetch(`${BACKEND_URL}/login`, {
+    const response = await fetch(`${BACKEND_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
@@ -121,6 +121,17 @@ export async function login(username, password) {
     if (response.ok && data?.token) {
       localStorage.setItem("token", data.token);
       localStorage.setItem("authToken", data.token);
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
+      if (typeof data.expiresIn === 'number') {
+        const expiresAt = Date.now() + data.expiresIn * 1000;
+        localStorage.setItem("tokenExpiresAt", expiresAt.toString());
+      }
+      if (data.user) {
+        localStorage.setItem("userData", JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
       return { success: true, token: data.token };
     } else {
       return { success: false, error: data?.error || "Credenciales inválidas" };

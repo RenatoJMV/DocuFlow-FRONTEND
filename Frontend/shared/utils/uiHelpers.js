@@ -140,14 +140,19 @@ function createNavItem(page, title, icon, currentPage) {
 }
 
 // Función de logout global
-window.logout = function() {
+window.logout = async function() {
   showNotification('Cerrando sesión...', 'info', 1000);
-  setTimeout(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '../auth/login.html';
-  }, 1000);
-}
+  try {
+    const { authService } = await import('../services/authService.js');
+    await authService.logout();
+  } catch (error) {
+    console.warn('❌ Error al cerrar sesión:', error);
+  } finally {
+    setTimeout(() => {
+      window.location.href = '../auth/login.html';
+    }, 600);
+  }
+};
 
 // Función para inicializar navbar en una página
 export function initializeNavbar(currentPage) {
@@ -296,60 +301,95 @@ export function debounce(func, wait) {
 
 // Componente de paginación reutilizable
 export class Pagination {
-  constructor(containerId, options = {}) {
-    this.container = document.getElementById(containerId);
+  constructor(containerOrId, options = {}) {
+    this.container = typeof containerOrId === 'string'
+      ? document.getElementById(containerOrId)
+      : containerOrId;
     this.itemsPerPage = options.itemsPerPage || 10;
-    this.currentPage = 1;
+    this.currentPage = options.currentPage || 1;
     this.onPageChange = options.onPageChange || (() => {});
+    this.maxPagesToShow = options.maxPagesToShow || 5;
   }
 
   render(totalItems) {
-    const totalPages = Math.ceil(totalItems / this.itemsPerPage);
     if (!this.container) return;
-    
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / this.itemsPerPage));
     this.container.innerHTML = '';
 
-    if (totalPages <= 1) return;
+    if (totalPages <= 1) {
+      this.totalPages = totalPages;
+      return;
+    }
+
+    this.totalPages = totalPages;
+    this.currentPage = Math.min(this.currentPage, totalPages);
 
     const nav = document.createElement('nav');
-    nav.innerHTML = `
-      <ul class="pagination justify-content-center">
-        ${this.createPageButton('&laquo;', this.currentPage > 1, () => this.goToPage(this.currentPage - 1))}
-        ${this.createPageNumbers(totalPages)}
-        ${this.createPageButton('&raquo;', this.currentPage < totalPages, () => this.goToPage(this.currentPage + 1))}
-      </ul>
-    `;
-    
+    const list = document.createElement('ul');
+    list.className = 'pagination justify-content-center';
+
+    list.appendChild(this.createPageButton('&laquo;', this.currentPage > 1, () => this.goToPage(this.currentPage - 1)));
+
+    this.createPageNumbers(totalPages).forEach(item => list.appendChild(item));
+
+    list.appendChild(this.createPageButton('&raquo;', this.currentPage < totalPages, () => this.goToPage(this.currentPage + 1)));
+
+    nav.appendChild(list);
     this.container.appendChild(nav);
   }
 
-  createPageButton(text, enabled, onClick, active = false) {
-    const disabled = enabled ? '' : 'disabled';
-    const activeClass = active ? 'active' : '';
-    return `
-      <li class="page-item ${disabled} ${activeClass}">
-        <a class="page-link" href="#" ${enabled ? `onclick="event.preventDefault(); (${onClick})();"` : ''}>
-          ${text}
-        </a>
-      </li>
-    `;
+  createPageButton(label, enabled, onClick, active = false) {
+    const listItem = document.createElement('li');
+    listItem.className = 'page-item';
+    if (!enabled) listItem.classList.add('disabled');
+    if (active) listItem.classList.add('active');
+
+    const link = document.createElement('a');
+    link.className = 'page-link';
+    link.href = '#';
+    link.innerHTML = label;
+
+    if (enabled) {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        onClick();
+      });
+    } else {
+      link.setAttribute('tabindex', '-1');
+      link.setAttribute('aria-disabled', 'true');
+    }
+
+    listItem.appendChild(link);
+    return listItem;
   }
 
   createPageNumbers(totalPages) {
-    const startPage = Math.max(1, this.currentPage - 2);
-    const endPage = Math.min(totalPages, this.currentPage + 2);
-    let html = '';
-    
-    for (let i = startPage; i <= endPage; i++) {
-      html += this.createPageButton(i, true, () => this.goToPage(i), i === this.currentPage);
+    const pages = [];
+    const halfRange = Math.floor(this.maxPagesToShow / 2);
+    let startPage = Math.max(1, this.currentPage - halfRange);
+    let endPage = startPage + this.maxPagesToShow - 1;
+
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - this.maxPagesToShow + 1);
     }
-    
-    return html;
+
+    for (let page = startPage; page <= endPage; page++) {
+      pages.push(this.createPageButton(String(page), true, () => this.goToPage(page), page === this.currentPage));
+    }
+
+    return pages;
   }
 
   goToPage(page) {
-    this.currentPage = page;
-    this.onPageChange(page);
+    const targetPage = Math.min(Math.max(1, page), this.totalPages || 1);
+    if (targetPage === this.currentPage) return;
+
+    this.currentPage = targetPage;
+    if (typeof this.onPageChange === 'function') {
+      this.onPageChange(targetPage);
+    }
   }
 
   getCurrentPage() {
@@ -358,5 +398,9 @@ export class Pagination {
 
   getItemsPerPage() {
     return this.itemsPerPage;
+  }
+
+  setItemsPerPage(itemsPerPage) {
+    this.itemsPerPage = Math.max(1, itemsPerPage);
   }
 }

@@ -1,6 +1,5 @@
-import { docuFlowAPI } from '../../shared/services/apiClient.js';
-import { store } from '../../shared/services/store.js';
-import { createNavbar, showNotification, FormValidator } from '../../shared/utils/uiHelpers.js';
+import { authService } from '../../shared/services/authService.js';
+import { showNotification, FormValidator, validators } from '../../shared/utils/uiHelpers.js';
 
 class LoginController {
   constructor() {
@@ -34,18 +33,18 @@ class LoginController {
   }
 
   setupFormValidation() {
-    this.validator = new FormValidator('loginForm', {
-      username: {
-        required: true,
-        minLength: 3,
-        message: 'El nombre de usuario debe tener al menos 3 caracteres'
-      },
-      password: {
-        required: true,
-        minLength: 6,
-        message: 'La contraseña debe tener al menos 6 caracteres'
-      }
-    });
+    this.validator = new FormValidator('loginForm');
+    this.validator
+      .addRule(
+        'username',
+        (value) => validators.required(value) && validators.email(value.trim().toLowerCase()),
+        'Ingresa un correo electrónico válido'
+      )
+      .addRule(
+        'password',
+        (value) => validators.required(value) && validators.minLength(8)(value),
+        'La contraseña debe tener al menos 8 caracteres'
+      );
   }
 
   setupEventListeners() {
@@ -55,7 +54,8 @@ class LoginController {
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      if (!this.validator.validate()) {
+      const { isValid } = this.validator.validate();
+      if (!isValid) {
         return;
       }
 
@@ -75,41 +75,18 @@ class LoginController {
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
 
-      console.log('🔐 Intentando login con:', { username, password: '***' });
-      console.log('📡 URL del endpoint:', window.location.hostname === 'localhost' ? 'http://localhost:8080/login' : 'https://docuflow-backend.onrender.com/login');
+      const loginResult = await authService.login({ username, password });
 
-      // Call API for login
-      const response = await docuFlowAPI.auth.login({ username, password });
+      if (loginResult?.success) {
+        const userName = loginResult.data?.user?.name || loginResult.data?.user?.username || username;
+        showNotification(`Bienvenido ${userName}`, 'success');
 
-      console.log('✅ Respuesta del servidor:', response);
-
-      if (response.token) {
-        // Crear objeto de usuario básico
-        const userData = {
-          username: username,
-          role: 'colaborador' // Rol por defecto
-        };
-
-        // Store user data
-        store.setState('user', {
-          user: userData,
-          isAuthenticated: true,
-          token: response.token
-        });
-
-        // Store token for API client
-        localStorage.setItem('authToken', response.token);
-        localStorage.setItem('userData', JSON.stringify(userData));
-
-        showNotification('¡Inicio de sesión exitoso!', 'success');
-
-        // Redirect to dashboard after short delay
         setTimeout(() => {
           window.location.href = '../dashboard/dashboard.html';
-        }, 1000);
-
+        }, 800);
       } else {
-        throw new Error(response.error || 'Error en el inicio de sesión');
+        const errorMessage = loginResult?.error || loginResult?.data?.message || 'Credenciales inválidas';
+        throw new Error(errorMessage);
       }
 
     } catch (error) {

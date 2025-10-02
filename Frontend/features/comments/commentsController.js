@@ -9,6 +9,15 @@ class CommentsController {
     this.currentPage = 1;
     this.itemsPerPage = 10;
     this.currentFilter = 'all';
+    this.pagination = new Pagination('paginationContainer', {
+      itemsPerPage: this.itemsPerPage,
+      currentPage: this.currentPage,
+      onPageChange: (page) => {
+        this.currentPage = page;
+        this.renderComments();
+        this.updatePagination();
+      }
+    });
     
     this.initializeComponents();
     this.setupEventListeners();
@@ -270,6 +279,7 @@ class CommentsController {
     if (commentsToShow.length === 0) {
       container.innerHTML = '';
       emptyState.classList.remove('d-none');
+      this.updateShowingCount();
       return;
     }
 
@@ -353,25 +363,21 @@ class CommentsController {
   }
 
   updatePagination() {
-    const totalItems = this.filteredComments.length;
-    const totalPages = Math.ceil(totalItems / this.itemsPerPage);
-    
-    const paginationContainer = document.getElementById('paginationContainer');
-    if (!paginationContainer) return;
-
-    if (totalPages <= 1) {
-      paginationContainer.innerHTML = '';
-      return;
+    if (!this.pagination) {
+      this.pagination = new Pagination('paginationContainer', {
+        itemsPerPage: this.itemsPerPage,
+        currentPage: this.currentPage,
+        onPageChange: (page) => {
+          this.currentPage = page;
+          this.renderComments();
+          this.updatePagination();
+        }
+      });
     }
 
-    const pagination = new Pagination(paginationContainer, {
-      currentPage: this.currentPage,
-      totalPages: totalPages,
-      onPageChange: (page) => {
-        this.currentPage = page;
-        this.renderComments();
-      }
-    });
+    this.pagination.setItemsPerPage(this.itemsPerPage);
+    this.pagination.currentPage = this.currentPage;
+    this.pagination.render(this.filteredComments.length);
   }
 
   updateShowingCount() {

@@ -185,6 +185,12 @@ class AppStore {
       permissions: [],
       logs: []
     });
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('tokenExpiresAt');
+    localStorage.removeItem('userData');
+    localStorage.removeItem('user');
     this.clearStorage();
   }
 

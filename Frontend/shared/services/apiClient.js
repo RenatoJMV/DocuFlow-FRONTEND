@@ -1,6 +1,42 @@
 // Cliente API moderno con fallback offline para DocuFlow
 import { store } from './store.js';
-import { showNotification, showLoading } from '../utils/uiHelpers.js';
+import { showNotification } from '../utils/uiHelpers.js';
+
+const ACCESS_TOKEN_KEY = 'authToken';
+const LEGACY_TOKEN_KEY = 'token';
+const REFRESH_TOKEN_KEY = 'refreshToken';
+const TOKEN_EXPIRATION_KEY = 'tokenExpiresAt';
+
+export function getStoredAccessToken() {
+  return localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY);
+}
+
+export function getStoredRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function persistAuthTokens({ token, refreshToken, expiresIn } = {}) {
+  if (token) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, token);
+    localStorage.setItem(LEGACY_TOKEN_KEY, token);
+  }
+
+  if (refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+
+  if (typeof expiresIn === 'number' && !Number.isNaN(expiresIn)) {
+    const expiresAt = Date.now() + expiresIn * 1000;
+    localStorage.setItem(TOKEN_EXPIRATION_KEY, expiresAt.toString());
+  }
+}
+
+export function clearAuthTokens() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(TOKEN_EXPIRATION_KEY);
+}
 
 class ApiClient {
   constructor() {
@@ -11,7 +47,8 @@ class ApiClient {
       ? 'http://localhost:8080'  // Puerto por defecto de Spring Boot
       : 'https://docuflow-backend.onrender.com';
       
-    this.offlineMode = false;
+  this.offlineMode = false;
+  this.refreshPromise = null;
     
     this.interceptors = {
       request: [],
@@ -47,20 +84,25 @@ class ApiClient {
 
   // Método principal para hacer requests
   async request(endpoint, options = {}) {
+    const { _retry, _skipAuthRetry, ...requestOptions } = options;
+    const hasRetried = Boolean(_retry);
+    const skipAuthRetry = Boolean(_skipAuthRetry);
+    const { showLoading: showLoadingOption = true, ...fetchOptions } = requestOptions;
+
     try {
       // Si ya estamos en modo offline, usar datos de demostración directamente
       if (this.offlineMode) {
-        return await this.getDemoResponse(endpoint, options);
+        return await this.getDemoResponse(endpoint, requestOptions);
       }
 
       // Configurar request base
       let config = {
-        method: options.method || 'GET',
+        method: fetchOptions.method || 'GET',
         headers: {
           ...this.defaults.headers,
-          ...options.headers
+          ...(fetchOptions.headers || {})
         },
-        ...options
+        ...fetchOptions
       };
 
       // Ejecutar interceptores de request
@@ -75,7 +117,7 @@ class ApiClient {
       }
 
       // Mostrar loading si está habilitado
-      if (options.showLoading !== false) {
+      if (showLoadingOption !== false) {
         store.setLoading(true);
       }
 
@@ -108,13 +150,30 @@ class ApiClient {
       return await this.handleResponse(processedResponse, options);
 
     } catch (error) {
+      if (error && error.status === 401 && !hasRetried && !skipAuthRetry) {
+        try {
+          const refreshResult = await this.refreshAccessToken();
+          const refreshedToken = refreshResult?.token || refreshResult;
+          if (refreshResult && refreshedToken) {
+            console.log('🔁 Token renovado, reintentando solicitud original');
+            return await this.request(endpoint, {
+              ...requestOptions,
+              showLoading: false,
+              _retry: true
+            });
+          }
+        } catch (refreshError) {
+          console.warn('⚠️ Error al refrescar token:', refreshError);
+        }
+      }
+
       // Si hay error de conexión, activar modo offline y usar datos demo
       const isConnectionError = error.name === 'AbortError' || 
                                error.name === 'TypeError' ||
-                               error.message.includes('Failed to fetch') || 
-                               error.message.includes('ERR_CONNECTION_REFUSED') || 
-                               error.message.includes('NetworkError') ||
-                               error.message.includes('net::ERR_');
+                               error.message?.includes('Failed to fetch') || 
+                               error.message?.includes('ERR_CONNECTION_REFUSED') || 
+                               error.message?.includes('NetworkError') ||
+                               error.message?.includes('net::ERR_');
       
       if (isConnectionError) {
         if (!this.offlineMode) {
@@ -128,7 +187,7 @@ class ApiClient {
           }
         }
         
-        return await this.getDemoResponse(endpoint, options);
+        return await this.getDemoResponse(endpoint, requestOptions);
       }
 
       // Ejecutar interceptores de error para otros tipos de error
@@ -140,7 +199,7 @@ class ApiClient {
 
     } finally {
       // Ocultar loading
-      if (options.showLoading !== false) {
+      if (showLoadingOption !== false) {
         store.setLoading(false);
       }
     }
@@ -295,6 +354,56 @@ class ApiClient {
     };
   }
 
+  async refreshAccessToken() {
+    const refreshToken = getStoredRefreshToken();
+    if (!refreshToken) {
+      return null;
+    }
+
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        console.log('🔄 Intentando refrescar token de acceso...');
+        const response = await this.request('/auth/refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ refreshToken }),
+          showLoading: false,
+          _skipAuthRetry: true
+        });
+
+        if (response?.token) {
+          persistAuthTokens({
+            token: response.token,
+            refreshToken: response.refreshToken,
+            expiresIn: response.expiresIn
+          });
+          return response;
+        }
+
+        clearAuthTokens();
+        return null;
+      } catch (error) {
+        clearAuthTokens();
+        throw error;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    try {
+      return await this.refreshPromise;
+    } catch (error) {
+      console.warn('❌ No se pudo refrescar el token:', error);
+      return null;
+    }
+  }
+
   // Procesar respuesta
   async handleResponse(response, options = {}) {
     const contentType = response.headers.get('content-type');
@@ -357,16 +466,22 @@ class ApiClient {
       ...(options.headers || {})
     };
 
-    if (!isFormData && headers['Content-Type'] === undefined) {
+    if (!isFormData && body !== undefined && headers['Content-Type'] === undefined) {
       headers['Content-Type'] = 'application/json';
     }
 
-    return this.request(endpoint, {
+    const payload = isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined);
+    const requestOptions = {
       ...options,
       method: 'POST',
-      headers,
-      body: isFormData ? body : JSON.stringify(body)
-    });
+      headers
+    };
+
+    if (payload !== undefined) {
+      requestOptions.body = payload;
+    }
+
+    return this.request(endpoint, requestOptions);
   }
 
   put(endpoint, body, options = {}) {
@@ -375,16 +490,22 @@ class ApiClient {
       ...(options.headers || {})
     };
 
-    if (!isFormData && headers['Content-Type'] === undefined) {
+    if (!isFormData && body !== undefined && headers['Content-Type'] === undefined) {
       headers['Content-Type'] = 'application/json';
     }
 
-    return this.request(endpoint, {
+    const payload = isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined);
+    const requestOptions = {
       ...options,
       method: 'PUT',
-      headers,
-      body: isFormData ? body : JSON.stringify(body)
-    });
+      headers
+    };
+
+    if (payload !== undefined) {
+      requestOptions.body = payload;
+    }
+
+    return this.request(endpoint, requestOptions);
   }
 
   delete(endpoint, options = {}) {
@@ -398,7 +519,7 @@ const apiClient = new ApiClient();
 // Configurar interceptores básicos
 apiClient.addRequestInterceptor((config, endpoint) => {
   // Agregar token de autenticación si existe
-  const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+  const token = getStoredAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -409,10 +530,10 @@ apiClient.addRequestInterceptor((config, endpoint) => {
 export const docuFlowAPI = {
   // Autenticación
   auth: {
-    login: (credentials) => apiClient.post('/login', credentials),
-    register: (userData) => apiClient.post('/auth/register', userData),
-    logout: () => apiClient.post('/auth/logout', {}),
-    refreshToken: () => apiClient.post('/auth/refresh', {})
+    login: (credentials) => apiClient.post('/auth/login', credentials, { _skipAuthRetry: true }),
+    register: (userData) => apiClient.post('/auth/register', userData, { _skipAuthRetry: true }),
+    logout: () => apiClient.post('/auth/logout', undefined, { showLoading: false }),
+    refreshToken: () => apiClient.refreshAccessToken()
   },
 
   // Comentarios

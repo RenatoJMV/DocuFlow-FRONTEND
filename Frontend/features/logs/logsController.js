@@ -14,6 +14,15 @@ class LogsController {
       action: '',
       level: ''
     };
+    this.pagination = new Pagination('logsPaginationContainer', {
+      itemsPerPage: this.itemsPerPage,
+      currentPage: this.currentPage,
+      onPageChange: (page) => {
+        this.currentPage = page;
+        this.renderLogs();
+        this.updatePagination();
+      }
+    });
     
     this.initializeComponents();
     this.setupEventListeners();
@@ -326,6 +335,7 @@ class LogsController {
     if (logsToShow.length === 0) {
       if (tbody) tbody.innerHTML = '';
       if (emptyState) emptyState.classList.remove('d-none');
+      this.updateShowingCount();
       return;
     }
 
@@ -407,30 +417,26 @@ class LogsController {
   }
 
   updatePagination() {
-    const totalItems = this.filteredLogs.length;
-    const totalPages = Math.ceil(totalItems / this.itemsPerPage);
-    
-    const paginationContainer = document.getElementById('paginationContainer');
-    if (!paginationContainer) return;
-
-    if (totalPages <= 1) {
-      paginationContainer.innerHTML = '';
-      return;
+    if (!this.pagination) {
+      this.pagination = new Pagination('logsPaginationContainer', {
+        itemsPerPage: this.itemsPerPage,
+        currentPage: this.currentPage,
+        onPageChange: (page) => {
+          this.currentPage = page;
+          this.renderLogs();
+          this.updatePagination();
+        }
+      });
     }
 
-    const pagination = new Pagination(paginationContainer, {
-      currentPage: this.currentPage,
-      totalPages: totalPages,
-      onPageChange: (page) => {
-        this.currentPage = page;
-        this.renderLogs();
-      }
-    });
+    this.pagination.setItemsPerPage(this.itemsPerPage);
+    this.pagination.currentPage = this.currentPage;
+    this.pagination.render(this.filteredLogs.length);
   }
 
   updateShowingCount() {
-    const showingElement = document.getElementById('showingCount');
-    const totalElement = document.getElementById('totalCount');
+    const showingElement = document.getElementById('showingLogsCount');
+    const totalElement = document.getElementById('totalLogsCount');
     
     if (showingElement && totalElement) {
       const startIndex = (this.currentPage - 1) * this.itemsPerPage;
