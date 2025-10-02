@@ -630,5 +630,32 @@ export const docuFlowAPI = {
   }
 };
 
-export { ApiClient, ApiError, apiClient };
+// Funciones auxiliares para manejo de tokens de autenticación
+export function persistAuthTokens(accessToken, refreshToken) {
+  if (accessToken) {
+    localStorage.setItem('token', accessToken);
+    localStorage.setItem('accessToken', accessToken);
+  }
+  if (refreshToken) {
+    localStorage.setItem('refreshToken', refreshToken);
+  }
+}
+
+export function clearAuthTokens() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('userData');
+  localStorage.removeItem('user');
+}
+
+export function getStoredAccessToken() {
+  return localStorage.getItem('token') || localStorage.getItem('accessToken');
+}
+
+export function getStoredRefreshToken() {
+  return localStorage.getItem('refreshToken');
+}
+
+export { ApiClient, ApiError, apiClient, docuFlowAPI };
 export default apiClient;
