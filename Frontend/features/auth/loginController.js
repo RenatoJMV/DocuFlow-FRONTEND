@@ -3,9 +3,18 @@ import { showNotification, FormValidator, validators } from '../../shared/utils/
 
 class LoginController {
   constructor() {
+    this.cacheElements();
     this.initializeComponents();
     this.setupEventListeners();
     this.setupFormValidation();
+    this.setButtonLoading(false);
+  }
+
+  cacheElements() {
+    this.loginForm = document.getElementById('loginForm');
+    this.loginBtn = document.getElementById('loginBtn');
+    this.btnText = this.loginBtn?.querySelector('.btn-text');
+    this.btnLoading = this.loginBtn?.querySelector('.btn-loading');
   }
 
   initializeComponents() {
@@ -37,21 +46,20 @@ class LoginController {
     this.validator
       .addRule(
         'username',
-        (value) => validators.required(value) && validators.email(value.trim().toLowerCase()),
-        'Ingresa un correo electrónico válido'
+        (value) => this.isValidUsername(value),
+        'Ingresa un usuario o correo válido'
       )
       .addRule(
         'password',
-        (value) => validators.required(value) && validators.minLength(8)(value),
-        'La contraseña debe tener al menos 8 caracteres'
+        (value) => validators.required(value) && validators.minLength(6)(value),
+        'La contraseña debe tener al menos 6 caracteres'
       );
   }
 
   setupEventListeners() {
-    const loginForm = document.getElementById('loginForm');
-    const loginBtn = document.getElementById('loginBtn');
+    if (!this.loginForm) return;
 
-    loginForm.addEventListener('submit', async (e) => {
+    this.loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
       const { isValid } = this.validator.validate();
@@ -63,14 +71,36 @@ class LoginController {
     });
   }
 
+  isValidUsername(value = '') {
+    const trimmed = value.trim();
+    if (!validators.required(trimmed)) return false;
+
+    const normalized = trimmed.toLowerCase();
+    if (normalized.includes('@')) {
+      return validators.email(normalized);
+    }
+
+    // Permite letras, números y caracteres comunes en nombres de usuario
+    return /^[a-zA-Z0-9._-]{3,}$/.test(trimmed);
+  }
+
+  setButtonLoading(isLoading) {
+    if (!this.loginBtn) return;
+
+    this.loginBtn.disabled = !!isLoading;
+    if (isLoading) {
+      this.btnText?.classList.add('d-none');
+      this.btnLoading?.classList.remove('d-none');
+    } else {
+      this.btnText?.classList.remove('d-none');
+      this.btnLoading?.classList.add('d-none');
+    }
+  }
+
   async handleLogin() {
-    const loginBtn = document.getElementById('loginBtn');
-    const originalText = loginBtn.innerHTML;
-    
     try {
       // Show loading state
-      loginBtn.disabled = true;
-      loginBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin me-2"></i>Iniciando sesión...';
+      this.setButtonLoading(true);
 
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
@@ -94,8 +124,7 @@ class LoginController {
       showNotification(error.message || 'Error al iniciar sesión', 'error');
     } finally {
       // Restore button state
-      loginBtn.disabled = false;
-      loginBtn.innerHTML = originalText;
+      this.setButtonLoading(false);
     }
   }
 
