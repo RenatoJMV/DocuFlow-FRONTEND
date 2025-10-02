@@ -162,17 +162,22 @@ class SecurityService {
   }
 
   interceptDOMManipulation() {
-    const originalInnerHTML = Element.prototype.innerHTML;
+    const originalInnerHTMLDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML') ||
+                                       Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerHTML');
     
-    Object.defineProperty(Element.prototype, 'innerHTML', {
-      set: function(value) {
-        const sanitized = securityService.sanitizeHTML(value);
-        originalInnerHTML.call(this, sanitized);
-      },
-      get: function() {
-        return originalInnerHTML.call(this);
-      }
-    });
+    if (originalInnerHTMLDescriptor) {
+      Object.defineProperty(Element.prototype, 'innerHTML', {
+        set: function(value) {
+          const sanitized = securityService.sanitizeHTML(value);
+          originalInnerHTMLDescriptor.set.call(this, sanitized);
+        },
+        get: function() {
+          return originalInnerHTMLDescriptor.get.call(this);
+        },
+        configurable: true,
+        enumerable: true
+      });
+    }
   }
 
   // ============================================================================
