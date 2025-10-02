@@ -553,7 +553,7 @@ if (window.location.hostname === 'localhost' || window.location.search.includes(
 }
 
 // Métodos específicos para la API de DocuFlow
-export const docuFlowAPI = {
+const docuFlowAPI = {
   // Autenticación
   auth: {
     login: (credentials) => apiClient.post('/auth/login', credentials, {
