@@ -23,7 +23,7 @@ class ApiClient {
 
     // Detectar si estamos en producción
     if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      this.baseUrl = 'https://your-render-app.onrender.com/api'; // Cambiar por tu URL de Render
+      this.baseUrl = 'https://docuflow-backend.onrender.com/api';
     }
   }
 

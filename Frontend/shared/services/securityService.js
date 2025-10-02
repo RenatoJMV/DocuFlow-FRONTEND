@@ -1,5 +1,4 @@
-// Servicio de Seguridad Avanzado para DocuFlow
-// Implementa las mejores prácticas de seguridad web
+//  Seguridad web
 
 class SecurityService {
   constructor() {

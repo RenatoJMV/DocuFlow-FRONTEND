@@ -43,15 +43,18 @@ export function showNotification(message, type = 'info', duration = 4000) {
   }, duration);
   
   // Manual close
-  notification.querySelector('.notification-close').onclick = () => {
-    clearTimeout(timeoutId);
-    notification.style.animation = 'slideOut 0.3s ease-in';
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.remove();
-      }
-    }, 300);
-  };
+  const closeBtn = notification.querySelector('.notification-close');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      clearTimeout(timeoutId);
+      notification.style.animation = 'slideOut 0.3s ease-in';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.remove();
+        }
+      }, 300);
+    };
+  }
 }
 
 function getIconForType(type) {
