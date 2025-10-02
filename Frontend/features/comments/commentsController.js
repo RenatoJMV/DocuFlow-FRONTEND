@@ -1,301 +1,598 @@
-// commentsControllerSimple.js - Controlador simplificado para comentarios y tareas
-import { docuFlowAPI } from '../../shared/services/apiClientSimple.js';
-import authService from '../../shared/services/authServiceSimple.js';
-import { showNotification } from '../../shared/utils/uiHelpers.js';
+class CommentsController {// commentsControllerSimple.js - Controlador simplificado para comentarios y tareas
 
-class SimpleCommentsController {
-  constructor() {
-    this.comments = [];
-    this.currentFileId = null;
-    this.init();
-  }
+    constructor() {import { docuFlowAPI } from '../../shared/services/apiClientSimple.js';
 
-  async init() {
-    if (!authService.isLoggedIn()) {
-      window.location.href = '../auth/login.html';
-      return;
-    }
+        this.comments = [import authService from '../../shared/services/authServiceSimple.js';
 
-    // Obtener fileId de la URL
-    const urlParams = new URLSearchParams(window.location.search);
-    this.currentFileId = urlParams.get('fileId');
+            {import { showNotification } from '../../shared/utils/uiHelpers.js';
 
-    if (!this.currentFileId) {
-      showNotification('ID de archivo no especificado', 'error');
-      window.location.href = '../files/upload.html';
-      return;
-    }
+                id: 1,
 
-    this.setupEventListeners();
-    await this.loadComments();
-    this.updateUI();
-  }
+                type: 'task',class SimpleCommentsController {
 
-  setupEventListeners() {
-    // Formulario de nuevo comentario
-    const commentForm = document.getElementById('commentForm');
-    if (commentForm) {
-      commentForm.addEventListener('submit', (e) => this.handleSubmitComment(e));
-    }
+                title: 'Revisar documentos legales',  constructor() {
 
-    // Tipo de comentario
-    const commentType = document.getElementById('commentType');
+                content: 'Necesitamos revisar todos los contratos pendientes para el próximo trimestre',    this.comments = [];
+
+                author: 'admin@docuflow.com',    this.currentFileId = null;
+
+                status: 'pending',    this.init();
+
+                priority: 'high',  }
+
+                createdAt: '2024-01-15T10:30:00',
+
+                dueDate: '2024-01-20T00:00:00'  async init() {
+
+            },    if (!authService.isLoggedIn()) {
+
+            {      window.location.href = '../auth/login.html';
+
+                id: 2,      return;
+
+                type: 'comment',    }
+
+                title: 'Feedback sobre interfaz',
+
+                content: 'La nueva interfaz está mucho más clara y es más fácil de usar',    // Obtener fileId de la URL
+
+                author: 'usuario@empresa.com',    const urlParams = new URLSearchParams(window.location.search);
+
+                status: 'completed',    this.currentFileId = urlParams.get('fileId');
+
+                priority: 'medium',
+
+                createdAt: '2024-01-14T14:22:00',    if (!this.currentFileId) {
+
+                dueDate: null      showNotification('ID de archivo no especificado', 'error');
+
+            },      window.location.href = '../files/upload.html';
+
+            {      return;
+
+                id: 3,    }
+
+                type: 'task',
+
+                title: 'Actualizar base de datos',    this.setupEventListeners();
+
+                content: 'Migrar información de clientes al nuevo sistema',    await this.loadComments();
+
+                author: 'desarrollo@empresa.com',    this.updateUI();
+
+                status: 'in-progress',  }
+
+                priority: 'urgent',
+
+                createdAt: '2024-01-13T09:15:00',  setupEventListeners() {
+
+                dueDate: '2024-01-18T00:00:00'    // Formulario de nuevo comentario
+
+            }    const commentForm = document.getElementById('commentForm');
+
+        ];    if (commentForm) {
+
+              commentForm.addEventListener('submit', (e) => this.handleSubmitComment(e));
+
+        this.initializeEventListeners();    }
+
+        this.renderComments();
+
+        this.updateStatistics();    // Tipo de comentario
+
+    }    const commentType = document.getElementById('commentType');
+
     if (commentType) {
-      commentType.addEventListener('change', (e) => this.toggleTaskFields(e.target.value));
-    }
 
-    // Filtros
+    initializeEventListeners() {      commentType.addEventListener('change', (e) => this.toggleTaskFields(e.target.value));
+
+        document.getElementById('saveCommentBtn').addEventListener('click', () => {    }
+
+            this.saveComment();
+
+        });    // Filtros
+
     const typeFilter = document.getElementById('typeFilter');
-    if (typeFilter) {
-      typeFilter.addEventListener('change', (e) => this.filterComments(e.target.value));
+
+        document.getElementById('newCommentModal').addEventListener('hidden.bs.modal', () => {    if (typeFilter) {
+
+            this.clearCommentForm();      typeFilter.addEventListener('change', (e) => this.filterComments(e.target.value));
+
+        });    }
+
+
+
+        document.getElementById('commentType').addEventListener('change', (e) => {    const statusFilter = document.getElementById('statusFilter');
+
+            const statusField = document.getElementById('statusField');    if (statusFilter) {
+
+            if (e.target.value === 'task') {      statusFilter.addEventListener('change', (e) => this.filterByStatus(e.target.value));
+
+                statusField.style.display = 'block';    }
+
+            } else {
+
+                statusField.style.display = 'none';    // Refresh
+
+            }    const refreshBtn = document.getElementById('refreshBtn');
+
+        });    if (refreshBtn) {
+
+    }      refreshBtn.addEventListener('click', () => this.loadComments());
+
     }
 
-    const statusFilter = document.getElementById('statusFilter');
-    if (statusFilter) {
-      statusFilter.addEventListener('change', (e) => this.filterByStatus(e.target.value));
-    }
+    saveComment() {
 
-    // Refresh
-    const refreshBtn = document.getElementById('refreshBtn');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => this.loadComments());
-    }
+        const type = document.getElementById('commentType').value;    // Volver a archivos
 
-    // Volver a archivos
-    const backBtn = document.getElementById('backBtn');
-    if (backBtn) {
-      backBtn.addEventListener('click', () => window.location.href = '../files/upload.html');
-    }
-  }
+        const title = document.getElementById('commentTitle').value;    const backBtn = document.getElementById('backBtn');
 
-  async handleSubmitComment(event) {
-    event.preventDefault();
+        const content = document.getElementById('commentContent').value;    if (backBtn) {
 
-    const content = document.getElementById('commentContent').value.trim();
+        const priority = document.getElementById('commentPriority').value;      backBtn.addEventListener('click', () => window.location.href = '../files/upload.html');
+
+        const dueDate = document.getElementById('commentDueDate').value;    }
+
+        const status = type === 'task' ? document.getElementById('commentStatus').value : 'completed';  }
+
+
+
+        if (!type || !title || !content) {  async handleSubmitComment(event) {
+
+            this.showNotification('Por favor completa todos los campos obligatorios', 'warning');    event.preventDefault();
+
+            return;
+
+        }    const content = document.getElementById('commentContent').value.trim();
+
     const type = document.getElementById('commentType').value;
-    
-    if (!content) {
-      showNotification('El contenido no puede estar vacío', 'error');
-      return;
-    }
 
-    const commentData = {
-      fileId: this.currentFileId,
-      content,
-      type,
-      author: authService.getCurrentUser().email,
+        const newComment = {    
+
+            id: this.comments.length + 1,    if (!content) {
+
+            type: type,      showNotification('El contenido no puede estar vacío', 'error');
+
+            title: title,      return;
+
+            content: content,    }
+
+            author: 'usuario@empresa.com',
+
+            status: status,    const commentData = {
+
+            priority: priority,      fileId: this.currentFileId,
+
+            createdAt: new Date().toISOString(),      content,
+
+            dueDate: dueDate ? new Date(dueDate).toISOString() : null      type,
+
+        };      author: authService.getCurrentUser().email,
+
       createdAt: new Date().toISOString()
-    };
 
-    // Si es una tarea, agregar campos adicionales
+        this.comments.unshift(newComment);    };
+
+        this.renderComments();
+
+        this.updateStatistics();    // Si es una tarea, agregar campos adicionales
+
     if (type === 'task') {
-      commentData.completed = false;
-      commentData.priority = document.getElementById('taskPriority')?.value || 'medium';
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('newCommentModal'));      commentData.completed = false;
+
+        modal.hide();      commentData.priority = document.getElementById('taskPriority')?.value || 'medium';
+
       commentData.dueDate = document.getElementById('taskDueDate')?.value || null;
+
+        this.showNotification('Comentario/tarea creado correctamente', 'success');    }
+
     }
 
     try {
-      const response = await docuFlowAPI.comments.create(commentData);
-      
-      if (response.success) {
-        showNotification(`${type === 'task' ? 'Tarea' : 'Comentario'} agregado correctamente`, 'success');
-        
-        // Limpiar formulario
-        document.getElementById('commentForm').reset();
-        this.toggleTaskFields('comment');
-        
-        // Recargar comentarios
+
+    deleteComment(commentId) {      const response = await docuFlowAPI.comments.create(commentData);
+
+        const commentIndex = this.comments.findIndex(c => c.id === commentId);      
+
+        if (commentIndex > -1) {      if (response.success) {
+
+            const commentTitle = this.comments[commentIndex].title;        showNotification(`${type === 'task' ? 'Tarea' : 'Comentario'} agregado correctamente`, 'success');
+
+            this.comments.splice(commentIndex, 1);        
+
+            this.renderComments();        // Limpiar formulario
+
+            this.updateStatistics();        document.getElementById('commentForm').reset();
+
+            this.showNotification(`${commentTitle} eliminado correctamente`, 'success');        this.toggleTaskFields('comment');
+
+        }        
+
+    }        // Recargar comentarios
+
         await this.loadComments();
-      }
 
-    } catch (error) {
-      console.error('Error agregando comentario:', error);
-      showNotification('Error agregando comentario', 'error');
-    }
-  }
+    toggleStatus(commentId) {      }
 
-  async loadComments() {
-    try {
-      const response = await docuFlowAPI.comments.list(this.currentFileId);
-      
-      if (response.success) {
-        this.comments = response.data.comments || [];
-        this.renderCommentsList();
-        this.updateStats();
-      }
+        const comment = this.comments.find(c => c.id === commentId);
 
-    } catch (error) {
-      console.error('Error cargando comentarios:', error);
-      showNotification('Error cargando comentarios', 'error');
-    }
-  }
+        if (comment && comment.type === 'task') {    } catch (error) {
 
-  filterComments(type) {
-    if (type === 'all') {
-      this.renderCommentsList();
-    } else {
-      const filtered = this.comments.filter(comment => comment.type === type);
-      this.renderCommentsList(filtered);
-    }
-  }
+            const statusOrder = ['pending', 'in-progress', 'completed'];      console.error('Error agregando comentario:', error);
 
-  filterByStatus(status) {
-    if (status === 'all') {
-      this.renderCommentsList();
-    } else {
-      const completed = status === 'completed';
-      const filtered = this.comments.filter(comment => 
-        comment.type === 'task' && comment.completed === completed
-      );
-      this.renderCommentsList(filtered);
-    }
-  }
+            const currentIndex = statusOrder.indexOf(comment.status);      showNotification('Error agregando comentario', 'error');
 
-  renderCommentsList(commentsToRender = this.comments) {
-    const container = document.getElementById('commentsList');
-    if (!container) return;
+            const nextIndex = (currentIndex + 1) % statusOrder.length;    }
 
-    if (commentsToRender.length === 0) {
-      container.innerHTML = `
-        <div class="text-center py-5">
-          <i class="bi bi-chat-dots" style="font-size: 3rem; color: #ccc;"></i>
-          <p class="text-muted mt-3">No hay comentarios para mostrar</p>
-        </div>
-      `;
-      return;
-    }
+            comment.status = statusOrder[nextIndex];  }
 
-    container.innerHTML = commentsToRender.map(comment => `
-      <div class="comment-item card mb-3 ${comment.type === 'task' ? 'task-item' : ''}">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <div class="d-flex align-items-center">
-              <i class="bi ${comment.type === 'task' ? 'bi-check-square' : 'bi-chat-dots'} me-2"></i>
-              <strong>${comment.author}</strong>
-              <span class="badge ${comment.type === 'task' ? 'bg-primary' : 'bg-secondary'} ms-2">
-                ${comment.type === 'task' ? 'Tarea' : 'Comentario'}
-              </span>
-              ${comment.type === 'task' && comment.completed ? 
-                '<span class="badge bg-success ms-1">Completada</span>' : ''}
-            </div>
-            <div class="comment-actions">
-              <small class="text-muted">${this.formatDate(comment.createdAt)}</small>
-              ${this.canEditComment(comment) ? `
-                <button class="btn btn-sm btn-outline-primary ms-2" onclick="commentsController.editComment(${comment.id})">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger ms-1" onclick="commentsController.deleteComment(${comment.id})">
-                  <i class="bi bi-trash"></i>
-                </button>
-              ` : ''}
-            </div>
-          </div>
-          
-          <div class="comment-content">
-            <p class="mb-2">${comment.content}</p>
             
-            ${comment.type === 'task' ? `
-              <div class="task-details mt-2">
-                <div class="row">
-                  <div class="col-md-4">
-                    <small class="text-muted">
-                      <i class="bi bi-flag me-1"></i>
-                      Prioridad: ${this.getPriorityText(comment.priority)}
-                    </small>
-                  </div>
-                  ${comment.dueDate ? `
-                    <div class="col-md-4">
-                      <small class="text-muted">
-                        <i class="bi bi-calendar me-1"></i>
-                        Vence: ${this.formatDate(comment.dueDate)}
-                      </small>
+
+            this.renderComments();  async loadComments() {
+
+            this.updateStatistics();    try {
+
+            this.showNotification(`Estado actualizado a: ${this.getStatusText(comment.status)}`, 'success');      const response = await docuFlowAPI.comments.list(this.currentFileId);
+
+        }      
+
+    }      if (response.success) {
+
+        this.comments = response.data.comments || [];
+
+    renderComments() {        this.renderCommentsList();
+
+        const tbody = document.getElementById('commentsTableBody');        this.updateStats();
+
+        tbody.innerHTML = '';      }
+
+
+
+        this.comments.forEach(comment => {    } catch (error) {
+
+            const row = document.createElement('tr');      console.error('Error cargando comentarios:', error);
+
+            row.innerHTML = `      showNotification('Error cargando comentarios', 'error');
+
+                <td>    }
+
+                    <span class="badge bg-${this.getTypeColor(comment.type)}">  }
+
+                        <i class="${this.getTypeIcon(comment.type)} me-1"></i>
+
+                        ${this.getTypeText(comment.type)}  filterComments(type) {
+
+                    </span>    if (type === 'all') {
+
+                </td>      this.renderCommentsList();
+
+                <td>    } else {
+
+                    <div>      const filtered = this.comments.filter(comment => comment.type === type);
+
+                        <strong>${comment.title}</strong>      this.renderCommentsList(filtered);
+
+                        <p class="text-muted mb-0 small">${comment.content}</p>    }
+
+                        ${comment.dueDate ? `<small class="text-warning"><i class="fas fa-calendar me-1"></i>Vence: ${this.formatDate(comment.dueDate)}</small>` : ''}  }
+
                     </div>
-                  ` : ''}
-                  <div class="col-md-4">
-                    <button class="btn btn-sm ${comment.completed ? 'btn-success' : 'btn-outline-success'}" 
-                            onclick="commentsController.toggleTaskStatus(${comment.id})">
-                      <i class="bi ${comment.completed ? 'bi-check-circle-fill' : 'bi-circle'}"></i>
-                      ${comment.completed ? 'Completada' : 'Marcar como completada'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ` : ''}
+
+                </td>  filterByStatus(status) {
+
+                <td>${comment.author}</td>    if (status === 'all') {
+
+                <td>      this.renderCommentsList();
+
+                    ${comment.type === 'task' ?     } else {
+
+                        `<span class="badge bg-${this.getStatusColor(comment.status)} cursor-pointer" onclick="commentsController.toggleStatus(${comment.id})" title="Clic para cambiar estado">      const completed = status === 'completed';
+
+                            <i class="${this.getStatusIcon(comment.status)} me-1"></i>      const filtered = this.comments.filter(comment => 
+
+                            ${this.getStatusText(comment.status)}        comment.type === 'task' && comment.completed === completed
+
+                        </span>` :       );
+
+                        `<span class="badge bg-secondary">N/A</span>`      this.renderCommentsList(filtered);
+
+                    }    }
+
+                </td>  }
+
+                <td>
+
+                    <span class="badge bg-${this.getPriorityColor(comment.priority)}">  renderCommentsList(commentsToRender = this.comments) {
+
+                        ${this.getPriorityText(comment.priority)}    const container = document.getElementById('commentsList');
+
+                    </span>    if (!container) return;
+
+                    <br>
+
+                    <small class="text-muted">${this.formatDate(comment.createdAt)}</small>    if (commentsToRender.length === 0) {
+
+                </td>      container.innerHTML = `
+
+                <td>        <div class="text-center py-5">
+
+                    <div class="btn-group" role="group">          <i class="bi bi-chat-dots" style="font-size: 3rem; color: #ccc;"></i>
+
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="commentsController.deleteComment(${comment.id})" title="Eliminar">          <p class="text-muted mt-3">No hay comentarios para mostrar</p>
+
+                            <i class="fas fa-trash"></i>        </div>
+
+                        </button>      `;
+
+                    </div>      return;
+
+                </td>    }
+
+            `;
+
+            tbody.appendChild(row);    container.innerHTML = commentsToRender.map(comment => `
+
+        });      <div class="comment-item card mb-3 ${comment.type === 'task' ? 'task-item' : ''}">
+
+    }        <div class="card-body">
+
+          <div class="d-flex justify-content-between align-items-start mb-2">
+
+    updateStatistics() {            <div class="d-flex align-items-center">
+
+        const totalComments = this.comments.length;              <i class="bi ${comment.type === 'task' ? 'bi-check-square' : 'bi-chat-dots'} me-2"></i>
+
+        const pendingTasks = this.comments.filter(c => c.type === 'task' && c.status === 'pending').length;              <strong>${comment.author}</strong>
+
+        const completedTasks = this.comments.filter(c => c.type === 'task' && c.status === 'completed').length;              <span class="badge ${comment.type === 'task' ? 'bg-primary' : 'bg-secondary'} ms-2">
+
+        const todayComments = this.comments.filter(comment => {                ${comment.type === 'task' ? 'Tarea' : 'Comentario'}
+
+            const commentDate = new Date(comment.createdAt);              </span>
+
+            const today = new Date();              ${comment.type === 'task' && comment.completed ? 
+
+            return commentDate.toDateString() === today.toDateString();                '<span class="badge bg-success ms-1">Completada</span>' : ''}
+
+        }).length;            </div>
+
+            <div class="comment-actions">
+
+        document.getElementById('totalComments').textContent = totalComments;              <small class="text-muted">${this.formatDate(comment.createdAt)}</small>
+
+        document.getElementById('pendingTasks').textContent = pendingTasks;              ${this.canEditComment(comment) ? `
+
+        document.getElementById('completedTasks').textContent = completedTasks;                <button class="btn btn-sm btn-outline-primary ms-2" onclick="commentsController.editComment(${comment.id})">
+
+        document.getElementById('todayComments').textContent = todayComments;                  <i class="bi bi-pencil"></i>
+
+    }                </button>
+
+                <button class="btn btn-sm btn-outline-danger ms-1" onclick="commentsController.deleteComment(${comment.id})">
+
+    clearCommentForm() {                  <i class="bi bi-trash"></i>
+
+        document.getElementById('commentForm').reset();                </button>
+
+        document.getElementById('statusField').style.display = 'none';              ` : ''}
+
+    }            </div>
+
           </div>
-        </div>
-      </div>
-    `).join('');
+
+    getTypeColor(type) {          
+
+        const colors = {          <div class="comment-content">
+
+            'comment': 'primary',            <p class="mb-2">${comment.content}</p>
+
+            'task': 'warning',            
+
+            'note': 'info'            ${comment.type === 'task' ? `
+
+        };              <div class="task-details mt-2">
+
+        return colors[type] || 'secondary';                <div class="row">
+
+    }                  <div class="col-md-4">
+
+                    <small class="text-muted">
+
+    getTypeIcon(type) {                      <i class="bi bi-flag me-1"></i>
+
+        const icons = {                      Prioridad: ${this.getPriorityText(comment.priority)}
+
+            'comment': 'fas fa-comment',                    </small>
+
+            'task': 'fas fa-tasks',                  </div>
+
+            'note': 'fas fa-sticky-note'                  ${comment.dueDate ? `
+
+        };                    <div class="col-md-4">
+
+        return icons[type] || 'fas fa-file';                      <small class="text-muted">
+
+    }                        <i class="bi bi-calendar me-1"></i>
+
+                        Vence: ${this.formatDate(comment.dueDate)}
+
+    getTypeText(type) {                      </small>
+
+        const texts = {                    </div>
+
+            'comment': 'Comentario',                  ` : ''}
+
+            'task': 'Tarea',                  <div class="col-md-4">
+
+            'note': 'Nota'                    <button class="btn btn-sm ${comment.completed ? 'btn-success' : 'btn-outline-success'}" 
+
+        };                            onclick="commentsController.toggleTaskStatus(${comment.id})">
+
+        return texts[type] || type;                      <i class="bi ${comment.completed ? 'bi-check-circle-fill' : 'bi-circle'}"></i>
+
+    }                      ${comment.completed ? 'Completada' : 'Marcar como completada'}
+
+                    </button>
+
+    getStatusColor(status) {                  </div>
+
+        const colors = {                </div>
+
+            'pending': 'warning',              </div>
+
+            'in-progress': 'info',            ` : ''}
+
+            'completed': 'success'          </div>
+
+        };        </div>
+
+        return colors[status] || 'secondary';      </div>
+
+    }    `).join('');
+
   }
 
-  async toggleTaskStatus(commentId) {
-    const comment = this.comments.find(c => c.id === commentId);
-    if (!comment || comment.type !== 'task') return;
+    getStatusIcon(status) {
 
-    try {
-      const updatedComment = {
-        ...comment,
+        const icons = {  async toggleTaskStatus(commentId) {
+
+            'pending': 'fas fa-clock',    const comment = this.comments.find(c => c.id === commentId);
+
+            'in-progress': 'fas fa-spinner',    if (!comment || comment.type !== 'task') return;
+
+            'completed': 'fas fa-check'
+
+        };    try {
+
+        return icons[status] || 'fas fa-question';      const updatedComment = {
+
+    }        ...comment,
+
         completed: !comment.completed
-      };
 
-      const response = await docuFlowAPI.comments.update(commentId, updatedComment);
-      
-      if (response.success) {
-        showNotification(
-          `Tarea marcada como ${!comment.completed ? 'completada' : 'pendiente'}`, 
-          'success'
+    getStatusText(status) {      };
+
+        const texts = {
+
+            'pending': 'Pendiente',      const response = await docuFlowAPI.comments.update(commentId, updatedComment);
+
+            'in-progress': 'En Progreso',      
+
+            'completed': 'Completado'      if (response.success) {
+
+        };        showNotification(
+
+        return texts[status] || status;          `Tarea marcada como ${!comment.completed ? 'completada' : 'pendiente'}`, 
+
+    }          'success'
+
         );
-        await this.loadComments();
-      }
 
-    } catch (error) {
-      console.error('Error actualizando tarea:', error);
-      showNotification('Error actualizando tarea', 'error');
+    getPriorityColor(priority) {        await this.loadComments();
+
+        const colors = {      }
+
+            'low': 'success',
+
+            'medium': 'warning',    } catch (error) {
+
+            'high': 'danger',      console.error('Error actualizando tarea:', error);
+
+            'urgent': 'dark'      showNotification('Error actualizando tarea', 'error');
+
+        };    }
+
+        return colors[priority] || 'secondary';  }
+
     }
-  }
 
   async deleteComment(commentId) {
-    const comment = this.comments.find(c => c.id === commentId);
-    if (!comment) return;
 
-    if (!this.canEditComment(comment)) {
-      showNotification('No tienes permisos para eliminar este comentario', 'error');
-      return;
-    }
+    getPriorityText(priority) {    const comment = this.comments.find(c => c.id === commentId);
 
-    const type = comment.type === 'task' ? 'tarea' : 'comentario';
+        const texts = {    if (!comment) return;
+
+            'low': 'Baja',
+
+            'medium': 'Media',    if (!this.canEditComment(comment)) {
+
+            'high': 'Alta',      showNotification('No tienes permisos para eliminar este comentario', 'error');
+
+            'urgent': 'Urgente'      return;
+
+        };    }
+
+        return texts[priority] || priority;
+
+    }    const type = comment.type === 'task' ? 'tarea' : 'comentario';
+
     if (!confirm(`¿Estás seguro de eliminar este ${type}?`)) return;
 
-    try {
-      const response = await docuFlowAPI.comments.delete(commentId);
-      
-      if (response.success) {
-        showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} eliminado`, 'success');
-        await this.loadComments();
-      }
+    formatDate(dateString) {
 
-    } catch (error) {
+        const date = new Date(dateString);    try {
+
+        return date.toLocaleDateString('es-ES', {      const response = await docuFlowAPI.comments.delete(commentId);
+
+            day: '2-digit',      
+
+            month: '2-digit',      if (response.success) {
+
+            year: 'numeric',        showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} eliminado`, 'success');
+
+            hour: '2-digit',        await this.loadComments();
+
+            minute: '2-digit'      }
+
+        });
+
+    }    } catch (error) {
+
       console.error('Error eliminando comentario:', error);
-      showNotification('Error eliminando comentario', 'error');
-    }
-  }
 
-  editComment(commentId) {
-    const comment = this.comments.find(c => c.id === commentId);
-    if (!comment || !this.canEditComment(comment)) return;
+    showNotification(message, type = 'info') {      showNotification('Error eliminando comentario', 'error');
 
-    // Prellenar el formulario
-    document.getElementById('commentContent').value = comment.content;
-    document.getElementById('commentType').value = comment.type;
-    
-    if (comment.type === 'task') {
-      this.toggleTaskFields('task');
-      if (document.getElementById('taskPriority')) {
-        document.getElementById('taskPriority').value = comment.priority || 'medium';
+        const notification = document.createElement('div');    }
+
+        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;  }
+
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+
+        notification.innerHTML = `  editComment(commentId) {
+
+            ${message}    const comment = this.comments.find(c => c.id === commentId);
+
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>    if (!comment || !this.canEditComment(comment)) return;
+
+        `;
+
+            // Prellenar el formulario
+
+        document.body.appendChild(notification);    document.getElementById('commentContent').value = comment.content;
+
+            document.getElementById('commentType').value = comment.type;
+
+        setTimeout(() => {    
+
+            notification.remove();    if (comment.type === 'task') {
+
+        }, 5000);      this.toggleTaskFields('task');
+
+    }      if (document.getElementById('taskPriority')) {
+
+}        document.getElementById('taskPriority').value = comment.priority || 'medium';
+
       }
-      if (document.getElementById('taskDueDate') && comment.dueDate) {
-        document.getElementById('taskDueDate').value = comment.dueDate.split('T')[0];
-      }
-    }
+
+let commentsController;      if (document.getElementById('taskDueDate') && comment.dueDate) {
+
+document.addEventListener('DOMContentLoaded', () => {        document.getElementById('taskDueDate').value = comment.dueDate.split('T')[0];
+
+    commentsController = new CommentsController();      }
+
+});    }
 
     // Cambiar el botón de submit para edición
     const submitBtn = document.querySelector('#commentForm button[type="submit"]');

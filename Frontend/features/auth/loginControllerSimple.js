@@ -8,13 +8,9 @@ class SimpleLoginController {
   }
 
   init() {
-    // Verificar si ya está autenticado
-    if (authService.isLoggedIn()) {
-      window.location.href = '../dashboard/dashboard.html';
-      return;
-    }
-
+    // Solo configurar eventos, no verificar autenticación aquí
     this.setupEventListeners();
+    this.clearStoredCredentials(); // Limpiar cualquier sesión previa
   }
 
   setupEventListeners() {
@@ -99,6 +95,14 @@ class SimpleLoginController {
 
   showForgotPassword() {
     showNotification('Contacte al administrador del sistema para recuperar su contraseña.', 'info', 4000);
+  }
+
+  // Limpiar credenciales almacenadas para forzar login real
+  clearStoredCredentials() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    authService.currentUser = null;
+    authService.isAuthenticated = false;
   }
 }
 

@@ -1,371 +1,296 @@
-// uploadControllerSimple.js - Controlador simplificado para gestión de archivos
-import { docuFlowAPI } from '../../shared/services/apiClientSimple.js';
-import authService from '../../shared/services/authServiceSimple.js';
-import { showNotification } from '../../shared/utils/uiHelpers.js';
-
-class SimpleUploadController {
-  constructor() {
-    this.files = [];
-    this.currentFilter = {};
-    this.init();
-  }
-
-  async init() {
-    if (!authService.isLoggedIn()) {
-      window.location.href = '../auth/login.html';
-      return;
-    }
-
-    this.setupEventListeners();
-    await this.loadFiles();
-    this.updateUI();
-  }
-
-  setupEventListeners() {
-    // Upload de archivos
-    const uploadBtn = document.getElementById('uploadBtn');
-    const fileInput = document.getElementById('fileInput');
-    
-    if (uploadBtn) {
-      uploadBtn.addEventListener('click', () => fileInput?.click());
-    }
-
-    if (fileInput) {
-      fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
-    }
-
-    // Búsqueda
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
-    }
-
-    // Filtros
-    this.setupFilters();
-
-    // Refresh
-    const refreshBtn = document.getElementById('refreshBtn');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => this.loadFiles());
-    }
-  }
-
-  setupFilters() {
-    // Filtro por tipo
-    const typeFilter = document.getElementById('typeFilter');
-    if (typeFilter) {
-      typeFilter.addEventListener('change', (e) => {
-        this.currentFilter.type = e.target.value;
-        this.filterFiles();
-      });
-    }
-
-    // Filtro por fecha
-    const dateFilter = document.getElementById('dateFilter');
-    if (dateFilter) {
-      dateFilter.addEventListener('change', (e) => {
-        this.currentFilter.date = e.target.value;
-        this.filterFiles();
-      });
-    }
-
-    // Filtro por usuario
-    const userFilter = document.getElementById('userFilter');
-    if (userFilter) {
-      userFilter.addEventListener('change', (e) => {
-        this.currentFilter.user = e.target.value;
-        this.filterFiles();
-      });
-    }
-  }
-
-  async handleFileUpload(event) {
-    const files = Array.from(event.target.files);
-    if (files.length === 0) return;
-
-    if (!authService.hasPermission('upload_files')) {
-      showNotification('No tienes permisos para subir archivos', 'error');
-      return;
-    }
-
-    for (const file of files) {
-      await this.uploadFile(file);
-    }
-
-    // Limpiar input
-    event.target.value = '';
-    await this.loadFiles();
-  }
-
-  async uploadFile(file) {
-    try {
-      showNotification(`Subiendo ${file.name}...`, 'info');
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('uploadedBy', authService.getCurrentUser().email);
-
-      const response = await docuFlowAPI.files.upload(formData);
-
-      if (response.success) {
-        showNotification(`${file.name} subido exitosamente`, 'success');
+class UploadController {
+    constructor() {
+        this.files = [
+            {
+                id: 1,
+                name: 'Contrato_Servicios_2024.pdf',
+                size: 2458192,
+                type: 'application/pdf',
+                uploadDate: '2024-01-15T10:30:00',
+                uploadedBy: 'admin@docuflow.com'
+            },
+            {
+                id: 2,
+                name: 'Factura_ENE_2024.xlsx',
+                size: 156789,
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                uploadDate: '2024-01-14T14:22:00',
+                uploadedBy: 'contabilidad@empresa.com'
+            },
+            {
+                id: 3,
+                name: 'Manual_Usuario.docx',
+                size: 3456789,
+                type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                uploadDate: '2024-01-13T09:15:00',
+                uploadedBy: 'documentacion@empresa.com'
+            }
+        ];
         
-        // Log de la acción
-        await this.logAction('file_upload', file.name);
-      } else {
-        throw new Error(response.error || 'Error subiendo archivo');
-      }
-
-    } catch (error) {
-      console.error('Error subiendo archivo:', error);
-      showNotification(`Error subiendo ${file.name}: ${error.message}`, 'error');
-    }
-  }
-
-  async loadFiles() {
-    try {
-      const response = await docuFlowAPI.files.list();
-      
-      if (response.success) {
-        this.files = response.data.files || [];
-        this.renderFileList();
-        this.updateStats();
-      }
-
-    } catch (error) {
-      console.error('Error cargando archivos:', error);
-      showNotification('Error cargando archivos', 'error');
-    }
-  }
-
-  filterFiles() {
-    const filtered = this.files.filter(file => {
-      // Filtro por tipo
-      if (this.currentFilter.type && this.currentFilter.type !== 'all') {
-        if (!file.type.includes(this.currentFilter.type)) return false;
-      }
-
-      // Filtro por fecha
-      if (this.currentFilter.date) {
-        const fileDate = new Date(file.uploadedAt);
-        const filterDate = new Date(this.currentFilter.date);
-        if (fileDate.toDateString() !== filterDate.toDateString()) return false;
-      }
-
-      // Filtro por usuario
-      if (this.currentFilter.user && this.currentFilter.user !== 'all') {
-        if (file.uploadedBy !== this.currentFilter.user) return false;
-      }
-
-      return true;
-    });
-
-    this.renderFileList(filtered);
-  }
-
-  async handleSearch(query) {
-    if (!query.trim()) {
-      this.renderFileList();
-      return;
+        this.initializeEventListeners();
+        this.renderFiles();
+        this.updateStatistics();
     }
 
-    const filtered = this.files.filter(file => 
-      file.name.toLowerCase().includes(query.toLowerCase()) ||
-      file.uploadedBy.toLowerCase().includes(query.toLowerCase())
-    );
+    initializeEventListeners() {
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
 
-    this.renderFileList(filtered);
-  }
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
 
-  renderFileList(filesToRender = this.files) {
-    const container = document.getElementById('filesList');
-    if (!container) return;
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
 
-    if (filesToRender.length === 0) {
-      container.innerHTML = `
-        <div class="text-center py-5">
-          <i class="bi bi-folder2-open" style="font-size: 3rem; color: #ccc;"></i>
-          <p class="text-muted mt-3">No hay archivos para mostrar</p>
-        </div>
-      `;
-      return;
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            this.handleFileSelection(e.dataTransfer.files);
+        });
+
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            this.handleFileSelection(e.target.files);
+        });
+
+        document.getElementById('uploadBtn').addEventListener('click', () => {
+            this.uploadFiles();
+        });
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            this.filterFiles(e.target.value);
+        });
     }
 
-    container.innerHTML = filesToRender.map(file => `
-      <div class="file-item card mb-2">
-        <div class="card-body d-flex align-items-center">
-          <div class="file-icon me-3">
-            <i class="bi ${this.getFileIcon(file.type)}" style="font-size: 1.5rem;"></i>
-          </div>
-          <div class="file-info flex-grow-1">
-            <h6 class="mb-1">${file.name}</h6>
-            <small class="text-muted">
-              ${this.formatFileSize(file.size)} • 
-              Subido por ${file.uploadedBy} • 
-              ${this.formatDate(file.uploadedAt)}
-            </small>
-          </div>
-          <div class="file-actions">
-            <button class="btn btn-sm btn-outline-primary me-1" onclick="uploadController.downloadFile(${file.id})">
-              <i class="bi bi-download"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-info me-1" onclick="uploadController.showComments(${file.id})">
-              <i class="bi bi-chat-dots"></i>
-            </button>
-            ${authService.hasPermission('delete_files') ? `
-              <button class="btn btn-sm btn-outline-danger" onclick="uploadController.deleteFile(${file.id})">
-                <i class="bi bi-trash"></i>
-              </button>
-            ` : ''}
-          </div>
-        </div>
-      </div>
-    `).join('');
-  }
+    handleFileSelection(files) {
+        const fileList = document.getElementById('selectedFiles');
+        fileList.innerHTML = '';
 
-  async downloadFile(fileId) {
-    try {
-      const file = this.files.find(f => f.id === fileId);
-      if (!file) return;
+        Array.from(files).forEach(file => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'selected-file-item d-flex justify-content-between align-items-center p-2 border rounded mb-2';
+            fileItem.innerHTML = `
+                <div>
+                    <strong>${file.name}</strong>
+                    <small class="text-muted d-block">${this.formatFileSize(file.size)}</small>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            fileList.appendChild(fileItem);
+        });
 
-      showNotification(`Descargando ${file.name}...`, 'info');
-      
-      const response = await docuFlowAPI.files.download(fileId);
-      
-      if (response.success) {
-        // En modo demo, solo simular descarga
-        showNotification(`${file.name} descargado`, 'success');
-        await this.logAction('file_download', file.name);
-      }
-
-    } catch (error) {
-      console.error('Error descargando archivo:', error);
-      showNotification('Error descargando archivo', 'error');
-    }
-  }
-
-  async deleteFile(fileId) {
-    if (!authService.hasPermission('delete_files')) {
-      showNotification('No tienes permisos para eliminar archivos', 'error');
-      return;
+        document.getElementById('uploadBtn').disabled = files.length === 0;
     }
 
-    const file = this.files.find(f => f.id === fileId);
-    if (!file) return;
+    uploadFiles() {
+        const fileItems = document.querySelectorAll('.selected-file-item');
+        
+        if (fileItems.length === 0) {
+            this.showNotification('Selecciona al menos un archivo para subir', 'warning');
+            return;
+        }
 
-    if (!confirm(`¿Estás seguro de eliminar "${file.name}"?`)) return;
+        fileItems.forEach((item, index) => {
+            const fileName = item.querySelector('strong').textContent;
+            const fileSize = Math.floor(Math.random() * 5000000) + 100000;
+            
+            const newFile = {
+                id: this.files.length + index + 1,
+                name: fileName,
+                size: fileSize,
+                type: this.getFileType(fileName),
+                uploadDate: new Date().toISOString(),
+                uploadedBy: 'usuario@empresa.com'
+            };
+            
+            this.files.unshift(newFile);
+        });
 
-    try {
-      const response = await docuFlowAPI.files.delete(fileId);
-      
-      if (response.success) {
-        showNotification(`${file.name} eliminado`, 'success');
-        await this.logAction('file_delete', file.name);
-        await this.loadFiles();
-      }
+        this.renderFiles();
+        this.updateStatistics();
+        
+        document.getElementById('selectedFiles').innerHTML = '';
+        document.getElementById('fileInput').value = '';
+        document.getElementById('uploadBtn').disabled = true;
 
-    } catch (error) {
-      console.error('Error eliminando archivo:', error);
-      showNotification('Error eliminando archivo', 'error');
-    }
-  }
+        const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+        modal.hide();
 
-  showComments(fileId) {
-    // Abrir modal de comentarios
-    window.location.href = `../comments/comments.html?fileId=${fileId}`;
-  }
-
-  async logAction(action, target) {
-    try {
-      await docuFlowAPI.logs.create({
-        action,
-        user: authService.getCurrentUser().email,
-        target,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.warn('Error registrando log:', error);
-    }
-  }
-
-  updateStats() {
-    const totalFiles = this.files.length;
-    const totalSize = this.files.reduce((sum, file) => sum + file.size, 0);
-
-    const statsContainer = document.getElementById('fileStats');
-    if (statsContainer) {
-      statsContainer.innerHTML = `
-        <div class="row">
-          <div class="col-md-6">
-            <div class="stat-card">
-              <h6>Total de Archivos</h6>
-              <span class="stat-number">${totalFiles}</span>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="stat-card">
-              <h6>Espacio Usado</h6>
-              <span class="stat-number">${this.formatFileSize(totalSize)}</span>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-  }
-
-  updateUI() {
-    const user = authService.getCurrentUser();
-    const userInfo = document.getElementById('userInfo');
-    
-    if (userInfo) {
-      userInfo.innerHTML = `
-        <span>Bienvenido, ${user.name}</span>
-        <button class="btn btn-sm btn-outline-secondary ms-2" onclick="authService.logout().then(() => location.href = '../auth/login.html')">
-          Cerrar Sesión
-        </button>
-      `;
+        this.showNotification(`${fileItems.length} archivo(s) subido(s) correctamente`, 'success');
     }
 
-    // Mostrar/ocultar botones según permisos
-    const uploadBtn = document.getElementById('uploadBtn');
-    if (uploadBtn) {
-      uploadBtn.style.display = authService.hasPermission('upload_files') ? 'block' : 'none';
+    downloadFile(fileId) {
+        const file = this.files.find(f => f.id === fileId);
+        if (file) {
+            this.showNotification(`Descargando ${file.name}...`, 'info');
+            setTimeout(() => {
+                this.showNotification(`${file.name} descargado correctamente`, 'success');
+            }, 1500);
+        }
     }
-  }
 
-  // Utilidades
-  getFileIcon(type) {
-    if (type.includes('pdf')) return 'bi-file-earmark-pdf';
-    if (type.includes('image')) return 'bi-file-earmark-image';
-    if (type.includes('text')) return 'bi-file-earmark-text';
-    if (type.includes('word')) return 'bi-file-earmark-word';
-    if (type.includes('excel')) return 'bi-file-earmark-excel';
-    return 'bi-file-earmark';
-  }
+    deleteFile(fileId) {
+        const file = this.files.find(f => f.id === fileId);
+        if (file) {
+            document.getElementById('deleteFileName').textContent = file.name;
+            document.getElementById('confirmDeleteBtn').onclick = () => {
+                this.confirmDelete(fileId);
+            };
+            
+            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            modal.show();
+        }
+    }
 
-  formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
+    confirmDelete(fileId) {
+        const fileIndex = this.files.findIndex(f => f.id === fileId);
+        if (fileIndex > -1) {
+            const fileName = this.files[fileIndex].name;
+            this.files.splice(fileIndex, 1);
+            this.renderFiles();
+            this.updateStatistics();
+            
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+            modal.hide();
+            
+            this.showNotification(`${fileName} eliminado correctamente`, 'success');
+        }
+    }
 
-  formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
+    renderFiles() {
+        const tbody = document.getElementById('filesTableBody');
+        tbody.innerHTML = '';
+
+        this.files.forEach(file => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <div class="d-flex align-items-center">
+                        <i class="${this.getFileIcon(file.type)} me-2"></i>
+                        <span>${file.name}</span>
+                    </div>
+                </td>
+                <td>${this.formatFileSize(file.size)}</td>
+                <td>${this.formatDate(file.uploadDate)}</td>
+                <td>${file.uploadedBy}</td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="uploadController.downloadFile(${file.id})" title="Descargar">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="uploadController.deleteFile(${file.id})" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    filterFiles(searchTerm) {
+        const rows = document.querySelectorAll('#filesTableBody tr');
+        
+        rows.forEach(row => {
+            const fileName = row.cells[0].textContent.toLowerCase();
+            const match = fileName.includes(searchTerm.toLowerCase());
+            row.style.display = match ? '' : 'none';
+        });
+    }
+
+    updateStatistics() {
+        const totalFiles = this.files.length;
+        const totalSize = this.files.reduce((sum, file) => sum + file.size, 0);
+        const todayUploads = this.files.filter(file => {
+            const uploadDate = new Date(file.uploadDate);
+            const today = new Date();
+            return uploadDate.toDateString() === today.toDateString();
+        }).length;
+
+        document.getElementById('totalFiles').textContent = totalFiles;
+        document.getElementById('totalSize').textContent = this.formatFileSize(totalSize);
+        document.getElementById('todayUploads').textContent = todayUploads;
+    }
+
+    getFileIcon(type) {
+        const iconMap = {
+            'application/pdf': 'fas fa-file-pdf text-danger',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'fas fa-file-word text-primary',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'fas fa-file-excel text-success',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'fas fa-file-powerpoint text-warning',
+            'text/csv': 'fas fa-file-csv text-info',
+            'image/jpeg': 'fas fa-file-image text-success',
+            'image/png': 'fas fa-file-image text-success',
+            'text/plain': 'fas fa-file-alt text-secondary'
+        };
+        
+        return iconMap[type] || 'fas fa-file text-secondary';
+    }
+
+    getFileType(fileName) {
+        const extension = fileName.split('.').pop().toLowerCase();
+        const typeMap = {
+            'pdf': 'application/pdf',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'csv': 'text/csv',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'txt': 'text/plain'
+        };
+        
+        return typeMap[extension] || 'application/octet-stream';
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
+    }
 }
 
-// Instancia global
-const uploadController = new SimpleUploadController();
-
-// Hacer disponible globalmente
-window.uploadController = uploadController;
-
-export default uploadController;
+let uploadController;
+document.addEventListener('DOMContentLoaded', () => {
+    uploadController = new UploadController();
+});

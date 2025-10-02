@@ -5,7 +5,7 @@ class SimpleAuthService {
   constructor() {
     this.currentUser = null;
     this.isAuthenticated = false;
-    this.loadStoredUser();
+    // No cargar usuario automáticamente para forzar login real
   }
 
   // Cargar usuario almacenado
