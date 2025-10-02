@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Exportación - DocuFlow</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Estilos compartidos -->
+  <link rel="stylesheet" href="../../shared/styles/styles.css">
+  <!-- Estilos específicos de exportación -->
+  <link rel="stylesheet" href="export.css">
+</head>
+<body>
+  <!-- Header de navegación -->
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="../dashboard/dashboard.html">
+        <i class="fas fa-file-alt me-2"></i>DocuFlow
+      </a>
+      
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="../dashboard/dashboard.html">
+              <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="../files/upload.html">
+              <i class="fas fa-cloud-upload-alt me-1"></i>Archivos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="export.html">
+              <i class="fas fa-download me-1"></i>Exportar
+            </a>
+          </li>
+        </ul>
+        
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+              <img src="../../shared/assets/default-avatar.png" alt="Avatar" class="user-avatar me-2" width="32" height="32">
+              <span id="nav-username">Usuario</span>
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="../profile/profile.html"><i class="fas fa-user me-2"></i>Mi Perfil</a></li>
+              <li><a class="dropdown-item" href="#" id="logout-btn"><i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenido principal -->
+  <div class="container-fluid py-4">
+    <!-- Header de la página -->
+    <div class="row mb-4">
+      <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h2 class="mb-1">
+              <i class="fas fa-download me-2 text-primary"></i>Sistema de Exportación
+            </h2>
+            <p class="text-muted">Genera y descarga reportes en múltiples formatos</p>
+          </div>
+          <div class="export-quick-actions">
+            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#schedule-modal">
+              <i class="fas fa-calendar-plus me-2"></i>Programar Reporte
+            </button>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#custom-export-modal">
+              <i class="fas fa-cogs me-2"></i>Exportación Personalizada
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exportaciones en progreso -->
+    <div class="row mb-4">
+      <div class="col">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-spinner me-2"></i>Exportaciones en Progreso
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="export-progress-container">
+              <p class="text-muted text-center">No hay exportaciones en progreso</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <!-- Panel principal de exportación -->
+      <div class="col-lg-8">
+        <!-- Tipos de reportes disponibles -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-file-export me-2"></i>Exportación Rápida
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="report-types-container" class="row">
+              <!-- Los tipos de reportes se cargan dinámicamente -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Historial de exportaciones -->
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="fas fa-history me-2"></i>Historial de Exportaciones
+            </h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.exportController?.updateExportHistory()">
+              <i class="fas fa-sync-alt me-1"></i>Actualizar
+            </button>
+          </div>
+          <div class="card-body">
+            <div id="export-history-container">
+              <!-- El historial se carga dinámicamente -->
+              <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mt-2 text-muted">Cargando historial...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar con información y reportes programados -->
+      <div class="col-lg-4">
+        <!-- Estadísticas de exportación -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="fas fa-chart-bar me-2"></i>Estadísticas
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="export-stats">
+              <div class="stat-item">
+                <div class="stat-icon bg-primary">
+                  <i class="fas fa-file-pdf"></i>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-number" id="pdf-exports-count">0</div>
+                  <div class="stat-label">PDFs generados</div>
+                </div>
+              </div>
+              
+              <div class="stat-item">
+                <div class="stat-icon bg-success">
+                  <i class="fas fa-file-excel"></i>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-number" id="excel-exports-count">0</div>
+                  <div class="stat-label">Archivos Excel</div>
+                </div>
+              </div>
+              
+              <div class="stat-item">
+                <div class="stat-icon bg-info">
+                  <i class="fas fa-file-csv"></i>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-number" id="csv-exports-count">0</div>
+                  <div class="stat-label">Archivos CSV</div>
+                </div>
+              </div>
+              
+              <div class="stat-item">
+                <div class="stat-icon bg-warning">
+                  <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-number" id="scheduled-exports-count">0</div>
+                  <div class="stat-label">Programados</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reportes programados -->
+        <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="fas fa-calendar-alt me-2"></i>Reportes Programados
+            </h6>
+          </div>
+          <div class="card-body">
+            <div id="scheduled-reports-container">
+              <!-- Los reportes programados se cargan dinámicamente -->
+              <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mt-2 text-muted">Cargando programación...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Exportación Personalizada -->
+  <div class="modal fade" id="custom-export-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="fas fa-cogs me-2"></i>Exportación Personalizada
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="custom-export-form">
+            <!-- Tipo de reporte -->
+            <div class="mb-4">
+              <h6 class="mb-3">Tipo de Reporte</h6>
+              <select class="form-select" id="report-type-selector" name="report-type" required>
+                <option value="">Selecciona un tipo de reporte</option>
+                <option value="dashboard">Estadísticas del Dashboard</option>
+                <option value="files">Reporte de Archivos</option>
+                <option value="users">Reporte de Usuarios</option>
+                <option value="logs">Registros del Sistema</option>
+                <option value="comments">Reporte de Comentarios</option>
+                <option value="permissions">Reporte de Permisos</option>
+                <option value="activity">Actividad del Sistema</option>
+                <option value="custom">Reporte Personalizado</option>
+              </select>
+            </div>
+
+            <!-- Formato de exportación -->
+            <div class="mb-4">
+              <h6 class="mb-3">Formato de Exportación</h6>
+              <div class="row">
+                <div class="col-md-4">
+                  <div class="form-check export-format-option">
+                    <input class="form-check-input" type="radio" name="export-format" id="format-pdf" value="pdf" required>
+                    <label class="form-check-label" for="format-pdf">
+                      <i class="fas fa-file-pdf text-danger me-2"></i>PDF
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-check export-format-option">
+                    <input class="form-check-input" type="radio" name="export-format" id="format-excel" value="excel" required>
+                    <label class="form-check-label" for="format-excel">
+                      <i class="fas fa-file-excel text-success me-2"></i>Excel
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-check export-format-option">
+                    <input class="form-check-input" type="radio" name="export-format" id="format-csv" value="csv" required>
+                    <label class="form-check-label" for="format-csv">
+                      <i class="fas fa-file-csv text-info me-2"></i>CSV
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rango de fechas -->
+            <div class="mb-4">
+              <h6 class="mb-3">Rango de Fechas</h6>
+              <div class="row">
+                <div class="col-md-6">
+                  <label for="date-start" class="form-label">Fecha Inicio</label>
+                  <input type="date" class="form-control" id="date-start" name="date-start">
+                </div>
+                <div class="col-md-6">
+                  <label for="date-end" class="form-label">Fecha Fin</label>
+                  <input type="date" class="form-control" id="date-end" name="date-end">
+                </div>
+              </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="mb-4">
+              <h6 class="mb-3">Filtros</h6>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="include-archived" name="include-archived">
+                    <label class="form-check-label" for="include-archived">
+                      Incluir archivados
+                    </label>
+                  </div>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="include-deleted" name="include-deleted">
+                    <label class="form-check-label" for="include-deleted">
+                      Incluir eliminados
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label for="user-filter" class="form-label">Filtrar por Usuario</label>
+                  <select class="form-select" id="user-filter" name="user-filter" multiple>
+                    <option value="">Todos los usuarios</option>
+                    <!-- Las opciones se cargan dinámicamente -->
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Opciones de personalización -->
+            <div class="mb-4">
+              <h6 class="mb-3">Personalización</h6>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="include-charts" name="include-charts" checked>
+                    <label class="form-check-label" for="include-charts">
+                      Incluir gráficos
+                    </label>
+                  </div>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="include-images" name="include-images" checked>
+                    <label class="form-check-label" for="include-images">
+                      Incluir imágenes
+                    </label>
+                  </div>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="include-metadata" name="include-metadata" checked>
+                    <label class="form-check-label" for="include-metadata">
+                      Incluir metadatos
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="group-by" class="form-label">Agrupar por</label>
+                    <select class="form-select" id="group-by" name="group-by">
+                      <option value="">Sin agrupación</option>
+                      <option value="date">Fecha</option>
+                      <option value="user">Usuario</option>
+                      <option value="type">Tipo</option>
+                      <option value="department">Departamento</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="sort-by" class="form-label">Ordenar por</label>
+                    <select class="form-select" id="sort-by" name="sort-by">
+                      <option value="date">Fecha</option>
+                      <option value="name">Nombre</option>
+                      <option value="size">Tamaño</option>
+                      <option value="user">Usuario</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Opciones específicas del formato -->
+            <div id="format-specific-options">
+              <!-- Se muestran según el formato seleccionado -->
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-outline-info" id="preview-export-btn">
+            <i class="fas fa-eye me-2"></i>Vista Previa
+          </button>
+          <button type="submit" form="custom-export-form" class="btn btn-primary">
+            <i class="fas fa-download me-2"></i>Generar Reporte
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Vista Previa -->
+  <div class="modal fade" id="preview-modal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="fas fa-eye me-2"></i>Vista Previa del Reporte
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="preview-content">
+            <!-- El contenido de la vista previa se carga dinámicamente -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-primary" onclick="document.getElementById('custom-export-form').dispatchEvent(new Event('submit'))">
+            <i class="fas fa-download me-2"></i>Generar Reporte
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Programación -->
+  <div class="modal fade" id="schedule-modal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="fas fa-calendar-plus me-2"></i>Programar Reporte
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="schedule-report-form">
+            <div class="mb-3">
+              <label for="schedule-report-type" class="form-label">Tipo de Reporte</label>
+              <select class="form-select" id="schedule-report-type" name="schedule-report-type" required>
+                <option value="">Selecciona un tipo</option>
+                <option value="dashboard">Estadísticas del Dashboard</option>
+                <option value="files">Reporte de Archivos</option>
+                <option value="users">Reporte de Usuarios</option>
+                <option value="logs">Registros del Sistema</option>
+                <option value="activity">Actividad del Sistema</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="schedule-format" class="form-label">Formato</label>
+              <select class="form-select" id="schedule-format" name="schedule-format" required>
+                <option value="pdf">PDF</option>
+                <option value="excel">Excel</option>
+                <option value="csv">CSV</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="schedule-frequency" class="form-label">Frecuencia</label>
+              <select class="form-select" id="schedule-frequency" name="schedule-frequency" required>
+                <option value="daily">Diario</option>
+                <option value="weekly">Semanal</option>
+                <option value="monthly">Mensual</option>
+                <option value="quarterly">Trimestral</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="schedule-time" class="form-label">Hora</label>
+              <input type="time" class="form-control" id="schedule-time" name="schedule-time" value="09:00" required>
+            </div>
+
+            <div class="mb-3">
+              <label for="schedule-recipients" class="form-label">Destinatarios (Email)</label>
+              <textarea class="form-control" id="schedule-recipients" name="schedule-recipients" rows="3" 
+                        placeholder="email1@ejemplo.com, email2@ejemplo.com"></textarea>
+              <div class="form-text">Separa múltiples emails con comas</div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" form="schedule-report-form" class="btn btn-primary">
+            <i class="fas fa-calendar-check me-2"></i>Programar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading indicator -->
+  <div id="loading-indicator" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+      <div class="spinner-border text-light" role="status">
+        <span class="visually-hidden">Cargando...</span>
+      </div>
+      <p class="mt-2 text-light" id="loading-text">Cargando...</p>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Controlador de exportación -->
+  <script type="module" src="exportController.js"></script>
+</body>
+</html>

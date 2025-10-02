@@ -240,7 +240,7 @@ class ApiClient {
       } else if (contentType && contentType.includes('text/')) {
         data = await response.text();
       } else {
-        data = await response.blob(); 
+        data = await response.blob();
       }
     } catch (parseError) {
       console.warn('Could not parse response:', parseError);

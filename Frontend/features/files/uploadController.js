@@ -548,17 +548,27 @@ class UploadController {
 
   async updateStats() {
     try {
-      // Usar los nuevos endpoints del backend
-      const statsResponse = await docuFlowAPI.files.getStats();
+      // Usar los nuevos endpoints del backend incluyendo GCS
+      const [statsResponse, gcsResponse] = await Promise.allSettled([
+        docuFlowAPI.files.getStats(),
+        this.getGcsStats()
+      ]);
+      
       console.log('📊 Estadísticas del servidor:', statsResponse);
+      console.log('☁️ Estadísticas de GCS:', gcsResponse);
       
       const totalFilesEl = document.getElementById('total-files');
       const totalSizeEl = document.getElementById('total-size');
+      const gcsUsageEl = document.getElementById('gcs-usage');
+      const orphanFilesEl = document.getElementById('orphan-files');
 
-      if (statsResponse && (statsResponse.totalFiles !== undefined || statsResponse.totalSizeBytes !== undefined)) {
-        const totalFiles = statsResponse.totalFiles ?? statsResponse.count ?? this.allFiles.length;
-        const totalSizeBytes = statsResponse.totalSizeBytes ?? statsResponse.totalSize ?? 0;
-        const formattedTotalSize = statsResponse.formattedTotalSize || this.formatFileSize(totalSizeBytes);
+      // Procesar estadísticas básicas
+      if (statsResponse.status === 'fulfilled' && statsResponse.value && 
+          (statsResponse.value.totalFiles !== undefined || statsResponse.value.totalSizeBytes !== undefined)) {
+        const stats = statsResponse.value;
+        const totalFiles = stats.totalFiles ?? stats.count ?? this.allFiles.length;
+        const totalSizeBytes = stats.totalSizeBytes ?? stats.totalSize ?? 0;
+        const formattedTotalSize = stats.formattedTotalSize || this.formatFileSize(totalSizeBytes);
 
         if (totalFilesEl) totalFilesEl.textContent = totalFiles;
         if (totalSizeEl) totalSizeEl.textContent = formattedTotalSize;
@@ -574,6 +584,22 @@ class UploadController {
         
         console.log(`📊 Estadísticas fallback: ${totalFiles} archivos, ${this.formatFileSize(totalSize)}`);
       }
+
+      // Procesar estadísticas de GCS
+      if (gcsResponse.status === 'fulfilled' && gcsResponse.value) {
+        const gcsStats = gcsResponse.value;
+        
+        if (gcsUsageEl) {
+          gcsUsageEl.textContent = `${this.formatFileSize(gcsStats.usedStorage)} / ${this.formatFileSize(gcsStats.totalStorage)}`;
+        }
+        
+        if (orphanFilesEl) {
+          orphanFilesEl.textContent = gcsStats.orphanedFiles || 0;
+        }
+
+        // Actualizar indicadores visuales
+        this.updateStorageIndicator(gcsStats);
+      }
       
     } catch (error) {
       console.error('Error updating stats:', error);
@@ -586,6 +612,123 @@ class UploadController {
       
       if (totalFilesEl) totalFilesEl.textContent = totalFiles;
       if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);
+    }
+  }
+
+  // Obtener estadísticas de Google Cloud Storage
+  async getGcsStats() {
+    try {
+      // Usar el nuevo GcsController endpoint
+      const response = await docuFlowAPI.gcs.getStats();
+      return response.data || response;
+    } catch (error) {
+      console.warn('⚠️ No se pudieron obtener estadísticas de GCS:', error);
+      return {
+        usedStorage: 0,
+        totalStorage: 10737418240, // 10GB por defecto
+        orphanedFiles: 0,
+        storageUsagePercent: 0
+      };
+    }
+  }
+
+  // Detectar archivos huérfanos
+  async detectOrphanedFiles() {
+    try {
+      showNotification('🔍 Detectando archivos huérfanos...', 'info');
+      
+      const response = await docuFlowAPI.gcs.getOrphanedFiles();
+      const orphanedFiles = response.data || response || [];
+      
+      if (orphanedFiles.length > 0) {
+        this.showOrphanedFilesModal(orphanedFiles);
+        showNotification(`⚠️ Se encontraron ${orphanedFiles.length} archivos huérfanos`, 'warning');
+      } else {
+        showNotification('✅ No se encontraron archivos huérfanos', 'success');
+      }
+      
+      return orphanedFiles;
+    } catch (error) {
+      console.error('Error detecting orphaned files:', error);
+      showNotification('❌ Error al detectar archivos huérfanos', 'error');
+      return [];
+    }
+  }
+
+  // Limpiar archivos huérfanos
+  async cleanupOrphanedFiles(fileIds = []) {
+    try {
+      if (fileIds.length === 0) {
+        // Detectar primero si no se especifican IDs
+        const orphanedFiles = await this.detectOrphanedFiles();
+        fileIds = orphanedFiles.map(file => file.id);
+      }
+
+      if (fileIds.length === 0) {
+        showNotification('✅ No hay archivos huérfanos para limpiar', 'info');
+        return;
+      }
+
+      const confirmed = confirm(`¿Estás seguro de que quieres eliminar ${fileIds.length} archivos huérfanos? Esta acción no se puede deshacer.`);
+      
+      if (!confirmed) return;
+
+      showNotification('🧹 Limpiando archivos huérfanos...', 'info');
+
+      const response = await docuFlowAPI.gcs.cleanupOrphaned(fileIds);
+      
+      if (response.success) {
+        showNotification(`✅ Se limpiaron ${fileIds.length} archivos huérfanos exitosamente`, 'success');
+        
+        // Actualizar estadísticas
+        this.updateStats();
+        
+        // Crear notificación del sistema
+        if (window.createNotification) {
+          window.createNotification('SYSTEM', 'Limpieza completada', 
+            `Se eliminaron ${fileIds.length} archivos huérfanos`, 2);
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error cleaning up orphaned files:', error);
+      showNotification('❌ Error durante la limpieza de archivos', 'error');
+    }
+  }
+
+  // Actualizar indicador visual de almacenamiento
+  updateStorageIndicator(gcsStats) {
+    const usagePercent = gcsStats.storageUsagePercent || 
+      (gcsStats.usedStorage / gcsStats.totalStorage) * 100;
+    
+    const storageBar = document.getElementById('storage-usage-bar');
+    const storagePercent = document.getElementById('storage-usage-percent');
+    
+    if (storageBar) {
+      storageBar.style.width = `${Math.min(usagePercent, 100)}%`;
+      
+      // Cambiar color según el uso
+      if (usagePercent > 90) {
+        storageBar.className = 'progress-bar bg-danger';
+      } else if (usagePercent > 75) {
+        storageBar.className = 'progress-bar bg-warning';
+      } else {
+        storageBar.className = 'progress-bar bg-success';
+      }
+    }
+    
+    if (storagePercent) {
+      storagePercent.textContent = `${usagePercent.toFixed(1)}%`;
+    }
+
+    // Mostrar advertencia si el almacenamiento está casi lleno
+    if (usagePercent > 85) {
+      const warningMessage = usagePercent > 95 ? 
+        '⚠️ Almacenamiento casi lleno' : 
+        '📊 Almacenamiento con uso alto';
+      
+      showNotification(warningMessage, 'warning', 5000);
     }
   }
 
@@ -645,6 +788,245 @@ class UploadController {
   showFileStatsModal() {
     this.updateStats();
     showNotification('Estadísticas actualizadas', 'success');
+  }
+
+  // Modal para mostrar archivos huérfanos
+  showOrphanedFilesModal(orphanedFiles) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+              Archivos Huérfanos Detectados
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning">
+              <i class="bi bi-info-circle me-2"></i>
+              Los archivos huérfanos son archivos que existen en Google Cloud Storage pero no tienen 
+              referencias en la base de datos. Pueden eliminarse de forma segura.
+            </div>
+            
+            <div class="mb-3">
+              <strong>Total encontrados:</strong> ${orphanedFiles.length} archivos
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Archivo</th>
+                    <th>Tamaño</th>
+                    <th>Fecha de Creación</th>
+                    <th>Bucket</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${orphanedFiles.map(file => `
+                    <tr>
+                      <td>
+                        <i class="bi bi-file-earmark me-2"></i>
+                        ${file.name || file.fileName || 'Archivo sin nombre'}
+                      </td>
+                      <td>${this.formatFileSize(file.size || 0)}</td>
+                      <td>${file.createdAt ? new Date(file.createdAt).toLocaleDateString() : 'Desconocida'}</td>
+                      <td>
+                        <span class="badge bg-secondary">${file.bucket || 'docuflow-storage'}</span>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            <button type="button" class="btn btn-warning" onclick="uploadController.cleanupOrphanedFiles()">
+              <i class="bi bi-trash me-2"></i>Limpiar Archivos Huérfanos
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    modal.addEventListener('hidden.bs.modal', () => {
+      modal.remove();
+    });
+  }
+
+  // Modal avanzado de estadísticas GCS
+  async showAdvancedStatsModal() {
+    try {
+      showNotification('📊 Cargando estadísticas avanzadas...', 'info');
+      
+      const [gcsStats, orphanedFiles] = await Promise.allSettled([
+        this.getGcsStats(),
+        this.detectOrphanedFiles()
+      ]);
+
+      const stats = gcsStats.status === 'fulfilled' ? gcsStats.value : {};
+      const orphans = orphanedFiles.status === 'fulfilled' ? orphanedFiles.value : [];
+
+      const modal = document.createElement('div');
+      modal.className = 'modal fade';
+      modal.innerHTML = `
+        <div class="modal-dialog modal-xl">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                <i class="bi bi-cloud-arrow-up text-primary me-2"></i>
+                Estadísticas Avanzadas - Google Cloud Storage
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <!-- Resumen de Almacenamiento -->
+              <div class="row mb-4">
+                <div class="col-md-6">
+                  <div class="card bg-primary text-white">
+                    <div class="card-body">
+                      <h6 class="card-title">
+                        <i class="bi bi-hdd me-2"></i>Almacenamiento Usado
+                      </h6>
+                      <h3>${this.formatFileSize(stats.usedStorage || 0)}</h3>
+                      <small>de ${this.formatFileSize(stats.totalStorage || 10737418240)}</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="card bg-warning text-white">
+                    <div class="card-body">
+                      <h6 class="card-title">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Archivos Huérfanos
+                      </h6>
+                      <h3>${orphans.length || 0}</h3>
+                      <small>archivos sin referencia</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Indicador de Uso -->
+              <div class="mb-4">
+                <h6>Uso del Almacenamiento</h6>
+                <div class="progress mb-2" style="height: 20px;">
+                  <div class="progress-bar ${this.getStorageColorClass(stats)}" 
+                       style="width: ${this.getStoragePercent(stats)}%">
+                    ${this.getStoragePercent(stats).toFixed(1)}%
+                  </div>
+                </div>
+                <small class="text-muted">
+                  Disponible: ${this.formatFileSize((stats.totalStorage || 10737418240) - (stats.usedStorage || 0))}
+                </small>
+              </div>
+
+              <!-- Estadísticas Detalladas -->
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>Detalles del Bucket</h6>
+                  <table class="table table-sm">
+                    <tr>
+                      <td>Bucket Principal:</td>
+                      <td><span class="badge bg-info">${stats.bucketName || 'docuflow-storage'}</span></td>
+                    </tr>
+                    <tr>
+                      <td>Región:</td>
+                      <td>${stats.region || 'us-central1'}</td>
+                    </tr>
+                    <tr>
+                      <td>Clase de Almacenamiento:</td>
+                      <td>${stats.storageClass || 'STANDARD'}</td>
+                    </tr>
+                    <tr>
+                      <td>Total de Objetos:</td>
+                      <td>${stats.totalObjects || 0}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>Métricas de Rendimiento</h6>
+                  <table class="table table-sm">
+                    <tr>
+                      <td>Subidas Hoy:</td>
+                      <td>${stats.uploadsToday || 0}</td>
+                    </tr>
+                    <tr>
+                      <td>Descargas Hoy:</td>
+                      <td>${stats.downloadsToday || 0}</td>
+                    </tr>
+                    <tr>
+                      <td>Último Backup:</td>
+                      <td>${stats.lastBackup ? new Date(stats.lastBackup).toLocaleString() : 'N/A'}</td>
+                    </tr>
+                    <tr>
+                      <td>Estado del Servicio:</td>
+                      <td>
+                        <span class="badge bg-success">
+                          <i class="bi bi-check-circle me-1"></i>Operativo
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+
+              ${orphans.length > 0 ? `
+                <div class="alert alert-warning mt-3">
+                  <i class="bi bi-exclamation-triangle me-2"></i>
+                  <strong>Atención:</strong> Se detectaron ${orphans.length} archivos huérfanos que 
+                  pueden eliminarse para liberar espacio.
+                </div>
+              ` : ''}
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+              ${orphans.length > 0 ? `
+                <button type="button" class="btn btn-warning" 
+                        onclick="uploadController.showOrphanedFilesModal(${JSON.stringify(orphans).replace(/"/g, '&quot;')})">
+                  <i class="bi bi-search me-2"></i>Ver Archivos Huérfanos
+                </button>
+              ` : ''}
+              <button type="button" class="btn btn-primary" onclick="uploadController.updateStats()">
+                <i class="bi bi-arrow-clockwise me-2"></i>Actualizar
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      const bsModal = new bootstrap.Modal(modal);
+      bsModal.show();
+      
+      modal.addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+      });
+
+    } catch (error) {
+      console.error('Error showing advanced stats:', error);
+      showNotification('❌ Error al cargar estadísticas avanzadas', 'error');
+    }
+  }
+
+  // Métodos auxiliares para las estadísticas
+  getStoragePercent(stats) {
+    if (!stats.usedStorage || !stats.totalStorage) return 0;
+    return (stats.usedStorage / stats.totalStorage) * 100;
+  }
+
+  getStorageColorClass(stats) {
+    const percent = this.getStoragePercent(stats);
+    if (percent > 90) return 'bg-danger';
+    if (percent > 75) return 'bg-warning';
+    return 'bg-success';
   }
 
   async downloadFile(fileId, filename) {

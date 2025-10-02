@@ -3,6 +3,8 @@ class AppStore {
   constructor() {
     this.state = {
       user: null,
+      profile: null,
+      preferences: {},
       files: [],
       comments: [],
       notifications: [],
@@ -286,6 +288,97 @@ class AppStore {
     return this.state.comments.filter(comment => comment.fileId === fileId);
   }
 
+  // Métodos específicos para perfil
+  setProfile(profile) {
+    this.setState('profile', profile);
+  }
+
+  getProfile() {
+    return this.getState('profile');
+  }
+
+  updateProfile(updates) {
+    this.updateState('profile', updates);
+  }
+
+  // Métodos para preferencias
+  setPreferences(preferences) {
+    this.setState('preferences', preferences);
+  }
+
+  getPreferences() {
+    return this.getState('preferences');
+  }
+
+  setPreference(key, value) {
+    const currentPreferences = this.getState('preferences') || {};
+    this.setState('preferences', {
+      ...currentPreferences,
+      [key]: value
+    });
+  }
+
+  getPreference(key, defaultValue = null) {
+    const preferences = this.getState('preferences') || {};
+    return preferences[key] ?? defaultValue;
+  }
+
+  // Verificar si el usuario está autenticado
+  isAuthenticated() {
+    const user = this.getState('user');
+    const token = localStorage.getItem('token');
+    return !!(user && token);
+  }
+
+  // Verificar rol del usuario
+  hasRole(role) {
+    const user = this.getState('user');
+    return user?.role === role;
+  }
+
+  // Verificar permisos del usuario
+  hasPermission(permission) {
+    const user = this.getState('user');
+    const permissions = user?.permissions || [];
+    return permissions.includes(permission);
+  }
+
+  // Método para cargar configuración inicial del perfil
+  async initializeProfile() {
+    try {
+      // Cargar preferencias del localStorage
+      const storedPreferences = localStorage.getItem('userPreferences');
+      if (storedPreferences) {
+        const preferences = JSON.parse(storedPreferences);
+        this.setPreferences(preferences);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error initializing profile:', error);
+      return false;
+    }
+  }
+
+  // Método para sincronizar preferencias
+  syncPreferences(preferences) {
+    this.setPreferences(preferences);
+    localStorage.setItem('userPreferences', JSON.stringify(preferences));
+  }
+
+  // Limpiar datos de usuario (actualizado)
+  clearUserData() {
+    this.setState({
+      user: null,
+      profile: null,
+      preferences: {},
+      files: [],
+      comments: [],
+      notifications: [],
+      permissions: []
+    });
+  }
+
   // Debug helpers
   debug() {
     console.log('Current State:', this.state);
@@ -295,6 +388,8 @@ class AppStore {
   reset() {
     this.state = {
       user: null,
+      profile: null,
+      preferences: {},
       files: [],
       comments: [],
       notifications: [],

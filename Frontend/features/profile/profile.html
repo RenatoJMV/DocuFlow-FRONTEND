@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Perfil - DocuFlow</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Estilos compartidos -->
+  <link rel="stylesheet" href="../../shared/styles/styles.css">
+  <!-- Estilos específicos del perfil -->
+  <link rel="stylesheet" href="profile.css">
+</head>
+<body>
+  <!-- Header de navegación -->
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="../dashboard/dashboard.html">
+        <i class="fas fa-file-alt me-2"></i>DocuFlow
+      </a>
+      
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="../dashboard/dashboard.html">
+              <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="../files/upload.html">
+              <i class="fas fa-cloud-upload-alt me-1"></i>Archivos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="profile.html">
+              <i class="fas fa-user me-1"></i>Mi Perfil
+            </a>
+          </li>
+        </ul>
+        
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+              <img src="../../shared/assets/default-avatar.png" alt="Avatar" class="user-avatar me-2" width="32" height="32">
+              <span id="nav-username">Usuario</span>
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="profile.html"><i class="fas fa-user me-2"></i>Mi Perfil</a></li>
+              <li><a class="dropdown-item" href="#" id="logout-btn"><i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenido principal -->
+  <div class="container-fluid py-4">
+    <div class="row">
+      <!-- Sidebar -->
+      <div class="col-lg-3 col-md-4">
+        <div class="profile-sidebar">
+          <!-- Información básica del usuario -->
+          <div class="profile-header text-center">
+            <div class="avatar-container">
+              <img id="avatar-preview" src="../../shared/assets/default-avatar.png" alt="Avatar" class="user-avatar-large">
+              <div class="user-initials" style="display: none;"></div>
+              <div class="avatar-actions">
+                <button type="button" class="btn btn-sm btn-primary" id="avatar-upload-btn">
+                  <i class="fas fa-camera"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="remove-avatar-btn">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+              <input type="file" id="avatar-input" accept="image/*" style="display: none;">
+            </div>
+            
+            <h4 id="user-name-display" class="mt-3 mb-1">Nombre Usuario</h4>
+            <p id="user-email-display" class="text-muted mb-2">email@ejemplo.com</p>
+            <span id="user-role-display" class="badge bg-primary">Usuario</span>
+          </div>
+
+          <!-- Estadísticas del usuario -->
+          <div class="profile-stats mt-4">
+            <h6 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Estadísticas</h6>
+            <div class="stat-item">
+              <div class="stat-icon">
+                <i class="fas fa-cloud-upload-alt"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-number" id="stats-files-uploaded">0</div>
+                <div class="stat-label">Archivos Subidos</div>
+              </div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="stat-icon">
+                <i class="fas fa-comments"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-number" id="stats-comments-made">0</div>
+                <div class="stat-label">Comentarios</div>
+              </div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="stat-icon">
+                <i class="fas fa-hdd"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-number" id="stats-total-storage">0 MB</div>
+                <div class="stat-label">Almacenamiento</div>
+              </div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="stat-icon">
+                <i class="fas fa-sign-in-alt"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-number" id="stats-login-count">0</div>
+                <div class="stat-label">Inicios de Sesión</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Información adicional -->
+          <div class="profile-info mt-4">
+            <h6 class="mb-3"><i class="fas fa-info-circle me-2"></i>Información</h6>
+            <div class="info-item">
+              <strong>Departamento:</strong>
+              <span id="user-department-display">Sin departamento</span>
+            </div>
+            <div class="info-item">
+              <strong>Último acceso:</strong>
+              <span id="user-last-login">N/A</span>
+            </div>
+            <div class="info-item">
+              <strong>Miembro desde:</strong>
+              <span id="user-member-since">N/A</span>
+            </div>
+            <div class="info-item">
+              <strong>Última actividad:</strong>
+              <span id="stats-last-activity">N/A</span>
+            </div>
+          </div>
+
+          <!-- Acciones rápidas -->
+          <div class="profile-actions mt-4">
+            <button type="button" class="btn btn-outline-primary btn-sm w-100 mb-2" id="change-password-btn">
+              <i class="fas fa-key me-2"></i>Cambiar Contraseña
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm w-100" id="delete-account-btn">
+              <i class="fas fa-trash me-2"></i>Eliminar Cuenta
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenido principal -->
+      <div class="col-lg-9 col-md-8">
+        <div class="profile-content">
+          <!-- Tabs de navegación -->
+          <ul class="nav nav-tabs profile-tabs mb-4">
+            <li class="nav-item">
+              <button class="nav-link profile-tab-btn active" data-tab="profile">
+                <i class="fas fa-user me-2"></i>Información Personal
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link profile-tab-btn" data-tab="preferences">
+                <i class="fas fa-cog me-2"></i>Preferencias
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link profile-tab-btn" data-tab="activity">
+                <i class="fas fa-history me-2"></i>Historial de Actividad
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link profile-tab-btn" data-tab="security">
+                <i class="fas fa-shield-alt me-2"></i>Seguridad
+              </button>
+            </li>
+          </ul>
+
+          <!-- Tab de Información Personal -->
+          <div id="profile-tab" class="profile-tab-content active">
+            <div class="card">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-user me-2"></i>Información Personal</h5>
+                <div class="profile-actions">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="edit-profile-btn">
+                    <i class="fas fa-edit me-1"></i>Editar
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="cancel-edit-btn" style="display: none;">
+                    <i class="fas fa-times me-1"></i>Cancelar
+                  </button>
+                  <button type="submit" form="profile-form" class="btn btn-primary btn-sm" id="save-profile-btn" style="display: none;">
+                    <i class="fas fa-save me-1"></i>Guardar
+                  </button>
+                </div>
+              </div>
+              <div class="card-body">
+                <form id="profile-form">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="profile-field mb-3">
+                        <label for="profile-username" class="form-label">Nombre de Usuario</label>
+                        <input type="text" class="form-control" id="profile-username" name="username" disabled>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="profile-field mb-3">
+                        <label for="profile-email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="profile-email" name="email" disabled>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="profile-field mb-3">
+                        <label for="profile-firstName" class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="profile-firstName" name="firstName" disabled>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="profile-field mb-3">
+                        <label for="profile-lastName" class="form-label">Apellido</label>
+                        <input type="text" class="form-control" id="profile-lastName" name="lastName" disabled>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="profile-field mb-3">
+                        <label for="profile-phone" class="form-label">Teléfono</label>
+                        <input type="tel" class="form-control" id="profile-phone" name="phone" disabled>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="profile-field mb-3">
+                        <label for="profile-department" class="form-label">Departamento</label>
+                        <select class="form-select" id="profile-department" name="department" disabled>
+                          <option value="">Seleccionar departamento</option>
+                          <option value="IT">Tecnología</option>
+                          <option value="HR">Recursos Humanos</option>
+                          <option value="Finance">Finanzas</option>
+                          <option value="Marketing">Marketing</option>
+                          <option value="Sales">Ventas</option>
+                          <option value="Operations">Operaciones</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="profile-field mb-3">
+                        <label for="profile-position" class="form-label">Cargo</label>
+                        <input type="text" class="form-control" id="profile-position" name="position" disabled>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="profile-field mb-3">
+                        <label for="profile-location" class="form-label">Ubicación</label>
+                        <input type="text" class="form-control" id="profile-location" name="location" disabled>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="profile-field mb-3">
+                    <label for="profile-bio" class="form-label">Biografía</label>
+                    <textarea class="form-control" id="profile-bio" name="bio" rows="4" disabled placeholder="Cuéntanos algo sobre ti..."></textarea>
+                  </div>
+                  
+                  <div class="profile-field mb-3">
+                    <label for="profile-timezone" class="form-label">Zona Horaria</label>
+                    <select class="form-select" id="profile-timezone" name="timezone" disabled>
+                      <option value="UTC-5">UTC-5 (Colombia)</option>
+                      <option value="UTC-6">UTC-6 (México)</option>
+                      <option value="UTC-3">UTC-3 (Argentina)</option>
+                      <option value="UTC+1">UTC+1 (España)</option>
+                    </select>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab de Preferencias -->
+          <div id="preferences-tab" class="profile-tab-content">
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Preferencias del Sistema</h5>
+              </div>
+              <div class="card-body">
+                <form id="preferences-form">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="mb-3">
+                        <label for="pref-language" class="form-label">Idioma</label>
+                        <select class="form-select" id="pref-language" name="pref-language">
+                          <option value="es">Español</option>
+                          <option value="en">English</option>
+                          <option value="pt">Português</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="mb-3">
+                        <label for="pref-theme" class="form-label">Tema</label>
+                        <select class="form-select" id="pref-theme" name="pref-theme">
+                          <option value="light">Claro</option>
+                          <option value="dark">Oscuro</option>
+                          <option value="auto">Automático</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mb-4">
+                    <h6 class="mb-3">Notificaciones</h6>
+                    <div class="form-check form-switch mb-2">
+                      <input class="form-check-input" type="checkbox" id="pref-notifications" name="pref-notifications">
+                      <label class="form-check-label" for="pref-notifications">
+                        Notificaciones por email
+                      </label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                      <input class="form-check-input" type="checkbox" id="pref-sound" name="pref-sound">
+                      <label class="form-check-label" for="pref-sound">
+                        Notificaciones sonoras
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="mb-4">
+                    <h6 class="mb-3">Configuración de Archivos</h6>
+                    <div class="form-check form-switch mb-2">
+                      <input class="form-check-input" type="checkbox" id="pref-auto-save" name="pref-auto-save">
+                      <label class="form-check-label" for="pref-auto-save">
+                        Autoguardado automático
+                      </label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                      <input class="form-check-input" type="checkbox" id="pref-file-preview" name="pref-file-preview">
+                      <label class="form-check-label" for="pref-file-preview">
+                        Vista previa de archivos
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">
+                      <i class="fas fa-save me-2"></i>Guardar Preferencias
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab de Historial de Actividad -->
+          <div id="activity-tab" class="profile-tab-content">
+            <div class="card">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Historial de Actividad</h5>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.profileController?.refreshProfile()">
+                  <i class="fas fa-sync-alt me-1"></i>Actualizar
+                </button>
+              </div>
+              <div class="card-body">
+                <div id="activity-history">
+                  <!-- El historial se carga dinámicamente -->
+                  <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Cargando historial de actividad...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab de Seguridad -->
+          <div id="security-tab" class="profile-tab-content">
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Configuración de Seguridad</h5>
+              </div>
+              <div class="card-body">
+                <div class="security-section mb-4">
+                  <h6 class="mb-3">Contraseña</h6>
+                  <p class="text-muted">Mantén tu cuenta segura con una contraseña fuerte.</p>
+                  <button type="button" class="btn btn-outline-primary" id="change-password-btn-tab">
+                    <i class="fas fa-key me-2"></i>Cambiar Contraseña
+                  </button>
+                </div>
+
+                <div class="security-section mb-4">
+                  <h6 class="mb-3">Sesiones Activas</h6>
+                  <p class="text-muted">Monitorea dónde has iniciado sesión.</p>
+                  <div class="session-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <div class="fw-bold">Dispositivo Actual</div>
+                        <small class="text-muted">Windows - Chrome</small>
+                      </div>
+                      <span class="badge bg-success">Activa</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="security-section">
+                  <h6 class="mb-3 text-danger">Zona Peligrosa</h6>
+                  <p class="text-muted">Estas acciones son irreversibles.</p>
+                  <button type="button" class="btn btn-outline-danger" id="delete-account-btn-tab">
+                    <i class="fas fa-trash me-2"></i>Eliminar Cuenta
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Cambio de Contraseña -->
+  <div class="modal fade" id="change-password-modal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="fas fa-key me-2"></i>Cambiar Contraseña
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="change-password-form">
+            <div class="mb-3">
+              <label for="current-password" class="form-label">Contraseña Actual</label>
+              <input type="password" class="form-control" id="current-password" name="current-password" required>
+            </div>
+            <div class="mb-3">
+              <label for="new-password" class="form-label">Nueva Contraseña</label>
+              <input type="password" class="form-control" id="new-password" name="new-password" required minlength="8">
+              <div class="form-text">La contraseña debe tener al menos 8 caracteres.</div>
+            </div>
+            <div class="mb-3">
+              <label for="confirm-password" class="form-label">Confirmar Nueva Contraseña</label>
+              <input type="password" class="form-control" id="confirm-password" name="confirm-password" required>
+            </div>
+            <div class="d-flex justify-content-end gap-2">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-2"></i>Guardar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Eliminación de Cuenta -->
+  <div class="modal fade" id="delete-account-modal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">
+            <i class="fas fa-exclamation-triangle me-2"></i>Eliminar Cuenta
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>¡Advertencia!</strong> Esta acción es irreversible.
+          </div>
+          <p>¿Estás seguro de que deseas eliminar tu cuenta? Se perderán todos tus datos:</p>
+          <ul>
+            <li>Archivos subidos</li>
+            <li>Comentarios y actividad</li>
+            <li>Configuraciones personales</li>
+            <li>Historial de actividad</li>
+          </ul>
+          <p>Para confirmar, escribe <strong>ELIMINAR</strong> en el campo a continuación:</p>
+          <input type="text" class="form-control" id="delete-confirmation" placeholder="Escribe ELIMINAR">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" id="confirm-delete-btn" disabled>
+            <i class="fas fa-trash me-2"></i>Eliminar Cuenta
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading indicator -->
+  <div id="loading-indicator" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+      <div class="spinner-border text-light" role="status">
+        <span class="visually-hidden">Cargando...</span>
+      </div>
+      <p class="mt-2 text-light" id="loading-text">Cargando...</p>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Controlador de perfil -->
+  <script type="module" src="profileController.js"></script>
+</body>
+</html>

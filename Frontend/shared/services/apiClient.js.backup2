@@ -1,5 +1,25 @@
-// Cliente API moderno con interceptores para DocuFlow con Seguridad Avanzada
+// Cliente API para DocuFlow
+// Maneja todas las peticiones HTTP con interceptores de autenticación y error
+
+import { authService } from './authService.js';
 import securityService from './securityService.js';
+
+class ApiClient {
+  constructor() {
+    this.baseURL = this.getBaseURL();
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+    
+    // Rate limiting y monitoreo
+    this.requestCount = new Map();
+    this.lastRequestTime = new Map();
+    
+    // Configurar interceptores
+    this.setupInterceptors();
+    this.setupSecurityInterceptors();
+  }
 import { store } from './store.js';
 import { showNotification, showLoading } from '../utils/uiHelpers.js';
 
@@ -240,7 +260,7 @@ class ApiClient {
       } else if (contentType && contentType.includes('text/')) {
         data = await response.text();
       } else {
-        data = await response.blob(); 
+        data = await response.blob();
       }
     } catch (parseError) {
       console.warn('Could not parse response:', parseError);
@@ -627,6 +647,93 @@ export const docuFlowAPI = {
       const queryString = new URLSearchParams(params).toString();
       return apiClient.get(`/logs${queryString ? `?${queryString}` : ''}`);
     }
+  },
+
+  // Google Cloud Storage
+  gcs: {
+    getStats: () => apiClient.get('/gcs/stats', {
+      showErrorNotification: false
+    }),
+    getOrphanedFiles: () => apiClient.get('/gcs/orphaned-files'),
+    cleanupOrphaned: (fileIds) => apiClient.post('/gcs/cleanup-orphaned', { fileIds }, {
+      successMessage: 'Archivos huérfanos limpiados exitosamente'
+    }),
+    getBucketInfo: () => apiClient.get('/gcs/bucket-info'),
+    getStorageMetrics: () => apiClient.get('/gcs/metrics')
+  },
+
+  // Perfil de Usuario
+  profile: {
+    getCurrent: () => apiClient.get('/profile/current'),
+    update: (profileData) => apiClient.put('/profile/current', profileData, {
+      successMessage: 'Perfil actualizado exitosamente'
+    }),
+    uploadAvatar: (file) => apiClient.upload('/profile/avatar', file, {
+      successMessage: 'Avatar actualizado exitosamente'
+    }),
+    removeAvatar: () => apiClient.delete('/profile/avatar', {
+      successMessage: 'Avatar removido exitosamente'
+    }),
+    getActivity: (params = {}) => {
+      const queryString = new URLSearchParams(params).toString();
+      return apiClient.get(`/profile/activity${queryString ? `?${queryString}` : ''}`);
+    },
+    getPreferences: () => apiClient.get('/profile/preferences'),
+    updatePreferences: (preferences) => apiClient.put('/profile/preferences', preferences, {
+      successMessage: 'Preferencias actualizadas exitosamente'
+    }),
+    changePassword: (passwordData) => apiClient.put('/profile/password', passwordData, {
+      successMessage: 'Contraseña cambiada exitosamente'
+    }),
+    deleteAccount: (confirmation) => apiClient.delete('/profile/account', {
+      body: { confirmation },
+      successMessage: 'Cuenta eliminada exitosamente'
+    }),
+    getStats: () => apiClient.get('/profile/stats'),
+    getSessions: () => apiClient.get('/profile/sessions'),
+    revokeSession: (sessionId) => apiClient.delete(`/profile/sessions/${sessionId}`, {
+      successMessage: 'Sesión revocada exitosamente'
+    })
+  },
+
+  // Sistema de Exportación
+  export: {
+    generatePdf: (type, options = {}) => apiClient.post('/export/pdf', { type, options }, {
+      showLoading: true,
+      successMessage: 'PDF generado exitosamente'
+    }),
+    generateExcel: (type, options = {}) => apiClient.post('/export/excel', { type, options }, {
+      showLoading: true,
+      successMessage: 'Excel generado exitosamente'
+    }),
+    generateCsv: (type, options = {}) => apiClient.post('/export/csv', { type, options }, {
+      showLoading: true,
+      successMessage: 'CSV generado exitosamente'
+    }),
+    downloadReport: (reportId, format) => apiClient.download(`/export/download/${reportId}`, {
+      filename: `reporte_${reportId}.${format}`,
+      successMessage: 'Descarga iniciada'
+    }),
+    getReportStatus: (reportId) => apiClient.get(`/export/status/${reportId}`),
+    getAvailableTemplates: (type) => apiClient.get(`/export/templates/${type}`),
+    createCustomTemplate: (templateData) => apiClient.post('/export/templates', templateData, {
+      successMessage: 'Plantilla creada exitosamente'
+    }),
+    getExportHistory: (params = {}) => {
+      const queryString = new URLSearchParams(params).toString();
+      return apiClient.get(`/export/history${queryString ? `?${queryString}` : ''}`);
+    },
+    deleteReport: (reportId) => apiClient.delete(`/export/reports/${reportId}`, {
+      successMessage: 'Reporte eliminado exitosamente'
+    }),
+    getReportPreview: (type, options = {}) => apiClient.post('/export/preview', { type, options }),
+    scheduleReport: (scheduleData) => apiClient.post('/export/schedule', scheduleData, {
+      successMessage: 'Reporte programado exitosamente'
+    }),
+    getScheduledReports: () => apiClient.get('/export/scheduled'),
+    cancelScheduledReport: (scheduleId) => apiClient.delete(`/export/scheduled/${scheduleId}`, {
+      successMessage: 'Reporte programado cancelado'
+    })
   }
 };
 
