@@ -1,182 +1,389 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Comentarios y Tareas - DocuFlow</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="../../shared/styles/styles.css">
-  <link rel="stylesheet" href="comments.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-</head>
-<body class="modern-body">
-  <!-- Navbar será generado por JavaScript -->
-  <div id="navbar-container" class="container-fluid mt-4 mb-4"></div>
+<!DOCTYPE html><!DOCTYPE html>
 
-  <div class="comments-container">
-    <!-- Header Section -->
-    <div class="card-modern comments-header">
-      <div class="d-flex align-items-center justify-content-between flex-wrap">
-        <div class="d-flex align-items-center gap-3">
-          <div class="header-icon">
-            <i class="bi bi-chat-dots-fill"></i>
+<html lang="es"><html lang="es">
+
+<head><head>
+
+  <meta charset="UTF-8">  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>DocuFlow - Comentarios y Tareas</title>  <title>Comentarios y Tareas - DocuFlow</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">  <link rel="stylesheet" href="../../shared/styles/styles.css">
+
+  <link rel="stylesheet" href="../../shared/styles/styles.css">  <link rel="stylesheet" href="comments.css">
+
+  <link rel="stylesheet" href="comments.css">  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+</head></head>
+
+<body><body class="modern-body">
+
+  <!-- Navbar de navegación -->  <!-- Navbar será generado por JavaScript -->
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary" style="position: sticky; top: 0; z-index: 1000;">  <div id="navbar-container" class="container-fluid mt-4 mb-4"></div>
+
+    <div class="container-fluid">
+
+      <a class="navbar-brand d-flex align-items-center" href="../dashboard/dashboard.html">  <div class="comments-container">
+
+        <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" alt="DocuFlow" width="30" height="30" class="me-2">    <!-- Header Section -->
+
+        DocuFlow    <div class="card-modern comments-header">
+
+      </a>      <div class="d-flex align-items-center justify-content-between flex-wrap">
+
+              <div class="d-flex align-items-center gap-3">
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">          <div class="header-icon">
+
+        <span class="navbar-toggler-icon"></span>            <i class="bi bi-chat-dots-fill"></i>
+
+      </button>          </div>
+
+                <div>
+
+      <div class="collapse navbar-collapse" id="navbarNav">            <h1 class="h3 mb-1 text-gray-800">Comentarios y Tareas</h1>
+
+        <ul class="navbar-nav me-auto">            <p class="mb-0 text-gray-600">Gestiona comentarios y organiza tareas del proyecto</p>
+
+          <li class="nav-item">          </div>
+
+            <a class="nav-link" href="../dashboard/dashboard.html">        </div>
+
+              <i class="bi bi-house-door me-1"></i>Dashboard        <div class="comments-stats d-flex">
+
+            </a>          <div class="stat-item text-info">
+
+          </li>            <i class="bi bi-chat-text"></i>
+
+          <li class="nav-item">            <span id="commentsCount">-</span>
+
+            <a class="nav-link" href="../files/upload.html">            <small>Comentarios</small>
+
+              <i class="bi bi-cloud-upload me-1"></i>Subir Archivos          </div>
+
+            </a>          <div class="stat-item text-warning">
+
+          </li>            <i class="bi bi-list-task"></i>
+
+          <li class="nav-item">            <span id="tasksCount">-</span>
+
+            <a class="nav-link active" href="comments.html">            <small>Tareas</small>
+
+              <i class="bi bi-chat-dots me-1"></i>Comentarios          </div>
+
+            </a>          <div class="stat-item text-success">
+
+          </li>            <i class="bi bi-check-circle"></i>
+
+          <li class="nav-item">            <span id="completedCount">-</span>
+
+            <a class="nav-link" href="../logs/logs.html">            <small>Completadas</small>
+
+              <i class="bi bi-journal-text me-1"></i>Logs          </div>
+
+            </a>        </div>
+
+          </li>      </div>
+
+          <li class="nav-item">    </div>
+
+            <a class="nav-link" href="../permissions/permissions.html">
+
+              <i class="bi bi-shield-check me-1"></i>Permisos  <div class="row g-4">
+
+            </a>      <!-- Comments List Section -->
+
+          </li>      <div class="col-lg-8">
+
+          <li class="nav-item">        <div class="card-modern comments-list">
+
+            <a class="nav-link" href="../export/export.html">          <div class="comments-list-header d-flex align-items-center justify-content-between flex-wrap">
+
+              <i class="bi bi-download me-1"></i>Exportar            <h5 class="mb-0 text-gray-800">
+
+            </a>              <i class="bi bi-list-ul me-2"></i>Lista de Comentarios y Tareas
+
+          </li>            </h5>
+
+        </ul>            <div class="d-flex gap-2 align-items-center">
+
+                      <div class="filter-dropdown">
+
+        <ul class="navbar-nav">                <select id="filterType" class="form-select form-select-sm">
+
+          <li class="nav-item dropdown">                  <option value="all">Todos</option>
+
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">                  <option value="comments">Comentarios</option>
+
+              <i class="bi bi-person-circle me-1"></i>                  <option value="tasks">Tareas</option>
+
+              <span id="nav-username">Usuario</span>                  <option value="pending">Pendientes</option>
+
+            </a>                  <option value="completed">Completadas</option>
+
+            <ul class="dropdown-menu dropdown-menu-end">                </select>
+
+              <li><a class="dropdown-item" href="../profile/profile.html">              </div>
+
+                <i class="bi bi-person me-2"></i>Mi Perfil              <div class="search-box">
+
+              </a></li>                <input type="text" class="form-control form-control-sm" id="searchComments" placeholder="Buscar...">
+
+              <li><hr class="dropdown-divider"></li>              </div>
+
+              <li><a class="dropdown-item" href="#" onclick="authService.logout()">            </div>
+
+                <i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión          </div>
+
+              </a></li>
+
+            </ul>          <div class="comments-content">
+
+          </li>            <div id="commentsSection">
+
+        </ul>              <!-- Comments will be rendered here -->
+
+      </div>            </div>
+
+    </div>            <div id="commentsMsg" class="empty-state d-none">
+
+  </nav>              <i class="bi bi-chat-dots display-1 text-gray-400"></i>
+
+              <h5 class="text-gray-600 mt-3">No hay comentarios aún</h5>
+
+  <div class="container mt-4">              <p class="text-gray-500">Los comentarios y tareas aparecerán aquí</p>
+
+    <div class="row">            </div>
+
+      <!-- Panel de comentarios -->            
+
+      <div class="col-lg-8">            <!-- Pagination -->
+
+        <div class="card">            <div class="d-flex align-items-center justify-content-between mt-4">
+
+          <div class="card-header d-flex justify-content-between align-items-center">              <div class="pagination-info text-gray-600 small">
+
+            <h5 class="mb-0">                Mostrando <span id="showingCount">0</span> de <span id="totalCount">0</span> elementos
+
+              <i class="bi bi-chat-dots text-primary me-2"></i>              </div>
+
+              Comentarios de Documentos              <div id="paginationContainer"></div>
+
+            </h5>            </div>
+
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshComments()">          </div>
+
+              <i class="bi bi-arrow-clockwise me-1"></i>Actualizar        </div>
+
+            </button>      </div>
+
           </div>
-          <div>
-            <h1 class="h3 mb-1 text-gray-800">Comentarios y Tareas</h1>
-            <p class="mb-0 text-gray-600">Gestiona comentarios y organiza tareas del proyecto</p>
-          </div>
-        </div>
-        <div class="comments-stats d-flex">
-          <div class="stat-item text-info">
-            <i class="bi bi-chat-text"></i>
-            <span id="commentsCount">-</span>
-            <small>Comentarios</small>
-          </div>
-          <div class="stat-item text-warning">
-            <i class="bi bi-list-task"></i>
-            <span id="tasksCount">-</span>
-            <small>Tareas</small>
-          </div>
-          <div class="stat-item text-success">
-            <i class="bi bi-check-circle"></i>
-            <span id="completedCount">-</span>
-            <small>Completadas</small>
-          </div>
-        </div>
-      </div>
+
+          <div class="card-body">      <!-- Add Comment Section -->
+
+            <!-- Formulario de nuevo comentario -->      <div class="col-lg-4">
+
+            <div class="mb-4">        <div class="card-modern add-comment-section sticky-top">
+
+              <h6>Agregar Comentario</h6>          <div class="add-comment-header">
+
+              <form id="comment-form">            <h5 class="mb-0 text-gray-800">
+
+                <div class="mb-3">              <i class="bi bi-plus-circle me-2"></i>Nuevo Comentario/Tarea
+
+                  <label for="document-select" class="form-label">Documento</label>            </h5>
+
+                  <select class="form-select" id="document-select" required>          </div>
+
+                    <option value="">Seleccionar documento...</option>          
+
+                  </select>          <form id="newCommentForm">
+
+                </div>            <div class="mb-3">
+
+                <div class="mb-3">              <label class="form-label text-gray-700">Tipo</label>
+
+                  <label for="comment-text" class="form-label">Comentario</label>              <div class="comment-type-selector">
+
+                  <textarea class="form-control" id="comment-text" rows="3" placeholder="Escribe tu comentario aquí..." required></textarea>                <input type="radio" class="btn-check" name="commentType" id="typeComment" value="comment" checked>
+
+                </div>                <label class="btn btn-outline-primary" for="typeComment">
+
+                <button type="submit" class="btn btn-primary">                  <i class="bi bi-chat-text me-1"></i>Comentario
+
+                  <i class="bi bi-send me-1"></i>Enviar Comentario                </label>
+
+                </button>                
+
+              </form>                <input type="radio" class="btn-check" name="commentType" id="typeTask" value="task">
+
+            </div>                <label class="btn btn-outline-warning" for="typeTask">
+
+                  <i class="bi bi-list-task me-1"></i>Tarea
+
+            <hr>                </label>
+
+              </div>
+
+            <!-- Lista de comentarios -->            </div>
+
+            <div id="comments-container">
+
+              <div class="text-center">            <div class="mb-3">
+
+                <div class="spinner-border" role="status">              <label for="commentContent" class="form-label text-gray-700">Contenido</label>
+
+                  <span class="visually-hidden">Cargando comentarios...</span>              <textarea id="commentContent" class="form-control" rows="4" 
+
+                </div>                      placeholder="Escribe tu comentario o describe la tarea..." required></textarea>
+
+                <p class="mt-2 text-muted">Cargando comentarios...</p>            </div>
+
+              </div>
+
+            </div>            <div class="mb-3 task-fields d-none">
+
+          </div>              <label for="assignees" class="form-label text-gray-700">Asignados</label>
+
+        </div>              <input type="text" id="assignees" class="form-control" 
+
+      </div>                   placeholder="Usuarios asignados (separados por coma)">
+
+              <small class="form-text text-gray-500">Ej: juan@email.com, maria@email.com</small>
+
+      <!-- Panel de tareas -->            </div>
+
+      <div class="col-lg-4">
+
+        <div class="card">            <div class="mb-3 task-fields d-none">
+
+          <div class="card-header">              <label for="dueDate" class="form-label text-gray-700">Fecha límite</label>
+
+            <h5 class="mb-0">              <input type="datetime-local" id="dueDate" class="form-control">
+
+              <i class="bi bi-list-task text-success me-2"></i>            </div>
+
+              Tareas Pendientes
+
+            </h5>            <div class="mb-3 task-fields d-none">
+
+          </div>              <label for="priority" class="form-label text-gray-700">Prioridad</label>
+
+          <div class="card-body">              <select id="priority" class="form-select">
+
+            <!-- Formulario de nueva tarea -->                <option value="low">Baja</option>
+
+            <div class="mb-4">                <option value="medium" selected>Media</option>
+
+              <h6>Nueva Tarea</h6>                <option value="high">Alta</option>
+
+              <form id="task-form">                <option value="urgent">Urgente</option>
+
+                <div class="mb-3">              </select>
+
+                  <input type="text" class="form-control" id="task-title" placeholder="Título de la tarea..." required>            </div>
+
+                </div>
+
+                <div class="mb-3">            <div class="mb-3">
+
+                  <textarea class="form-control" id="task-description" rows="2" placeholder="Descripción (opcional)"></textarea>              <label for="documentId" class="form-label text-gray-700">ID de Documento</label>
+
+                </div>              <input type="number" id="documentId" class="form-control" 
+
+                <div class="mb-3">                   placeholder="ID del documento relacionado" required>
+
+                  <select class="form-select" id="task-priority">            </div>
+
+                    <option value="low">Baja prioridad</option>
+
+                    <option value="medium" selected>Prioridad media</option>            <button type="submit" class="btn-modern btn-modern-primary w-100" id="submitBtn">
+
+                    <option value="high">Alta prioridad</option>              <i class="bi bi-plus-circle me-2"></i>
+
+                  </select>              <span id="submitText">Agregar Comentario</span>
+
+                </div>            </button>
+
+                <button type="submit" class="btn btn-success btn-sm w-100">          </form>
+
+                  <i class="bi bi-plus me-1"></i>Agregar Tarea        </div>
+
+                </button>
+
+              </form>        <!-- Quick Actions -->
+
+            </div>        <div class="card-modern mt-3">
+
+          <h6 class="text-gray-700 mb-3">Acciones Rápidas</h6>
+
+            <hr>          <div class="quick-actions">
+
+            <button class="btn-modern btn-modern-outline w-100 mb-2" id="markAllRead">
+
+            <!-- Lista de tareas -->              <i class="bi bi-check2-all me-2"></i>Marcar todo como leído
+
+            <div id="tasks-container">            </button>
+
+              <div class="text-center">            <button class="btn-modern btn-modern-outline w-100 mb-2" id="exportComments">
+
+                <div class="spinner-border spinner-border-sm" role="status">              <i class="bi bi-download me-2"></i>Exportar comentarios
+
+                  <span class="visually-hidden">Cargando tareas...</span>            </button>
+
+                </div>            <button class="btn-modern btn-modern-outline w-100" id="refreshComments">
+
+                <p class="mt-2 text-muted small">Cargando tareas...</p>              <i class="bi bi-arrow-clockwise me-2"></i>Actualizar
+
+              </div>            </button>
+
+            </div>          </div>
+
+          </div>        </div>
+
+        </div>      </div>
+
     </div>
 
-  <div class="row g-4">
-      <!-- Comments List Section -->
-      <div class="col-lg-8">
-        <div class="card-modern comments-list">
-          <div class="comments-list-header d-flex align-items-center justify-content-between flex-wrap">
-            <h5 class="mb-0 text-gray-800">
-              <i class="bi bi-list-ul me-2"></i>Lista de Comentarios y Tareas
-            </h5>
-            <div class="d-flex gap-2 align-items-center">
-              <div class="filter-dropdown">
-                <select id="filterType" class="form-select form-select-sm">
-                  <option value="all">Todos</option>
-                  <option value="comments">Comentarios</option>
-                  <option value="tasks">Tareas</option>
-                  <option value="pending">Pendientes</option>
-                  <option value="completed">Completadas</option>
-                </select>
-              </div>
-              <div class="search-box">
-                <input type="text" class="form-control form-control-sm" id="searchComments" placeholder="Buscar...">
-              </div>
-            </div>
+        <!-- Estadísticas -->  </div>
+
+        <div class="card mt-3">
+
+          <div class="card-header">  <script type="module" src="commentsController.js"></script>
+
+            <h6 class="mb-0">  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+              <i class="bi bi-graph-up text-info me-2"></i></body>
+
+              Estadísticas</html>
+
+            </h6>
           </div>
-
-          <div class="comments-content">
-            <div id="commentsSection">
-              <!-- Comments will be rendered here -->
-            </div>
-            <div id="commentsMsg" class="empty-state d-none">
-              <i class="bi bi-chat-dots display-1 text-gray-400"></i>
-              <h5 class="text-gray-600 mt-3">No hay comentarios aún</h5>
-              <p class="text-gray-500">Los comentarios y tareas aparecerán aquí</p>
-            </div>
-            
-            <!-- Pagination -->
-            <div class="d-flex align-items-center justify-content-between mt-4">
-              <div class="pagination-info text-gray-600 small">
-                Mostrando <span id="showingCount">0</span> de <span id="totalCount">0</span> elementos
+          <div class="card-body">
+            <div class="row text-center">
+              <div class="col-6">
+                <h4 class="text-primary" id="total-comments">0</h4>
+                <small class="text-muted">Comentarios</small>
               </div>
-              <div id="paginationContainer"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Add Comment Section -->
-      <div class="col-lg-4">
-        <div class="card-modern add-comment-section sticky-top">
-          <div class="add-comment-header">
-            <h5 class="mb-0 text-gray-800">
-              <i class="bi bi-plus-circle me-2"></i>Nuevo Comentario/Tarea
-            </h5>
-          </div>
-          
-          <form id="newCommentForm">
-            <div class="mb-3">
-              <label class="form-label text-gray-700">Tipo</label>
-              <div class="comment-type-selector">
-                <input type="radio" class="btn-check" name="commentType" id="typeComment" value="comment" checked>
-                <label class="btn btn-outline-primary" for="typeComment">
-                  <i class="bi bi-chat-text me-1"></i>Comentario
-                </label>
-                
-                <input type="radio" class="btn-check" name="commentType" id="typeTask" value="task">
-                <label class="btn btn-outline-warning" for="typeTask">
-                  <i class="bi bi-list-task me-1"></i>Tarea
-                </label>
+              <div class="col-6">
+                <h4 class="text-success" id="total-tasks">0</h4>
+                <small class="text-muted">Tareas</small>
               </div>
             </div>
-
-            <div class="mb-3">
-              <label for="commentContent" class="form-label text-gray-700">Contenido</label>
-              <textarea id="commentContent" class="form-control" rows="4" 
-                      placeholder="Escribe tu comentario o describe la tarea..." required></textarea>
-            </div>
-
-            <div class="mb-3 task-fields d-none">
-              <label for="assignees" class="form-label text-gray-700">Asignados</label>
-              <input type="text" id="assignees" class="form-control" 
-                   placeholder="Usuarios asignados (separados por coma)">
-              <small class="form-text text-gray-500">Ej: juan@email.com, maria@email.com</small>
-            </div>
-
-            <div class="mb-3 task-fields d-none">
-              <label for="dueDate" class="form-label text-gray-700">Fecha límite</label>
-              <input type="datetime-local" id="dueDate" class="form-control">
-            </div>
-
-            <div class="mb-3 task-fields d-none">
-              <label for="priority" class="form-label text-gray-700">Prioridad</label>
-              <select id="priority" class="form-select">
-                <option value="low">Baja</option>
-                <option value="medium" selected>Media</option>
-                <option value="high">Alta</option>
-                <option value="urgent">Urgente</option>
-              </select>
-            </div>
-
-            <div class="mb-3">
-              <label for="documentId" class="form-label text-gray-700">ID de Documento</label>
-              <input type="number" id="documentId" class="form-control" 
-                   placeholder="ID del documento relacionado" required>
-            </div>
-
-            <button type="submit" class="btn-modern btn-modern-primary w-100" id="submitBtn">
-              <i class="bi bi-plus-circle me-2"></i>
-              <span id="submitText">Agregar Comentario</span>
-            </button>
-          </form>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="card-modern mt-3">
-          <h6 class="text-gray-700 mb-3">Acciones Rápidas</h6>
-          <div class="quick-actions">
-            <button class="btn-modern btn-modern-outline w-100 mb-2" id="markAllRead">
-              <i class="bi bi-check2-all me-2"></i>Marcar todo como leído
-            </button>
-            <button class="btn-modern btn-modern-outline w-100 mb-2" id="exportComments">
-              <i class="bi bi-download me-2"></i>Exportar comentarios
-            </button>
-            <button class="btn-modern btn-modern-outline w-100" id="refreshComments">
-              <i class="bi bi-arrow-clockwise me-2"></i>Actualizar
-            </button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <script type="module" src="commentsController.js"></script>
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="../../shared/utils/uiHelpers.js"></script>
+  <script type="module" src="commentsControllerSimple.js"></script>
 </body>
 </html>

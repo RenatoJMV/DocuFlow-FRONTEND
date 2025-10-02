@@ -1,518 +1,457 @@
-import { docuFlowAPI } from '../../shared/services/apiClient.js';
-import { store } from '../../shared/services/store.js';
-import { initializeNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
+// commentsControllerSimple.js - Controlador simplificado para comentarios y tareas
+import { docuFlowAPI } from '../../shared/services/apiClientSimple.js';
+import authService from '../../shared/services/authServiceSimple.js';
+import { showNotification } from '../../shared/utils/uiHelpers.js';
 
-class CommentsController {
+class SimpleCommentsController {
   constructor() {
     this.comments = [];
-    this.filteredComments = [];
-    this.currentPage = 1;
-    this.itemsPerPage = 10;
-    this.currentFilter = 'all';
-    this.pagination = new Pagination('paginationContainer', {
-      itemsPerPage: this.itemsPerPage,
-      currentPage: this.currentPage,
-      onPageChange: (page) => {
-        this.currentPage = page;
-        this.renderComments();
-        this.updatePagination();
-      }
-    });
-    
-    this.initializeComponents();
-    this.setupEventListeners();
-    this.loadComments();
-    this.updateStats();
+    this.currentFileId = null;
+    this.init();
   }
 
-  initializeComponents() {
-    // Create navbar
-    initializeNavbar('comments');
-    
-    // Setup form validation
-    this.setupFormValidation();
-  }
-
-  setupFormValidation() {
-    this.validator = new FormValidator('newCommentForm', {
-      commentContent: {
-        required: true,
-        minLength: 5,
-        message: 'El comentario debe tener al menos 5 caracteres'
-      },
-      documentId: {
-        required: true,
-        message: 'El ID del documento es requerido'
-      }
-    });
-  }
-
-  setupEventListeners() {
-    // Comment form submission
-    const commentForm = document.getElementById('newCommentForm');
-    commentForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.handleCommentSubmission();
-    });
-
-    // Comment type toggle
-    const typeRadios = document.querySelectorAll('input[name="commentType"]');
-    typeRadios.forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        this.toggleTaskFields(e.target.value === 'task');
-        this.updateSubmitButton(e.target.value);
-      });
-    });
-
-    // Filter dropdown
-    const filterType = document.getElementById('filterType');
-    if (filterType) {
-      filterType.addEventListener('change', (e) => {
-        this.currentFilter = e.target.value;
-        this.filterComments();
-      });
-    }
-
-    // Search input
-    const searchInput = document.getElementById('searchComments');
-    if (searchInput) {
-      searchInput.addEventListener('input', () => this.filterComments());
-    }
-
-    // Quick actions
-    this.setupQuickActions();
-  }
-
-  setupQuickActions() {
-    const markAllReadBtn = document.getElementById('markAllRead');
-    const exportBtn = document.getElementById('exportComments');
-    const refreshBtn = document.getElementById('refreshComments');
-
-    if (markAllReadBtn) {
-      markAllReadBtn.addEventListener('click', () => this.markAllAsRead());
-    }
-
-    if (exportBtn) {
-      exportBtn.addEventListener('click', () => this.exportComments());
-    }
-
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => this.loadComments());
-    }
-  }
-
-  toggleTaskFields(isTask) {
-    const taskFields = document.querySelectorAll('.task-fields');
-    taskFields.forEach(field => {
-      if (isTask) {
-        field.classList.remove('d-none');
-        field.classList.add('show');
-      } else {
-        field.classList.add('d-none');
-        field.classList.remove('show');
-      }
-    });
-  }
-
-  updateSubmitButton(type) {
-    const submitBtn = document.getElementById('submitBtn');
-    const submitText = document.getElementById('submitText');
-    
-    if (type === 'task') {
-      submitText.textContent = 'Crear Tarea';
-      submitBtn.querySelector('i').className = 'bi bi-list-task me-2';
-    } else {
-      submitText.textContent = 'Agregar Comentario';
-      submitBtn.querySelector('i').className = 'bi bi-plus-circle me-2';
-    }
-  }
-
-  async handleCommentSubmission() {
-    if (!this.validator.validate()) {
+  async init() {
+    if (!authService.isLoggedIn()) {
+      window.location.href = '../auth/login.html';
       return;
     }
 
-    const submitBtn = document.getElementById('submitBtn');
-    const originalText = submitBtn.innerHTML;
-    
-    try {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin me-2"></i>Guardando...';
+    // Obtener fileId de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    this.currentFileId = urlParams.get('fileId');
 
-      const formData = this.getFormData();
-      
-      const response = await docuFlowAPI.comments.create(formData);
-      
-      showNotification(`${formData.type === 'task' ? 'Tarea' : 'Comentario'} creado exitosamente`, 'success');
-      
-      // Reset form and reload comments
-      document.getElementById('newCommentForm').reset();
-      this.toggleTaskFields(false);
-      this.updateSubmitButton('comment');
-      
-      this.loadComments();
-      this.updateStats();
+    if (!this.currentFileId) {
+      showNotification('ID de archivo no especificado', 'error');
+      window.location.href = '../files/upload.html';
+      return;
+    }
 
-    } catch (error) {
-      console.error('Error creating comment:', error);
-      showNotification('Error al crear el comentario', 'error');
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = originalText;
+    this.setupEventListeners();
+    await this.loadComments();
+    this.updateUI();
+  }
+
+  setupEventListeners() {
+    // Formulario de nuevo comentario
+    const commentForm = document.getElementById('commentForm');
+    if (commentForm) {
+      commentForm.addEventListener('submit', (e) => this.handleSubmitComment(e));
+    }
+
+    // Tipo de comentario
+    const commentType = document.getElementById('commentType');
+    if (commentType) {
+      commentType.addEventListener('change', (e) => this.toggleTaskFields(e.target.value));
+    }
+
+    // Filtros
+    const typeFilter = document.getElementById('typeFilter');
+    if (typeFilter) {
+      typeFilter.addEventListener('change', (e) => this.filterComments(e.target.value));
+    }
+
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+      statusFilter.addEventListener('change', (e) => this.filterByStatus(e.target.value));
+    }
+
+    // Refresh
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.loadComments());
+    }
+
+    // Volver a archivos
+    const backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => window.location.href = '../files/upload.html');
     }
   }
 
-  getFormData() {
-    const commentType = document.querySelector('input[name="commentType"]:checked').value;
-    
-    const formData = {
-      content: document.getElementById('commentContent').value.trim(),
-      type: commentType,
-      documentId: parseInt(document.getElementById('documentId').value)
-    };
+  async handleSubmitComment(event) {
+    event.preventDefault();
 
-    if (commentType === 'task') {
-      const assignees = document.getElementById('assignees').value.trim();
-      const dueDate = document.getElementById('dueDate').value;
-      const priority = document.getElementById('priority').value;
-      
-      formData.assignees = assignees ? assignees.split(',').map(email => email.trim()) : [];
-      formData.dueDate = dueDate || null;
-      formData.priority = priority;
+    const content = document.getElementById('commentContent').value.trim();
+    const type = document.getElementById('commentType').value;
+    
+    if (!content) {
+      showNotification('El contenido no puede estar vacío', 'error');
+      return;
     }
 
-    return formData;
+    const commentData = {
+      fileId: this.currentFileId,
+      content,
+      type,
+      author: authService.getCurrentUser().email,
+      createdAt: new Date().toISOString()
+    };
+
+    // Si es una tarea, agregar campos adicionales
+    if (type === 'task') {
+      commentData.completed = false;
+      commentData.priority = document.getElementById('taskPriority')?.value || 'medium';
+      commentData.dueDate = document.getElementById('taskDueDate')?.value || null;
+    }
+
+    try {
+      const response = await docuFlowAPI.comments.create(commentData);
+      
+      if (response.success) {
+        showNotification(`${type === 'task' ? 'Tarea' : 'Comentario'} agregado correctamente`, 'success');
+        
+        // Limpiar formulario
+        document.getElementById('commentForm').reset();
+        this.toggleTaskFields('comment');
+        
+        // Recargar comentarios
+        await this.loadComments();
+      }
+
+    } catch (error) {
+      console.error('Error agregando comentario:', error);
+      showNotification('Error agregando comentario', 'error');
+    }
   }
 
   async loadComments() {
     try {
-      // Cargar comentarios del endpoint real del backend
-      console.log('📝 Cargando comentarios desde /api/comments...');
-      const response = await docuFlowAPI.get('/api/comments');
+      const response = await docuFlowAPI.comments.list(this.currentFileId);
       
-      // Extraer comentarios del response
-      const comments = response?.comments || response?.data || response || [];
-      
-      if (Array.isArray(comments) && comments.length > 0) {
-        // Convertir comentarios del backend al formato del frontend
-        this.comments = comments.map(comment => ({
-          id: comment.id || Date.now() + Math.random(),
-          content: comment.content || comment.text || 'Sin contenido',
-          type: comment.type || 'comment',
-          author: comment.author || comment.user || 'Usuario desconocido',
-          createdAt: comment.createdAt || comment.timestamp || new Date().toISOString(),
-          status: comment.status || comment.resolved ? 'resolved' : 'pending',
-          fileId: comment.fileId || null,
-          // Campos adicionales si existen
-          priority: comment.priority || 'normal',
-          assignees: comment.assignees || [],
-          dueDate: comment.dueDate || null
-        }));
-        
-        console.log(`✅ ${this.comments.length} comentarios cargados desde el backend`);
-        showNotification(`${this.comments.length} comentarios cargados del servidor`, 'success', 2000);
-      } else {
-        console.log('⚠️ No se encontraron comentarios en el servidor');
-        this.comments = [];
-        showNotification('No se encontraron comentarios en el servidor', 'info', 2000);
+      if (response.success) {
+        this.comments = response.data.comments || [];
+        this.renderCommentsList();
+        this.updateStats();
       }
-      
-      this.filterComments();
-      
+
     } catch (error) {
-      console.error('❌ Error cargando comentarios del backend:', error);
-      showNotification('Error al cargar comentarios, usando datos demo', 'warning');
-      
-      // Fallback a datos demo
-      this.comments = this.getDemoComments();
-      this.filterComments();
+      console.error('Error cargando comentarios:', error);
+      showNotification('Error cargando comentarios', 'error');
     }
   }
 
-  getDemoComments() {
-    // Demo data for development
-    return [
-      {
-        id: '1',
-        content: 'Este documento necesita revisión urgente en la sección de conclusiones.',
-        type: 'comment',
-        author: 'María González',
-        createdAt: '2024-03-15T10:30:00Z',
-        status: 'pending'
-      },
-      {
-        id: '2',
-        content: 'Completar la validación de datos antes del viernes.',
-        type: 'task',
-        author: 'Juan Pérez',
-        createdAt: '2024-03-14T15:45:00Z',
-        dueDate: '2024-03-22T17:00:00Z',
-        priority: 'high',
-        assignees: ['ana@docuflow.com', 'carlos@docuflow.com'],
-        status: 'pending'
-      },
-      {
-        id: '3',
-        content: 'Actualización de formato aplicada correctamente.',
-        type: 'comment',
-        author: 'Ana López',
-        createdAt: '2024-03-13T09:15:00Z',
-        status: 'completed'
-      },
-      {
-        id: '4',
-        content: 'Revisar y aprobar los cambios propuestos en el documento.',
-        type: 'task',
-        author: 'Carlos Ruiz',
-        createdAt: '2024-03-12T14:20:00Z',
-        dueDate: '2024-03-20T12:00:00Z',
-        priority: 'medium',
-        assignees: ['supervisor@docuflow.com'],
-        status: 'completed'
-      }
-    ];
+  filterComments(type) {
+    if (type === 'all') {
+      this.renderCommentsList();
+    } else {
+      const filtered = this.comments.filter(comment => comment.type === type);
+      this.renderCommentsList(filtered);
+    }
   }
 
-  filterComments() {
-    const searchTerm = document.getElementById('searchComments')?.value.toLowerCase() || '';
-    
-    this.filteredComments = this.comments.filter(comment => {
-      // Filter by type
-      if (this.currentFilter !== 'all') {
-        if (this.currentFilter === 'comments' && comment.type === 'task') return false;
-        if (this.currentFilter === 'tasks' && comment.type === 'comment') return false;
-        if (this.currentFilter === 'pending' && comment.status === 'completed') return false;
-        if (this.currentFilter === 'completed' && comment.status !== 'completed') return false;
-      }
-      
-      // Filter by search term
-      if (searchTerm) {
-        return comment.content.toLowerCase().includes(searchTerm) ||
-               (comment.author && comment.author.toLowerCase().includes(searchTerm));
-      }
-      
-      return true;
-    });
-
-    this.currentPage = 1;
-    this.renderComments();
-    this.updatePagination();
+  filterByStatus(status) {
+    if (status === 'all') {
+      this.renderCommentsList();
+    } else {
+      const completed = status === 'completed';
+      const filtered = this.comments.filter(comment => 
+        comment.type === 'task' && comment.completed === completed
+      );
+      this.renderCommentsList(filtered);
+    }
   }
 
-  renderComments() {
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
-    const commentsToShow = this.filteredComments.slice(startIndex, endIndex);
+  renderCommentsList(commentsToRender = this.comments) {
+    const container = document.getElementById('commentsList');
+    if (!container) return;
 
-    const container = document.getElementById('commentsSection');
-    const emptyState = document.getElementById('commentsMsg');
-
-    if (commentsToShow.length === 0) {
-      container.innerHTML = '';
-      emptyState.classList.remove('d-none');
-      this.updateShowingCount();
+    if (commentsToRender.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-5">
+          <i class="bi bi-chat-dots" style="font-size: 3rem; color: #ccc;"></i>
+          <p class="text-muted mt-3">No hay comentarios para mostrar</p>
+        </div>
+      `;
       return;
     }
 
-    emptyState.classList.add('d-none');
-    container.innerHTML = commentsToShow.map(comment => this.renderCommentItem(comment)).join('');
-    
-    this.updateShowingCount();
-  }
-
-  renderCommentItem(comment) {
-    const isTask = comment.type === 'task';
-    const typeClass = isTask ? 'task' : 'comment';
-    const completedClass = comment.status === 'completed' ? 'completed' : '';
-    
-    return `
-      <div class="comment-item ${typeClass} ${completedClass}" data-comment-id="${comment.id}">
-        <div class="comment-header">
-          <div class="d-flex align-items-center gap-2">
-            <span class="comment-type ${typeClass}">
-              <i class="bi bi-${isTask ? 'list-task' : 'chat-text'}"></i>
-              ${isTask ? 'Tarea' : 'Comentario'}
-            </span>
-            ${comment.priority && isTask ? `<span class="priority-badge ${comment.priority}">${this.getPriorityText(comment.priority)}</span>` : ''}
+    container.innerHTML = commentsToRender.map(comment => `
+      <div class="comment-item card mb-3 ${comment.type === 'task' ? 'task-item' : ''}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="d-flex align-items-center">
+              <i class="bi ${comment.type === 'task' ? 'bi-check-square' : 'bi-chat-dots'} me-2"></i>
+              <strong>${comment.author}</strong>
+              <span class="badge ${comment.type === 'task' ? 'bg-primary' : 'bg-secondary'} ms-2">
+                ${comment.type === 'task' ? 'Tarea' : 'Comentario'}
+              </span>
+              ${comment.type === 'task' && comment.completed ? 
+                '<span class="badge bg-success ms-1">Completada</span>' : ''}
+            </div>
+            <div class="comment-actions">
+              <small class="text-muted">${this.formatDate(comment.createdAt)}</small>
+              ${this.canEditComment(comment) ? `
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="commentsController.editComment(${comment.id})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger ms-1" onclick="commentsController.deleteComment(${comment.id})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              ` : ''}
+            </div>
           </div>
-          <div class="comment-meta">
-            <span><i class="bi bi-person"></i> ${comment.author || 'Usuario'}</span>
-            <span><i class="bi bi-clock"></i> ${this.formatDate(comment.createdAt)}</span>
-            ${comment.dueDate && isTask ? `<span><i class="bi bi-calendar"></i> ${this.formatDate(comment.dueDate)}</span>` : ''}
+          
+          <div class="comment-content">
+            <p class="mb-2">${comment.content}</p>
+            
+            ${comment.type === 'task' ? `
+              <div class="task-details mt-2">
+                <div class="row">
+                  <div class="col-md-4">
+                    <small class="text-muted">
+                      <i class="bi bi-flag me-1"></i>
+                      Prioridad: ${this.getPriorityText(comment.priority)}
+                    </small>
+                  </div>
+                  ${comment.dueDate ? `
+                    <div class="col-md-4">
+                      <small class="text-muted">
+                        <i class="bi bi-calendar me-1"></i>
+                        Vence: ${this.formatDate(comment.dueDate)}
+                      </small>
+                    </div>
+                  ` : ''}
+                  <div class="col-md-4">
+                    <button class="btn btn-sm ${comment.completed ? 'btn-success' : 'btn-outline-success'}" 
+                            onclick="commentsController.toggleTaskStatus(${comment.id})">
+                      <i class="bi ${comment.completed ? 'bi-check-circle-fill' : 'bi-circle'}"></i>
+                      ${comment.completed ? 'Completada' : 'Marcar como completada'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
           </div>
-        </div>
-        
-        <div class="comment-content">
-          ${comment.content}
-        </div>
-        
-        ${comment.assignees && isTask ? `
-          <div class="comment-assignees">
-            <small class="text-gray-600">
-              <i class="bi bi-people"></i> Asignado a: ${comment.assignees.join(', ')}
-            </small>
-          </div>
-        ` : ''}
-        
-        <div class="comment-actions">
-          <button class="action-btn reply" onclick="commentsController.replyToComment('${comment.id}')">
-            <i class="bi bi-reply"></i> Responder
-          </button>
-          ${isTask && comment.status !== 'completed' ? `
-            <button class="action-btn complete" onclick="commentsController.completeTask('${comment.id}')">
-              <i class="bi bi-check-circle"></i> Completar
-            </button>
-          ` : ''}
-          <button class="action-btn delete" onclick="commentsController.deleteComment('${comment.id}')">
-            <i class="bi bi-trash"></i> Eliminar
-          </button>
         </div>
       </div>
-    `;
+    `).join('');
   }
 
-  getPriorityText(priority) {
-    const priorities = {
-      low: 'Baja',
-      medium: 'Media',
-      high: 'Alta',
-      urgent: 'Urgente'
-    };
-    return priorities[priority] || priority;
-  }
+  async toggleTaskStatus(commentId) {
+    const comment = this.comments.find(c => c.id === commentId);
+    if (!comment || comment.type !== 'task') return;
 
-  formatDate(dateString) {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  updatePagination() {
-    if (!this.pagination) {
-      this.pagination = new Pagination('paginationContainer', {
-        itemsPerPage: this.itemsPerPage,
-        currentPage: this.currentPage,
-        onPageChange: (page) => {
-          this.currentPage = page;
-          this.renderComments();
-          this.updatePagination();
-        }
-      });
-    }
-
-    this.pagination.setItemsPerPage(this.itemsPerPage);
-    this.pagination.currentPage = this.currentPage;
-    this.pagination.render(this.filteredComments.length);
-  }
-
-  updateShowingCount() {
-    const showingElement = document.getElementById('showingCount');
-    const totalElement = document.getElementById('totalCount');
-    
-    if (showingElement && totalElement) {
-      const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-      const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredComments.length);
-      
-      showingElement.textContent = this.filteredComments.length > 0 ? `${startIndex + 1}-${endIndex}` : '0';
-      totalElement.textContent = this.filteredComments.length;
-    }
-  }
-
-  async updateStats() {
-    const commentsCount = this.comments.filter(c => c.type === 'comment').length;
-    const tasksCount = this.comments.filter(c => c.type === 'task').length;
-    const completedCount = this.comments.filter(c => c.type === 'task' && c.status === 'completed').length;
-    
-    document.getElementById('commentsCount').textContent = commentsCount;
-    document.getElementById('tasksCount').textContent = tasksCount;
-    document.getElementById('completedCount').textContent = completedCount;
-  }
-
-  // Action methods
-  async replyToComment(commentId) {
-    showNotification('Función de respuesta en desarrollo', 'info');
-  }
-
-  async completeTask(commentId) {
     try {
-      // Find and update the comment locally for demo
-      const comment = this.comments.find(c => c.id === commentId);
-      if (comment) {
-        comment.status = 'completed';
-        showNotification('Tarea marcada como completada', 'success');
-        this.filterComments();
-        this.updateStats();
+      const updatedComment = {
+        ...comment,
+        completed: !comment.completed
+      };
+
+      const response = await docuFlowAPI.comments.update(commentId, updatedComment);
+      
+      if (response.success) {
+        showNotification(
+          `Tarea marcada como ${!comment.completed ? 'completada' : 'pendiente'}`, 
+          'success'
+        );
+        await this.loadComments();
       }
+
     } catch (error) {
-      console.error('Error completing task:', error);
-      showNotification('Error al completar la tarea', 'error');
+      console.error('Error actualizando tarea:', error);
+      showNotification('Error actualizando tarea', 'error');
     }
   }
 
   async deleteComment(commentId) {
-    if (!confirm('¿Estás seguro de eliminar este elemento?')) return;
+    const comment = this.comments.find(c => c.id === commentId);
+    if (!comment) return;
 
-    try {
-      // Remove from local array for demo
-      this.comments = this.comments.filter(c => c.id !== commentId);
-      showNotification('Elemento eliminado', 'success');
-      this.filterComments();
-      this.updateStats();
-    } catch (error) {
-      console.error('Error deleting comment:', error);
-      showNotification('Error al eliminar el elemento', 'error');
+    if (!this.canEditComment(comment)) {
+      showNotification('No tienes permisos para eliminar este comentario', 'error');
+      return;
     }
-  }
 
-  async markAllAsRead() {
-    showNotification('Todos los comentarios marcados como leídos', 'success');
-  }
+    const type = comment.type === 'task' ? 'tarea' : 'comentario';
+    if (!confirm(`¿Estás seguro de eliminar este ${type}?`)) return;
 
-  async exportComments() {
     try {
-      const csvContent = this.generateCSV();
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `comentarios_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const response = await docuFlowAPI.comments.delete(commentId);
       
-      showNotification('Comentarios exportados', 'success');
+      if (response.success) {
+        showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} eliminado`, 'success');
+        await this.loadComments();
+      }
+
     } catch (error) {
-      console.error('Export error:', error);
-      showNotification('Error al exportar comentarios', 'error');
+      console.error('Error eliminando comentario:', error);
+      showNotification('Error eliminando comentario', 'error');
     }
   }
 
-  generateCSV() {
-    const headers = ['ID', 'Tipo', 'Contenido', 'Autor', 'Fecha', 'Estado', 'Prioridad', 'Asignados'];
-    const rows = this.comments.map(comment => [
-      comment.id,
-      comment.type === 'task' ? 'Tarea' : 'Comentario',
-      `"${comment.content.replace(/"/g, '""')}"`,
-      comment.author || '',
-      this.formatDate(comment.createdAt),
-      comment.status === 'completed' ? 'Completado' : 'Pendiente',
-      comment.priority || '',
-      comment.assignees ? comment.assignees.join('; ') : ''
-    ]);
+  editComment(commentId) {
+    const comment = this.comments.find(c => c.id === commentId);
+    if (!comment || !this.canEditComment(comment)) return;
+
+    // Prellenar el formulario
+    document.getElementById('commentContent').value = comment.content;
+    document.getElementById('commentType').value = comment.type;
     
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    if (comment.type === 'task') {
+      this.toggleTaskFields('task');
+      if (document.getElementById('taskPriority')) {
+        document.getElementById('taskPriority').value = comment.priority || 'medium';
+      }
+      if (document.getElementById('taskDueDate') && comment.dueDate) {
+        document.getElementById('taskDueDate').value = comment.dueDate.split('T')[0];
+      }
+    }
+
+    // Cambiar el botón de submit para edición
+    const submitBtn = document.querySelector('#commentForm button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.textContent = 'Actualizar';
+      submitBtn.onclick = (e) => this.handleUpdateComment(e, commentId);
+    }
+
+    // Scroll al formulario
+    document.getElementById('commentForm').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async handleUpdateComment(event, commentId) {
+    event.preventDefault();
+
+    const content = document.getElementById('commentContent').value.trim();
+    const type = document.getElementById('commentType').value;
+    
+    if (!content) {
+      showNotification('El contenido no puede estar vacío', 'error');
+      return;
+    }
+
+    const originalComment = this.comments.find(c => c.id === commentId);
+    const updatedComment = {
+      ...originalComment,
+      content,
+      type,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (type === 'task') {
+      updatedComment.priority = document.getElementById('taskPriority')?.value || 'medium';
+      updatedComment.dueDate = document.getElementById('taskDueDate')?.value || null;
+    }
+
+    try {
+      const response = await docuFlowAPI.comments.update(commentId, updatedComment);
+      
+      if (response.success) {
+        showNotification('Comentario actualizado correctamente', 'success');
+        
+        // Resetear formulario
+        this.resetCommentForm();
+        await this.loadComments();
+      }
+
+    } catch (error) {
+      console.error('Error actualizando comentario:', error);
+      showNotification('Error actualizando comentario', 'error');
+    }
+  }
+
+  resetCommentForm() {
+    const form = document.getElementById('commentForm');
+    if (form) form.reset();
+    
+    this.toggleTaskFields('comment');
+    
+    const submitBtn = document.querySelector('#commentForm button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.textContent = 'Agregar';
+      submitBtn.onclick = null;
+    }
+  }
+
+  toggleTaskFields(type) {
+    const taskFields = document.getElementById('taskFields');
+    if (taskFields) {
+      taskFields.style.display = type === 'task' ? 'block' : 'none';
+    }
+  }
+
+  updateStats() {
+    const totalComments = this.comments.filter(c => c.type === 'comment').length;
+    const totalTasks = this.comments.filter(c => c.type === 'task').length;
+    const completedTasks = this.comments.filter(c => c.type === 'task' && c.completed).length;
+    const pendingTasks = totalTasks - completedTasks;
+
+    const statsContainer = document.getElementById('commentsStats');
+    if (statsContainer) {
+      statsContainer.innerHTML = `
+        <div class="row">
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Comentarios</h6>
+              <span class="stat-number">${totalComments}</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Tareas Total</h6>
+              <span class="stat-number">${totalTasks}</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Completadas</h6>
+              <span class="stat-number text-success">${completedTasks}</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Pendientes</h6>
+              <span class="stat-number text-warning">${pendingTasks}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  updateUI() {
+    const user = authService.getCurrentUser();
+    const userInfo = document.getElementById('userInfo');
+    
+    if (userInfo) {
+      userInfo.innerHTML = `
+        <span>Archivo ID: ${this.currentFileId} | Usuario: ${user.name}</span>
+        <button class="btn btn-sm btn-outline-secondary ms-2" onclick="authService.logout().then(() => location.href = '../auth/login.html')">
+          Cerrar Sesión
+        </button>
+      `;
+    }
+  }
+
+  // Utilidades
+  canEditComment(comment) {
+    const currentUser = authService.getCurrentUser();
+    return currentUser.email === comment.author || authService.isAdmin();
+  }
+
+  getPriorityText(priority) {
+    const priorities = {
+      high: 'Alta',
+      medium: 'Media',
+      low: 'Baja'
+    };
+    return priorities[priority] || 'Media';
+  }
+
+  formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 }
 
-// Initialize controller and make it globally available
-let commentsController;
-document.addEventListener('DOMContentLoaded', () => {
-  commentsController = new CommentsController();
-});
+// Instancia global
+const commentsController = new SimpleCommentsController();
+
+// Hacer disponible globalmente
+window.commentsController = commentsController;
+
+export default commentsController;

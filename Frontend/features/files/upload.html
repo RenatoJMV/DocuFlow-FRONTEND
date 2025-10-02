@@ -1,225 +1,446 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DocuFlow - Gestión de Archivos</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="../../shared/styles/styles.css">
-  <link rel="stylesheet" href="upload.css">
-</head>
-<body>
-  <!-- Navbar Container -->
-  <div id="navbar-container" class="container-fluid mt-4 mb-4"></div>
+<!DOCTYPE html><!DOCTYPE html>
 
-  <div class="files-container">
-    <!-- Header Section -->
-    <div class="files-header card-modern mb-4">
-      <div class="d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center gap-3">
-          <div class="header-icon">
-            <i class="bi bi-cloud-arrow-up"></i>
-          </div>
-          <div>
-            <h2 class="mb-1 text-primary">Gestión de Archivos</h2>
-            <p class="text-muted mb-0">Sube, organiza y gestiona tus documentos</p>
-          </div>
-        </div>
-        <div class="files-stats">
-          <div class="stat-item">
-            <i class="bi bi-files text-primary"></i>
-            <span id="total-files">0</span>
-            <small>archivos</small>
-          </div>
-          <div class="stat-item">
-            <i class="bi bi-hdd text-success"></i>
-            <span id="total-size">0 MB</span>
-            <small>usado</small>
-          </div>
-          <div class="stat-item">
-            <i class="bi bi-cloud text-info"></i>
-            <span id="gcs-usage">0 MB / 10 GB</span>
-            <small>GCS</small>
-          </div>
-          <div class="stat-item">
-            <i class="bi bi-exclamation-triangle text-warning"></i>
-            <span id="orphan-files">0</span>
-            <small>huérfanos</small>
-          </div>
-        </div>
+<html lang="es"><html lang="es">
+
+<head><head>
+
+  <meta charset="UTF-8">  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>DocuFlow - Subir Archivos</title>  <title>DocuFlow - Gestión de Archivos</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <link rel="stylesheet" href="../../shared/styles/styles.css">  <link rel="stylesheet" href="../../shared/styles/styles.css">
+
+  <link rel="stylesheet" href="upload.css">  <link rel="stylesheet" href="upload.css">
+
+</head></head>
+
+<body><body>
+
+  <!-- Navbar de navegación -->  <!-- Navbar Container -->
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary" style="position: sticky; top: 0; z-index: 1000;">  <div id="navbar-container" class="container-fluid mt-4 mb-4"></div>
+
+    <div class="container-fluid">
+
+      <a class="navbar-brand d-flex align-items-center" href="../dashboard/dashboard.html">  <div class="files-container">
+
+        <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" alt="DocuFlow" width="30" height="30" class="me-2">    <!-- Header Section -->
+
+        DocuFlow    <div class="files-header card-modern mb-4">
+
+      </a>      <div class="d-flex justify-content-between align-items-center">
+
+              <div class="d-flex align-items-center gap-3">
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">          <div class="header-icon">
+
+        <span class="navbar-toggler-icon"></span>            <i class="bi bi-cloud-arrow-up"></i>
+
+      </button>          </div>
+
+                <div>
+
+      <div class="collapse navbar-collapse" id="navbarNav">            <h2 class="mb-1 text-primary">Gestión de Archivos</h2>
+
+        <ul class="navbar-nav me-auto">            <p class="text-muted mb-0">Sube, organiza y gestiona tus documentos</p>
+
+          <li class="nav-item">          </div>
+
+            <a class="nav-link" href="../dashboard/dashboard.html">        </div>
+
+              <i class="bi bi-house-door me-1"></i>Dashboard        <div class="files-stats">
+
+            </a>          <div class="stat-item">
+
+          </li>            <i class="bi bi-files text-primary"></i>
+
+          <li class="nav-item">            <span id="total-files">0</span>
+
+            <a class="nav-link active" href="upload.html">            <small>archivos</small>
+
+              <i class="bi bi-cloud-upload me-1"></i>Subir Archivos          </div>
+
+            </a>          <div class="stat-item">
+
+          </li>            <i class="bi bi-hdd text-success"></i>
+
+          <li class="nav-item">            <span id="total-size">0 MB</span>
+
+            <a class="nav-link" href="../comments/comments.html">            <small>usado</small>
+
+              <i class="bi bi-chat-dots me-1"></i>Comentarios          </div>
+
+            </a>          <div class="stat-item">
+
+          </li>            <i class="bi bi-cloud text-info"></i>
+
+          <li class="nav-item">            <span id="gcs-usage">0 MB / 10 GB</span>
+
+            <a class="nav-link" href="../logs/logs.html">            <small>GCS</small>
+
+              <i class="bi bi-journal-text me-1"></i>Logs          </div>
+
+            </a>          <div class="stat-item">
+
+          </li>            <i class="bi bi-exclamation-triangle text-warning"></i>
+
+          <li class="nav-item">            <span id="orphan-files">0</span>
+
+            <a class="nav-link" href="../permissions/permissions.html">            <small>huérfanos</small>
+
+              <i class="bi bi-shield-check me-1"></i>Permisos          </div>
+
+            </a>        </div>
+
+          </li>      </div>
+
+          <li class="nav-item">    </div>
+
+            <a class="nav-link" href="../export/export.html">
+
+              <i class="bi bi-download me-1"></i>Exportar    <div class="row">
+
+            </a>      <!-- Upload Section -->
+
+          </li>      <div class="col-lg-4">
+
+        </ul>        <div class="upload-section card-modern">
+
+                  <div class="upload-header mb-3">
+
+        <ul class="navbar-nav">            <h5><i class="bi bi-cloud-upload me-2"></i>Subir Archivos</h5>
+
+          <li class="nav-item dropdown">            <small class="text-muted">Máximo 10MB por archivo</small>
+
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">          </div>
+
+              <i class="bi bi-person-circle me-1"></i>
+
+              <span id="nav-username">Usuario</span>          <!-- Drag & Drop Area -->
+
+            </a>          <div class="drop-zone" id="dropZone">
+
+            <ul class="dropdown-menu dropdown-menu-end">            <div class="drop-zone-content">
+
+              <li><a class="dropdown-item" href="../profile/profile.html">              <i class="bi bi-cloud-upload display-4 text-primary mb-3"></i>
+
+                <i class="bi bi-person me-2"></i>Mi Perfil              <p class="mb-2">Arrastra archivos aquí o</p>
+
+              </a></li>              <button type="button" class="btn btn-modern btn-outline-modern" onclick="document.getElementById('fileInput').click()">
+
+              <li><hr class="dropdown-divider"></li>                Seleccionar Archivos
+
+              <li><a class="dropdown-item" href="#" onclick="authService.logout()">              </button>
+
+                <i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión            </div>
+
+              </a></li>          </div>
+
+            </ul>
+
+          </li>          <!-- File Input -->
+
+        </ul>          <input type="file" id="fileInput" multiple hidden accept="*/*">
+
       </div>
-    </div>
 
-    <div class="row">
-      <!-- Upload Section -->
-      <div class="col-lg-4">
-        <div class="upload-section card-modern">
-          <div class="upload-header mb-3">
-            <h5><i class="bi bi-cloud-upload me-2"></i>Subir Archivos</h5>
-            <small class="text-muted">Máximo 10MB por archivo</small>
-          </div>
+    </div>          <!-- Upload Form -->
 
-          <!-- Drag & Drop Area -->
-          <div class="drop-zone" id="dropZone">
-            <div class="drop-zone-content">
-              <i class="bi bi-cloud-upload display-4 text-primary mb-3"></i>
-              <p class="mb-2">Arrastra archivos aquí o</p>
-              <button type="button" class="btn btn-modern btn-outline-modern" onclick="document.getElementById('fileInput').click()">
-                Seleccionar Archivos
-              </button>
-            </div>
-          </div>
+  </nav>          <form id="uploadForm" class="mt-3" style="display: none;">
 
-          <!-- File Input -->
-          <input type="file" id="fileInput" multiple hidden accept="*/*">
-
-          <!-- Upload Form -->
-          <form id="uploadForm" class="mt-3" style="display: none;">
             <div class="selected-files mb-3" id="selectedFiles"></div>
-            <button type="submit" id="uploadBtn" class="btn btn-modern btn-primary-modern w-100">
-              <span class="btn-text">
-                <i class="bi bi-cloud-upload me-2"></i>
-                Subir Archivos
-              </span>
-              <span class="btn-loading d-none">
-                <span class="spinner-border spinner-border-sm me-2"></span>
-                Subiendo...
-              </span>
-            </button>
-          </form>
 
-          <!-- Progress Bar -->
-          <div class="upload-progress mt-3" id="uploadProgress" style="display: none;">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <small class="text-muted">Subiendo archivo...</small>
-              <small class="text-muted" id="progressText">0%</small>
-            </div>
-            <div class="progress">
-              <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                   id="progressBar" 
-                   role="progressbar" 
-                   style="width: 0%"></div>
-            </div>
+  <div class="container mt-4">            <button type="submit" id="uploadBtn" class="btn btn-modern btn-primary-modern w-100">
+
+    <div class="row">              <span class="btn-text">
+
+      <!-- Panel de subida -->                <i class="bi bi-cloud-upload me-2"></i>
+
+      <div class="col-lg-8">                Subir Archivos
+
+        <div class="card">              </span>
+
+          <div class="card-header">              <span class="btn-loading d-none">
+
+            <h5 class="mb-0">                <span class="spinner-border spinner-border-sm me-2"></span>
+
+              <i class="bi bi-cloud-upload text-primary me-2"></i>                Subiendo...
+
+              Subir Documentos              </span>
+
+            </h5>            </button>
+
+          </div>          </form>
+
+          <div class="card-body">
+
+            <!-- Zona de arrastrar y soltar -->          <!-- Progress Bar -->
+
+            <div class="upload-zone" id="upload-zone">          <div class="upload-progress mt-3" id="uploadProgress" style="display: none;">
+
+              <div class="text-center p-5">            <div class="d-flex justify-content-between align-items-center mb-2">
+
+                <i class="bi bi-cloud-upload display-1 text-muted"></i>              <small class="text-muted">Subiendo archivo...</small>
+
+                <h4 class="mt-3">Arrastra archivos aquí</h4>              <small class="text-muted" id="progressText">0%</small>
+
+                <p class="text-muted">o haz clic para seleccionar archivos</p>            </div>
+
+                <button class="btn btn-primary" onclick="selectFiles()">            <div class="progress">
+
+                  <i class="bi bi-folder me-1"></i>Seleccionar Archivos              <div class="progress-bar progress-bar-striped progress-bar-animated" 
+
+                </button>                   id="progressBar" 
+
+                <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.txt,.jpg,.png,.xlsx,.pptx" style="display: none;">                   role="progressbar" 
+
+              </div>                   style="width: 0%"></div>
+
+            </div>            </div>
+
           </div>
 
-          <!-- Quick Actions -->
-          <div class="quick-actions mt-4">
-            <h6>Acciones Rápidas</h6>
-            <div class="d-grid gap-2">
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.refreshFileList?.()">
-                <i class="bi bi-arrow-clockwise me-2"></i>Actualizar Lista
-              </button>
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.downloadAllSelected?.()">
-                <i class="bi bi-download me-2"></i>Descargar Todo
-              </button>
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.showAdvancedStatsModal?.()">
-                <i class="bi bi-bar-chart me-2"></i>Estadísticas GCS
-              </button>
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.detectOrphanedFiles?.()">
-                <i class="bi bi-search me-2"></i>Detectar Huérfanos
-              </button>
-            </div>
-          </div>
+            <!-- Lista de archivos seleccionados -->
 
-          <!-- Storage Monitor -->
-          <div class="storage-monitor mt-4">
-            <h6>Monitor de Almacenamiento</h6>
-            <div class="storage-info">
-              <div class="d-flex justify-content-between align-items-center mb-2">
+            <div id="file-list" class="mt-4" style="display: none;">          <!-- Quick Actions -->
+
+              <h6>Archivos Seleccionados:</h6>          <div class="quick-actions mt-4">
+
+              <div id="selected-files"></div>            <h6>Acciones Rápidas</h6>
+
+              <div class="d-flex gap-2 mt-3">            <div class="d-grid gap-2">
+
+                <button class="btn btn-success" onclick="uploadFiles()">              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.refreshFileList?.()">
+
+                  <i class="bi bi-upload me-1"></i>Subir Archivos                <i class="bi bi-arrow-clockwise me-2"></i>Actualizar Lista
+
+                </button>              </button>
+
+                <button class="btn btn-outline-secondary" onclick="clearFiles()">              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.downloadAllSelected?.()">
+
+                  <i class="bi bi-x me-1"></i>Limpiar                <i class="bi bi-download me-2"></i>Descargar Todo
+
+                </button>              </button>
+
+              </div>              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.showAdvancedStatsModal?.()">
+
+            </div>                <i class="bi bi-bar-chart me-2"></i>Estadísticas GCS
+
+              </button>
+
+            <!-- Progreso de subida -->              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.detectOrphanedFiles?.()">
+
+            <div id="upload-progress" class="mt-4" style="display: none;">                <i class="bi bi-search me-2"></i>Detectar Huérfanos
+
+              <h6>Progreso de Subida:</h6>              </button>
+
+              <div class="progress mb-2">            </div>
+
+                <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%"></div>          </div>
+
+              </div>
+
+              <div id="upload-status"></div>          <!-- Storage Monitor -->
+
+            </div>          <div class="storage-monitor mt-4">
+
+          </div>            <h6>Monitor de Almacenamiento</h6>
+
+        </div>            <div class="storage-info">
+
+      </div>              <div class="d-flex justify-content-between align-items-center mb-2">
+
                 <small class="text-muted">Uso de Google Cloud Storage</small>
-                <small class="text-muted" id="storage-usage-percent">0%</small>
-              </div>
-              <div class="progress mb-2" style="height: 8px;">
-                <div class="progress-bar bg-success" 
-                     id="storage-usage-bar" 
-                     style="width: 0%"></div>
-              </div>
-              <div class="row text-center">
-                <div class="col-6">
-                  <small class="text-muted d-block">Usado</small>
-                  <span class="fw-bold" id="storage-used">0 MB</span>
-                </div>
-                <div class="col-6">
-                  <small class="text-muted d-block">Disponible</small>
-                  <span class="fw-bold" id="storage-available">10 GB</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Files List Section -->
-      <div class="col-lg-8">
-        <div class="files-list card-modern">
-          <div class="files-list-header d-flex justify-content-between align-items-center mb-3">
-            <h5><i class="bi bi-folder2-open me-2"></i>Mis Archivos</h5>
-            <div class="d-flex gap-2">
-              <div class="search-box">
-                <input type="text" class="form-control form-control-sm" id="searchFiles" placeholder="Buscar archivos...">
-              </div>
-              <div class="view-toggle btn-group" role="group">
-                <button type="button" class="btn btn-outline-secondary btn-sm active" id="listViewButton" data-view="table">
-                  <i class="bi bi-list"></i>
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="gridViewButton" data-view="grid">
-                  <i class="bi bi-grid"></i>
-                </button>
-              </div>
-            </div>
-          </div>
+      <!-- Panel lateral -->                <small class="text-muted" id="storage-usage-percent">0%</small>
 
-          <!-- Files Table -->
-          <div class="table-container" id="tableView">
-            <div class="table-responsive">
-              <table class="table table-hover align-middle" id="filesTable">
-                <thead class="table-light">
-                  <tr>
-                    <th>
-                      <input type="checkbox" class="form-check-input" id="selectAll">
-                    </th>
-                    <th><i class="bi bi-file-earmark me-1"></i>Nombre</th>
-                    <th><i class="bi bi-hdd me-1"></i>Tamaño</th>
-                    <th><i class="bi bi-calendar me-1"></i>Fecha</th>
-                    <th><i class="bi bi-gear me-1"></i>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="filesTableBody">
-                  <!-- Los archivos se cargarán aquí -->
-                </tbody>
+      <div class="col-lg-4">              </div>
+
+        <!-- Información de archivos -->              <div class="progress mb-2" style="height: 8px;">
+
+        <div class="card">                <div class="progress-bar bg-success" 
+
+          <div class="card-header">                     id="storage-usage-bar" 
+
+            <h6 class="mb-0">                     style="width: 0%"></div>
+
+              <i class="bi bi-info-circle text-info me-2"></i>              </div>
+
+              Información              <div class="row text-center">
+
+            </h6>                <div class="col-6">
+
+          </div>                  <small class="text-muted d-block">Usado</small>
+
+          <div class="card-body">                  <span class="fw-bold" id="storage-used">0 MB</span>
+
+            <div class="mb-3">                </div>
+
+              <strong>Formatos Soportados:</strong>                <div class="col-6">
+
+              <div class="mt-2">                  <small class="text-muted d-block">Disponible</small>
+
+                <span class="badge bg-secondary me-1">PDF</span>                  <span class="fw-bold" id="storage-available">10 GB</span>
+
+                <span class="badge bg-secondary me-1">DOC</span>                </div>
+
+                <span class="badge bg-secondary me-1">DOCX</span>              </div>
+
+                <span class="badge bg-secondary me-1">TXT</span>            </div>
+
+                <span class="badge bg-secondary me-1">JPG</span>          </div>
+
+                <span class="badge bg-secondary me-1">PNG</span>        </div>
+
+                <span class="badge bg-secondary me-1">XLSX</span>      </div>
+
+                <span class="badge bg-secondary me-1">PPTX</span>
+
+              </div>      <!-- Files List Section -->
+
+            </div>      <div class="col-lg-8">
+
+            <div class="mb-3">        <div class="files-list card-modern">
+
+              <strong>Tamaño Máximo:</strong>          <div class="files-list-header d-flex justify-content-between align-items-center mb-3">
+
+              <p class="text-muted mb-0">10 MB por archivo</p>            <h5><i class="bi bi-folder2-open me-2"></i>Mis Archivos</h5>
+
+            </div>            <div class="d-flex gap-2">
+
+            <div>              <div class="search-box">
+
+              <strong>Espacio Usado:</strong>                <input type="text" class="form-control form-control-sm" id="searchFiles" placeholder="Buscar archivos...">
+
+              <div class="progress mt-2">              </div>
+
+                <div class="progress-bar bg-info" style="width: 24%"></div>              <div class="view-toggle btn-group" role="group">
+
+              </div>                <button type="button" class="btn btn-outline-secondary btn-sm active" id="listViewButton" data-view="table">
+
+              <small class="text-muted">2.4 GB de 10 GB</small>                  <i class="bi bi-list"></i>
+
+            </div>                </button>
+
+          </div>                <button type="button" class="btn btn-outline-secondary btn-sm" id="gridViewButton" data-view="grid">
+
+        </div>                  <i class="bi bi-grid"></i>
+
+                </button>
+
+        <!-- Archivos recientes -->              </div>
+
+        <div class="card mt-3">            </div>
+
+          <div class="card-header d-flex justify-content-between align-items-center">          </div>
+
+            <h6 class="mb-0">
+
+              <i class="bi bi-clock text-warning me-2"></i>          <!-- Files Table -->
+
+              Archivos Recientes          <div class="table-container" id="tableView">
+
+            </h6>            <div class="table-responsive">
+
+            <button class="btn btn-sm btn-outline-primary" onclick="refreshFiles()">              <table class="table table-hover align-middle" id="filesTable">
+
+              <i class="bi bi-arrow-clockwise"></i>                <thead class="table-light">
+
+            </button>                  <tr>
+
+          </div>                    <th>
+
+          <div class="card-body">                      <input type="checkbox" class="form-check-input" id="selectAll">
+
+            <div id="recent-files">                    </th>
+
+              <div class="text-center">                    <th><i class="bi bi-file-earmark me-1"></i>Nombre</th>
+
+                <div class="spinner-border spinner-border-sm" role="status">                    <th><i class="bi bi-hdd me-1"></i>Tamaño</th>
+
+                  <span class="visually-hidden">Cargando...</span>                    <th><i class="bi bi-calendar me-1"></i>Fecha</th>
+
+                </div>                    <th><i class="bi bi-gear me-1"></i>Acciones</th>
+
+                <p class="mt-2 text-muted small">Cargando archivos...</p>                  </tr>
+
+              </div>                </thead>
+
+            </div>                <tbody id="filesTableBody">
+
+          </div>                  <!-- Los archivos se cargarán aquí -->
+
+        </div>                </tbody>
+
               </table>
-            </div>
-            
-            <!-- Empty State -->
-            <div class="empty-state text-center py-5 d-none" id="emptyState">
-              <i class="bi bi-folder-x display-4 text-muted mb-3"></i>
-              <h5 class="text-muted">No hay archivos</h5>
-              <p class="text-muted">Sube tu primer archivo para comenzar</p>
-            </div>
-          </div>
 
-          <!-- Grid View -->
-          <div class="files-grid" id="gridViewContainer" style="display: none;">
-            <div class="row" id="filesGrid">
-              <!-- Los archivos se cargarán aquí -->
-            </div>
-          </div>
+        <!-- Estadísticas -->            </div>
 
-          <!-- Pagination -->
-          <div class="d-flex justify-content-between align-items-center mt-4">
-            <div class="pagination-info">
-              <small class="text-muted">Mostrando <span id="showingCount">0</span> de <span id="totalCount">0</span> archivos</small>
-            </div>
-            <nav>
-              <div id="paginationContainer"></div>
+        <div class="card mt-3">            
+
+          <div class="card-header">            <!-- Empty State -->
+
+            <h6 class="mb-0">            <div class="empty-state text-center py-5 d-none" id="emptyState">
+
+              <i class="bi bi-graph-up text-success me-2"></i>              <i class="bi bi-folder-x display-4 text-muted mb-3"></i>
+
+              Estadísticas              <h5 class="text-muted">No hay archivos</h5>
+
+            </h6>              <p class="text-muted">Sube tu primer archivo para comenzar</p>
+
+          </div>            </div>
+
+          <div class="card-body">          </div>
+
+            <div class="row text-center">
+
+              <div class="col-6">          <!-- Grid View -->
+
+                <h4 class="text-primary" id="total-files">0</h4>          <div class="files-grid" id="gridViewContainer" style="display: none;">
+
+                <small class="text-muted">Total</small>            <div class="row" id="filesGrid">
+
+              </div>              <!-- Los archivos se cargarán aquí -->
+
+              <div class="col-6">            </div>
+
+                <h4 class="text-success" id="files-today">0</h4>          </div>
+
+                <small class="text-muted">Hoy</small>
+
+              </div>          <!-- Pagination -->
+
+            </div>          <div class="d-flex justify-content-between align-items-center mt-4">
+
+          </div>            <div class="pagination-info">
+
+        </div>              <small class="text-muted">Mostrando <span id="showingCount">0</span> de <span id="totalCount">0</span> archivos</small>
+
+      </div>            </div>
+
+    </div>            <nav>
+
+  </div>              <div id="paginationContainer"></div>
+
             </nav>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
+  <!-- Scripts -->          </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>        </div>
+
+  <script type="module" src="../../shared/utils/uiHelpers.js"></script>      </div>
+
+  <script type="module" src="uploadControllerSimple.js"></script>    </div>
+
+</body>  </div>
+
+</html>
   <!-- Modal para previsualizar archivos -->
   <div class="modal fade" id="previewModal" tabindex="-1">
     <div class="modal-dialog modal-lg">

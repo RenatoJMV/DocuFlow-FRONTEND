@@ -1,665 +1,353 @@
-import { docuFlowAPI } from '../../shared/services/apiClient.js';
-import { store } from '../../shared/services/store.js';
-import { initializeNavbar, showNotification, Pagination } from '../../shared/utils/uiHelpers.js';
+// logsControllerSimple.js - Controlador simplificado para gestión de logs
+import { docuFlowAPI } from '../../shared/services/apiClientSimple.js';
+import authService from '../../shared/services/authServiceSimple.js';
+import { showNotification } from '../../shared/utils/uiHelpers.js';
 
-class LogsController {
+class SimpleLogsController {
   constructor() {
-    this.allLogs = [];
-    this.filteredLogs = [];
-    this.currentPage = 1;
-    this.itemsPerPage = 20;
-    this.currentFilters = {
-      date: '',
-      user: '',
-      action: '',
-      level: ''
-    };
-    this.pagination = new Pagination('logsPaginationContainer', {
-      itemsPerPage: this.itemsPerPage,
-      currentPage: this.currentPage,
-      onPageChange: (page) => {
-        this.currentPage = page;
-        this.renderLogs();
-        this.updatePagination();
-      }
-    });
-    
-    this.initializeComponents();
+    this.logs = [];
+    this.currentFilter = {};
+    this.init();
+  }
+
+  async init() {
+    if (!authService.isLoggedIn()) {
+      window.location.href = '../auth/login.html';
+      return;
+    }
+
+    if (!authService.hasPermission('view_logs')) {
+      showNotification('No tienes permisos para ver los logs', 'error');
+      window.location.href = '../dashboard/dashboard.html';
+      return;
+    }
+
     this.setupEventListeners();
-    this.loadLogs();
-  }
-
-  initializeComponents() {
-    // Create navbar
-    initializeNavbar('logs');
-    
-    // Setup filters
-    this.setupFilters();
-  }
-
-  setupFilters() {
-    // Populate action filter with available actions
-    const actionFilter = document.getElementById('filterAction');
-    if (actionFilter) {
-      const actions = this.getAvailableActions();
-      actionFilter.innerHTML = `
-        <option value="">Todas las acciones</option>
-        ${actions.map(action => 
-          `<option value="${action.id}">${action.name}</option>`
-        ).join('')}
-      `;
-    }
-
-    // Populate level filter
-    const levelFilter = document.getElementById('filterLevel');
-    if (levelFilter) {
-      const levels = this.getAvailableLevels();
-      levelFilter.innerHTML = `
-        <option value="">Todos los niveles</option>
-        ${levels.map(level => 
-          `<option value="${level.id}">${level.name}</option>`
-        ).join('')}
-      `;
-    }
-  }
-
-  getAvailableActions() {
-    return [
-      { id: 'login', name: 'Iniciar sesión', icon: 'bi-box-arrow-in-right' },
-      { id: 'logout', name: 'Cerrar sesión', icon: 'bi-box-arrow-right' },
-      { id: 'upload', name: 'Subir archivo', icon: 'bi-upload' },
-      { id: 'download', name: 'Descargar archivo', icon: 'bi-download' },
-      { id: 'delete', name: 'Eliminar archivo', icon: 'bi-trash' },
-      { id: 'edit', name: 'Editar archivo', icon: 'bi-pencil' },
-      { id: 'share', name: 'Compartir archivo', icon: 'bi-share' },
-      { id: 'comment', name: 'Comentar', icon: 'bi-chat-text' },
-      { id: 'permission_change', name: 'Cambio de permisos', icon: 'bi-shield-check' },
-      { id: 'role_change', name: 'Cambio de rol', icon: 'bi-person-gear' },
-      { id: 'system_error', name: 'Error del sistema', icon: 'bi-exclamation-triangle' }
-    ];
-  }
-
-  getAvailableLevels() {
-    return [
-      { id: 'info', name: 'Información', color: 'info' },
-      { id: 'warning', name: 'Advertencia', color: 'warning' },
-      { id: 'error', name: 'Error', color: 'danger' },
-      { id: 'success', name: 'Éxito', color: 'success' }
-    ];
+    await this.loadLogs();
+    this.updateUI();
   }
 
   setupEventListeners() {
-    // Filter inputs
-    const dateFilter = document.getElementById('filterDate');
-    const userFilter = document.getElementById('filterUser');
-    const actionFilter = document.getElementById('filterAction');
-    const levelFilter = document.getElementById('filterLevel');
-
-    if (dateFilter) {
-      dateFilter.addEventListener('change', () => this.applyFilters());
-    }
-
-    if (userFilter) {
-      userFilter.addEventListener('input', () => this.debounceFilter());
-    }
-
+    // Filtros
+    const actionFilter = document.getElementById('actionFilter');
     if (actionFilter) {
-      actionFilter.addEventListener('change', () => this.applyFilters());
+      actionFilter.addEventListener('change', (e) => {
+        this.currentFilter.action = e.target.value;
+        this.filterLogs();
+      });
     }
 
-    if (levelFilter) {
-      levelFilter.addEventListener('change', () => this.applyFilters());
+    const userFilter = document.getElementById('userFilter');
+    if (userFilter) {
+      userFilter.addEventListener('change', (e) => {
+        this.currentFilter.user = e.target.value;
+        this.filterLogs();
+      });
     }
 
-    // Action buttons
-    const clearFiltersBtn = document.getElementById('clearFilters');
-    const refreshBtn = document.getElementById('refreshLogs');
-    const exportBtn = document.getElementById('exportLogs');
-    const downloadLogBtn = document.getElementById('downloadDailyLog');
-
-    if (clearFiltersBtn) {
-      clearFiltersBtn.addEventListener('click', () => this.clearFilters());
+    const dateFilter = document.getElementById('dateFilter');
+    if (dateFilter) {
+      dateFilter.addEventListener('change', (e) => {
+        this.currentFilter.date = e.target.value;
+        this.filterLogs();
+      });
     }
 
+    // Búsqueda
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
+    }
+
+    // Refresh
+    const refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => this.loadLogs());
     }
 
+    // Limpiar filtros
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    if (clearFiltersBtn) {
+      clearFiltersBtn.addEventListener('click', () => this.clearFilters());
+    }
+
+    // Exportar logs
+    const exportBtn = document.getElementById('exportLogsBtn');
     if (exportBtn) {
       exportBtn.addEventListener('click', () => this.exportLogs());
     }
-
-    if (downloadLogBtn) {
-      downloadLogBtn.addEventListener('click', () => this.downloadDailyLog());
-    }
-
-    // Real-time toggle
-    const realtimeToggle = document.getElementById('realtimeToggle');
-    if (realtimeToggle) {
-      realtimeToggle.addEventListener('change', (e) => {
-        this.toggleRealtimeUpdates(e.target.checked);
-      });
-    }
-  }
-
-  debounceFilter() {
-    clearTimeout(this.filterTimeout);
-    this.filterTimeout = setTimeout(() => {
-      this.applyFilters();
-    }, 300);
   }
 
   async loadLogs() {
     try {
-      // Show loading state
-      this.showLoadingState();
-      
-      // Cargar logs del endpoint real del backend Spring Boot
-      console.log('📋 Cargando logs desde el endpoint /api/logs...');
-      const response = await docuFlowAPI.get('/api/logs');
-      
-      // Extraer logs del response
-      const logs = response?.logs || response?.data || response || [];
+      showNotification('Cargando logs...', 'info', 1000);
 
-      if (Array.isArray(logs) && logs.length > 0) {
-        // Convertir los logs del backend al formato esperado por el frontend
-        this.allLogs = logs.map(log => ({
-          id: log.id || Date.now() + Math.random(),
-          timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
-          level: this.mapActionToLevel(log.action || 'INFO'),
-          action: log.action || 'UNKNOWN',
-          user: log.user || log.username || 'Sistema',
-          details: log.details || `${log.action} - ${log.message || 'Sin detalles'}`,
-          ip: log.ip || log.ipAddress || 'N/A',
-          userAgent: log.userAgent || 'N/A'
-        }));
-
-        console.log(`✅ ${this.allLogs.length} logs cargados desde el backend`);
-        showNotification(`${this.allLogs.length} registros cargados del servidor`, 'success', 2000);
-      } else {
-        console.log('⚠️ No se encontraron logs en el servidor');
-        this.allLogs = [];
-        showNotification('No se encontraron registros en el servidor', 'info', 2000);
+      const response = await docuFlowAPI.logs.list();
+      
+      if (response.success) {
+        this.logs = response.data.logs || [];
+        this.renderLogsList();
+        this.updateStats();
+        showNotification('Logs cargados correctamente', 'success', 2000);
       }
-      
-      this.applyFilters();
-      this.updateStats();
-      
+
     } catch (error) {
-      console.error('❌ Error cargando logs del backend:', error);
-      showNotification('Error al cargar registros, usando datos demo', 'warning');
-      
-      // Fallback a datos demo si hay error
-      console.log('🔄 Fallback a datos demo...');
-      this.allLogs = this.getDemoLogs();
-      this.applyFilters();
-      this.updateStats();
+      console.error('Error cargando logs:', error);
+      showNotification('Error cargando logs', 'error');
     }
   }
 
-  mapActionToLevel(action) {
-    // Mapear acciones del backend a niveles para el frontend
-    const actionLevelMap = {
-      'upload': 'info',
-      'download': 'info', 
-      'delete': 'warning',
-      'comment': 'info',
-      'login': 'success',
-      'logout': 'info',
-      'error': 'error'
-    };
-    
-    return actionLevelMap[action] || 'info';
+  filterLogs() {
+    const filtered = this.logs.filter(log => {
+      // Filtro por acción
+      if (this.currentFilter.action && this.currentFilter.action !== 'all') {
+        if (log.action !== this.currentFilter.action) return false;
+      }
+
+      // Filtro por usuario
+      if (this.currentFilter.user && this.currentFilter.user !== 'all') {
+        if (log.user !== this.currentFilter.user) return false;
+      }
+
+      // Filtro por fecha
+      if (this.currentFilter.date) {
+        const logDate = new Date(log.timestamp);
+        const filterDate = new Date(this.currentFilter.date);
+        if (logDate.toDateString() !== filterDate.toDateString()) return false;
+      }
+
+      return true;
+    });
+
+    this.renderLogsList(filtered);
   }
 
-  getDemoLogs() {
-    // Demo logs for development
-    const actions = this.getAvailableActions();
-    const levels = this.getAvailableLevels();
-    const users = ['admin@docuflow.com', 'editor@docuflow.com', 'viewer@docuflow.com', 'guest@docuflow.com'];
-    
-    const logs = [];
-    for (let i = 0; i < 150; i++) {
-      const randomAction = actions[Math.floor(Math.random() * actions.length)];
-      const randomLevel = levels[Math.floor(Math.random() * levels.length)];
-      const randomUser = users[Math.floor(Math.random() * users.length)];
-      const date = new Date();
-      date.setMinutes(date.getMinutes() - (i * 15)); // 15 minutes apart
-      
-      logs.push({
-        id: i + 1,
-        timestamp: date.toISOString(),
-        action: randomAction.id,
-        actionName: randomAction.name,
-        level: randomLevel.id,
-        username: randomUser,
-        details: this.generateLogDetails(randomAction.id),
-        ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        documentId: Math.random() > 0.5 ? Math.floor(Math.random() * 100) + 1 : null
-      });
+  handleSearch(query) {
+    if (!query.trim()) {
+      this.renderLogsList();
+      return;
     }
-    
-    return logs.reverse(); // Most recent first
+
+    const filtered = this.logs.filter(log => 
+      log.action.toLowerCase().includes(query.toLowerCase()) ||
+      log.user.toLowerCase().includes(query.toLowerCase()) ||
+      log.target.toLowerCase().includes(query.toLowerCase())
+    );
+
+    this.renderLogsList(filtered);
   }
 
-  generateLogDetails(action) {
-    const details = {
-      login: 'Usuario inició sesión exitosamente',
-      logout: 'Usuario cerró sesión',
-      upload: 'Archivo subido: documento.pdf',
-      download: 'Archivo descargado: reporte.xlsx',
-      delete: 'Archivo eliminado permanentemente',
-      edit: 'Documento modificado',
-      share: 'Documento compartido con 3 usuarios',
-      comment: 'Nuevo comentario agregado',
-      permission_change: 'Permisos actualizados',
-      role_change: 'Rol cambiado a Editor',
-      system_error: 'Error en el procesamiento de archivos'
-    };
+  clearFilters() {
+    this.currentFilter = {};
     
-    return details[action] || 'Acción realizada';
+    // Limpiar selects
+    const actionFilter = document.getElementById('actionFilter');
+    const userFilter = document.getElementById('userFilter');
+    const dateFilter = document.getElementById('dateFilter');
+    const searchInput = document.getElementById('searchInput');
+    
+    if (actionFilter) actionFilter.value = 'all';
+    if (userFilter) userFilter.value = 'all';
+    if (dateFilter) dateFilter.value = '';
+    if (searchInput) searchInput.value = '';
+
+    this.renderLogsList();
+    showNotification('Filtros limpiados', 'info', 2000);
   }
 
-  showLoadingState() {
-    const tbody = document.querySelector('#logsTable tbody');
-    if (tbody) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6" class="text-center py-4">
-            <div class="spinner-border text-primary me-2" role="status">
-              <span class="visually-hidden">Cargando...</span>
+  renderLogsList(logsToRender = this.logs) {
+    const container = document.getElementById('logsList');
+    if (!container) return;
+
+    if (logsToRender.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-5">
+          <i class="bi bi-journal-x" style="font-size: 3rem; color: #ccc;"></i>
+          <p class="text-muted mt-3">No hay logs para mostrar</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = logsToRender.map(log => `
+      <div class="log-item card mb-2">
+        <div class="card-body d-flex align-items-center">
+          <div class="log-icon me-3">
+            <i class="bi ${this.getActionIcon(log.action)} ${this.getActionColor(log.action)}" style="font-size: 1.2rem;"></i>
+          </div>
+          <div class="log-info flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <span class="fw-bold">${this.getActionText(log.action)}</span>
+                <span class="text-muted ms-2">${log.target}</span>
+              </div>
+              <small class="text-muted">${this.formatDate(log.timestamp)}</small>
             </div>
-            Cargando registros...
-          </td>
-        </tr>
+            <small class="text-muted">
+              Usuario: ${log.user} • ID: ${log.id}
+            </small>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  updateStats() {
+    const totalLogs = this.logs.length;
+    const uniqueUsers = [...new Set(this.logs.map(log => log.user))].length;
+    const actions = this.logs.reduce((acc, log) => {
+      acc[log.action] = (acc[log.action] || 0) + 1;
+      return acc;
+    }, {});
+
+    const statsContainer = document.getElementById('logsStats');
+    if (statsContainer) {
+      const topAction = Object.keys(actions).reduce((a, b) => actions[a] > actions[b] ? a : b, '');
+      
+      statsContainer.innerHTML = `
+        <div class="row">
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Total de Logs</h6>
+              <span class="stat-number">${totalLogs}</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Usuarios Activos</h6>
+              <span class="stat-number">${uniqueUsers}</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Acción Más Común</h6>
+              <span class="stat-number">${this.getActionText(topAction)}</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Hoy</h6>
+              <span class="stat-number">${this.getTodayLogsCount()}</span>
+            </div>
+          </div>
+        </div>
       `;
     }
   }
 
-  applyFilters() {
-    const dateFilter = document.getElementById('filterDate')?.value || '';
-    const userFilter = document.getElementById('filterUser')?.value.toLowerCase() || '';
-    const actionFilter = document.getElementById('filterAction')?.value || '';
-    const levelFilter = document.getElementById('filterLevel')?.value || '';
-
-    this.currentFilters = {
-      date: dateFilter,
-      user: userFilter,
-      action: actionFilter,
-      level: levelFilter
-    };
-
-    this.filteredLogs = this.allLogs.filter(log => {
-      let match = true;
-
-      // Date filter
-      if (dateFilter) {
-        const logDate = log.timestamp.split('T')[0];
-        match = match && logDate === dateFilter;
-      }
-
-      // User filter
-      if (userFilter) {
-        match = match && log.username.toLowerCase().includes(userFilter);
-      }
-
-      // Action filter
-      if (actionFilter) {
-        match = match && log.action === actionFilter;
-      }
-
-      // Level filter
-      if (levelFilter) {
-        match = match && log.level === levelFilter;
-      }
-
-      return match;
-    });
-
-    this.currentPage = 1;
-    this.renderLogs();
-    this.updatePagination();
-    this.updateFilterInfo();
+  getTodayLogsCount() {
+    const today = new Date().toDateString();
+    return this.logs.filter(log => new Date(log.timestamp).toDateString() === today).length;
   }
 
-  renderLogs() {
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
-    const logsToShow = this.filteredLogs.slice(startIndex, endIndex);
-
-    const tbody = document.querySelector('#logsTable tbody');
-    const emptyState = document.getElementById('logsEmptyState');
-
-    if (logsToShow.length === 0) {
-      if (tbody) tbody.innerHTML = '';
-      if (emptyState) emptyState.classList.remove('d-none');
-      this.updateShowingCount();
-      return;
-    }
-
-    if (emptyState) emptyState.classList.add('d-none');
-
-    if (tbody) {
-      tbody.innerHTML = logsToShow.map(log => this.renderLogRow(log)).join('');
-    }
-
-    this.updateShowingCount();
-  }
-
-  renderLogRow(log) {
-    const actionInfo = this.getAvailableActions().find(a => a.id === log.action);
-    const levelInfo = this.getAvailableLevels().find(l => l.id === log.level);
+  updateUI() {
+    const user = authService.getCurrentUser();
+    const userInfo = document.getElementById('userInfo');
     
-    return `
-      <tr class="log-row" data-log-id="${log.id}">
-        <td>
-          <div class="log-timestamp">
-            <strong>${this.formatTime(log.timestamp)}</strong>
-            <small class="text-muted d-block">${this.formatDate(log.timestamp)}</small>
-          </div>
-        </td>
-        <td>
-          <span class="badge bg-${levelInfo?.color || 'secondary'} level-badge">
-            ${levelInfo?.name || log.level}
-          </span>
-        </td>
-        <td>
-          <div class="action-info">
-            <i class="bi ${actionInfo?.icon || 'bi-circle'} me-2"></i>
-            ${actionInfo?.name || log.action}
-          </div>
-        </td>
-        <td>
-          <div class="user-info">
-            <strong>${log.username}</strong>
-            <small class="text-muted d-block">${log.ip}</small>
-          </div>
-        </td>
-        <td>
-          <span class="log-details" title="${log.details}">
-            ${log.details}
-          </span>
-        </td>
-        <td>
-          <div class="log-actions">
-            <button class="btn btn-sm btn-outline-primary" onclick="logsController.showLogDetails('${log.id}')">
-              <i class="bi bi-eye"></i>
-            </button>
-            ${log.documentId ? `
-              <button class="btn btn-sm btn-outline-info" onclick="logsController.goToDocument('${log.documentId}')">
-                <i class="bi bi-file-earmark"></i>
-              </button>
-            ` : ''}
-          </div>
-        </td>
-      </tr>
-    `;
+    if (userInfo) {
+      userInfo.innerHTML = `
+        <span>Bienvenido, ${user.name}</span>
+        <button class="btn btn-sm btn-outline-secondary ms-2" onclick="authService.logout().then(() => location.href = '../auth/login.html')">
+          Cerrar Sesión
+        </button>
+      `;
+    }
   }
 
-  formatDate(timestamp) {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('es-ES', {
+  exportLogs() {
+    try {
+      const csvContent = this.generateCSV();
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `logs_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showNotification('Logs exportados correctamente', 'success');
+      }
+    } catch (error) {
+      console.error('Error exportando logs:', error);
+      showNotification('Error exportando logs', 'error');
+    }
+  }
+
+  generateCSV() {
+    const headers = ['ID', 'Acción', 'Usuario', 'Objetivo', 'Fecha'];
+    const rows = this.logs.map(log => [
+      log.id,
+      this.getActionText(log.action),
+      log.user,
+      log.target,
+      this.formatDate(log.timestamp)
+    ]);
+
+    return [headers, ...rows]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+  }
+
+  // Utilidades
+  getActionIcon(action) {
+    const icons = {
+      file_upload: 'bi-cloud-upload',
+      file_download: 'bi-cloud-download',
+      file_delete: 'bi-trash',
+      user_login: 'bi-box-arrow-in-right',
+      user_logout: 'bi-box-arrow-left',
+      permission_grant: 'bi-shield-check',
+      permission_revoke: 'bi-shield-x'
+    };
+    return icons[action] || 'bi-info-circle';
+  }
+
+  getActionColor(action) {
+    const colors = {
+      file_upload: 'text-success',
+      file_download: 'text-info',
+      file_delete: 'text-danger',
+      user_login: 'text-primary',
+      user_logout: 'text-secondary',
+      permission_grant: 'text-success',
+      permission_revoke: 'text-warning'
+    };
+    return colors[action] || 'text-muted';
+  }
+
+  getActionText(action) {
+    const texts = {
+      file_upload: 'Subida de archivo',
+      file_download: 'Descarga de archivo',
+      file_delete: 'Eliminación de archivo',
+      user_login: 'Inicio de sesión',
+      user_logout: 'Cierre de sesión',
+      permission_grant: 'Permiso otorgado',
+      permission_revoke: 'Permiso revocado'
+    };
+    return texts[action] || action;
+  }
+
+  formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  }
-
-  formatTime(timestamp) {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('es-ES', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     });
   }
-
-  updatePagination() {
-    if (!this.pagination) {
-      this.pagination = new Pagination('logsPaginationContainer', {
-        itemsPerPage: this.itemsPerPage,
-        currentPage: this.currentPage,
-        onPageChange: (page) => {
-          this.currentPage = page;
-          this.renderLogs();
-          this.updatePagination();
-        }
-      });
-    }
-
-    this.pagination.setItemsPerPage(this.itemsPerPage);
-    this.pagination.currentPage = this.currentPage;
-    this.pagination.render(this.filteredLogs.length);
-  }
-
-  updateShowingCount() {
-    const showingElement = document.getElementById('showingLogsCount');
-    const totalElement = document.getElementById('totalLogsCount');
-    
-    if (showingElement && totalElement) {
-      const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-      const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredLogs.length);
-      
-      showingElement.textContent = this.filteredLogs.length > 0 ? `${startIndex + 1}-${endIndex}` : '0';
-      totalElement.textContent = this.filteredLogs.length;
-    }
-  }
-
-  updateFilterInfo() {
-    const filterInfo = document.getElementById('filterInfo');
-    if (!filterInfo) return;
-
-    const activeFilters = [];
-    if (this.currentFilters.date) activeFilters.push(`Fecha: ${this.currentFilters.date}`);
-    if (this.currentFilters.user) activeFilters.push(`Usuario: ${this.currentFilters.user}`);
-    if (this.currentFilters.action) activeFilters.push(`Acción: ${this.currentFilters.action}`);
-    if (this.currentFilters.level) activeFilters.push(`Nivel: ${this.currentFilters.level}`);
-
-    if (activeFilters.length > 0) {
-      filterInfo.innerHTML = `
-        <small class="text-muted">
-          <i class="bi bi-funnel me-1"></i>
-          Filtros activos: ${activeFilters.join(', ')}
-        </small>
-      `;
-      filterInfo.classList.remove('d-none');
-    } else {
-      filterInfo.classList.add('d-none');
-    }
-  }
-
-  updateStats() {
-    const stats = this.calculateStats();
-    
-    document.getElementById('totalLogsCount').textContent = this.allLogs.length;
-    document.getElementById('todayLogsCount').textContent = stats.today;
-    document.getElementById('errorsCount').textContent = stats.errors;
-    document.getElementById('warningsCount').textContent = stats.warnings;
-  }
-
-  calculateStats() {
-    const today = new Date().toISOString().split('T')[0];
-    
-    return {
-      today: this.allLogs.filter(log => log.timestamp.startsWith(today)).length,
-      errors: this.allLogs.filter(log => log.level === 'error').length,
-      warnings: this.allLogs.filter(log => log.level === 'warning').length
-    };
-  }
-
-  clearFilters() {
-    document.getElementById('filterDate').value = '';
-    document.getElementById('filterUser').value = '';
-    document.getElementById('filterAction').value = '';
-    document.getElementById('filterLevel').value = '';
-    
-    this.applyFilters();
-    showNotification('Filtros limpiados', 'info');
-  }
-
-  toggleRealtimeUpdates(enabled) {
-    if (enabled) {
-      this.startRealtimeUpdates();
-      showNotification('Actualizaciones en tiempo real activadas', 'info');
-    } else {
-      this.stopRealtimeUpdates();
-      showNotification('Actualizaciones en tiempo real desactivadas', 'info');
-    }
-  }
-
-  startRealtimeUpdates() {
-    this.realtimeInterval = setInterval(() => {
-      // Simulate new log entries
-      this.addSimulatedLog();
-    }, 10000); // Every 10 seconds
-  }
-
-  stopRealtimeUpdates() {
-    if (this.realtimeInterval) {
-      clearInterval(this.realtimeInterval);
-      this.realtimeInterval = null;
-    }
-  }
-
-  addSimulatedLog() {
-    const actions = this.getAvailableActions();
-    const levels = this.getAvailableLevels();
-    const users = ['admin@docuflow.com', 'editor@docuflow.com', 'viewer@docuflow.com'];
-    
-    const randomAction = actions[Math.floor(Math.random() * actions.length)];
-    const randomLevel = levels[Math.floor(Math.random() * levels.length)];
-    const randomUser = users[Math.floor(Math.random() * users.length)];
-    
-    const newLog = {
-      id: this.allLogs.length + 1,
-      timestamp: new Date().toISOString(),
-      action: randomAction.id,
-      actionName: randomAction.name,
-      level: randomLevel.id,
-      username: randomUser,
-      details: this.generateLogDetails(randomAction.id),
-      ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
-      documentId: Math.random() > 0.5 ? Math.floor(Math.random() * 100) + 1 : null
-    };
-    
-    this.allLogs.unshift(newLog); // Add to beginning
-    this.applyFilters();
-    this.updateStats();
-    
-    // Show notification for new log
-    if (this.currentPage === 1) {
-      showNotification(`Nuevo registro: ${randomAction.name}`, 'info', 3000);
-    }
-  }
-
-  async exportLogs() {
-    try {
-      const csvContent = this.generateCSV();
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `logs_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      showNotification('Registros exportados exitosamente', 'success');
-    } catch (error) {
-      console.error('Export error:', error);
-      showNotification('Error al exportar registros', 'error');
-    }
-  }
-
-  generateCSV() {
-    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Detalles', 'IP', 'Documento'];
-    const rows = this.filteredLogs.map(log => [
-      this.formatDate(log.timestamp),
-      this.formatTime(log.timestamp),
-      log.level,
-      log.actionName,
-      log.username,
-      `"${log.details.replace(/"/g, '""')}"`,
-      log.ip,
-      log.documentId || ''
-    ]);
-    
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-  }
-
-  async downloadDailyLog() {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const todayLogs = this.allLogs.filter(log => log.timestamp.startsWith(today));
-      
-      if (todayLogs.length === 0) {
-        showNotification('No hay registros para hoy', 'info');
-        return;
-      }
-      
-      const csvContent = this.generateDailyCSV(todayLogs);
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `log_diario_${today}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      showNotification('Log diario descargado', 'success');
-    } catch (error) {
-      console.error('Download error:', error);
-      showNotification('Error al descargar el log diario', 'error');
-    }
-  }
-
-  generateDailyCSV(logs) {
-    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Detalles', 'IP', 'Documento'];
-    const rows = logs.map(log => [
-      this.formatDate(log.timestamp),
-      this.formatTime(log.timestamp),
-      log.level,
-      log.actionName,
-      log.username,
-      `"${log.details.replace(/"/g, '""')}"`,
-      log.ip,
-      log.documentId || ''
-    ]);
-    
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-  }
-
-  showLogDetails(logId) {
-    const log = this.allLogs.find(l => l.id == logId);
-    if (!log) return;
-    
-    // Simple alert for now - in a real app, use a modal
-    const details = `
-Registro ID: ${log.id}
-Fecha: ${this.formatDate(log.timestamp)} ${this.formatTime(log.timestamp)}
-Nivel: ${log.level}
-Acción: ${log.actionName}
-Usuario: ${log.username}
-IP: ${log.ip}
-Detalles: ${log.details}
-${log.documentId ? `Documento ID: ${log.documentId}` : ''}
-    `.trim();
-    
-    alert(details);
-  }
-
-  goToDocument(documentId) {
-    // In a real app, navigate to the document
-    showNotification(`Navegando al documento ${documentId}`, 'info');
-  }
 }
 
-// Initialize controller and make it globally available
-let logsController;
-document.addEventListener('DOMContentLoaded', () => {
-  logsController = new LogsController();
-});
+// Instancia global
+const logsController = new SimpleLogsController();
+
+// Hacer disponible globalmente
+window.logsController = logsController;
+
+export default logsController;

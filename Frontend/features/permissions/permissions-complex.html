@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Permisos y Roles - DocuFlow</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="../../shared/styles/styles.css">
+  <link rel="stylesheet" href="permissions.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body class="modern-body">
+  <!-- Navbar será generado por JavaScript -->
+  <div id="navbar-container" class="container-fluid mt-4 mb-4"></div>
+
+  <div class="permissions-container">
+    <!-- Header Section -->
+    <div class="card-modern permissions-header">
+      <div class="d-flex align-items-center justify-content-between flex-wrap">
+        <div class="d-flex align-items-center gap-3">
+          <div class="header-icon">
+            <i class="bi bi-shield-lock-fill"></i>
+          </div>
+          <div>
+            <h1 class="h3 mb-1 text-gray-800">Gestión de Permisos</h1>
+            <p class="mb-0 text-gray-600">Administra roles y permisos de usuarios del sistema</p>
+          </div>
+        </div>
+        <div class="permissions-stats d-flex">
+          <div class="stat-item text-info">
+            <i class="bi bi-people"></i>
+            <span id="usersCount">-</span>
+            <small>Usuarios</small>
+          </div>
+          <div class="stat-item text-warning">
+            <i class="bi bi-person-gear"></i>
+            <span id="rolesCount">-</span>
+            <small>Roles</small>
+          </div>
+          <div class="stat-item text-success">
+            <i class="bi bi-shield-check"></i>
+            <span id="permissionsCount">-</span>
+            <small>Permisos</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <div class="row g-4">
+      <!-- Users & Roles Management -->
+      <div class="col-lg-8">
+        <div class="card-modern users-management">
+          <div class="users-header d-flex align-items-center justify-content-between flex-wrap">
+            <h5 class="mb-0 text-gray-800">
+              <i class="bi bi-people me-2"></i>Usuarios y Roles
+            </h5>
+            <div class="d-flex gap-2 align-items-center">
+              <div class="search-box">
+                <input type="text" class="form-control form-control-sm" id="searchUsers" placeholder="Buscar usuarios...">
+              </div>
+              <button class="btn-modern btn-modern-primary btn-sm" id="addUserBtn">
+                <i class="bi bi-person-plus me-1"></i>Agregar Usuario
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>
+                      <input type="checkbox" class="form-check-input" id="selectAll">
+                    </th>
+                    <th>Usuario</th>
+                    <th>Email</th>
+                    <th>Rol Actual</th>
+                    <th>Estado</th>
+                    <th>Última Conexión</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTable">
+                  <!-- Users will be rendered here -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="usersEmptyState" class="empty-state d-none">
+              <i class="bi bi-people display-1 text-gray-400"></i>
+              <h5 class="text-gray-600 mt-3">No hay usuarios registrados</h5>
+              <p class="text-gray-500">Los usuarios aparecerán aquí cuando se registren</p>
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex align-items-center justify-content-between mt-4">
+              <div class="pagination-info text-gray-600 small">
+                Mostrando <span id="showingUsersCount">0</span> de <span id="totalUsersCount">0</span> usuarios
+              </div>
+              <div id="usersPaginationContainer"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Roles Section -->
+        <div class="card-modern roles-section mt-4">
+          <div class="roles-header d-flex align-items-center justify-content-between">
+            <h5 class="mb-0 text-gray-800">
+              <i class="bi bi-person-gear me-2"></i>Gestión de Roles
+            </h5>
+            <button class="btn-modern btn-modern-outline btn-sm" id="addRoleBtn">
+              <i class="bi bi-plus-circle me-1"></i>Nuevo Rol
+            </button>
+          </div>
+
+          <div class="roles-grid" id="rolesGrid">
+            <!-- Roles will be rendered here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Permission Assignment Section -->
+      <div class="col-lg-4">
+        <div class="card-modern permission-assignment sticky-top">
+          <div class="assignment-header">
+            <h5 class="mb-0 text-gray-800">
+              <i class="bi bi-shield-lock me-2"></i>Asignar Permisos
+            </h5>
+          </div>
+          
+          <form id="permissionForm">
+            <div class="mb-3">
+              <label for="userSelect" class="form-label text-gray-700">Usuario</label>
+              <select id="userSelect" class="form-select" required>
+                <option value="">Seleccionar usuario...</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="roleSelect" class="form-label text-gray-700">Rol</label>
+              <select id="roleSelect" class="form-select" required>
+                <option value="">Seleccionar rol...</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label text-gray-700">Permisos Específicos</label>
+              <div class="permissions-list" id="permissionsList">
+                <!-- Permissions checkboxes will be rendered here -->
+              </div>
+            </div>
+
+            <div class="permission-preview mb-3" id="permissionPreview" style="display: none;">
+              <label class="form-label text-gray-700">Vista Previa de Permisos</label>
+              <div class="preview-content">
+                <!-- Permission preview will be shown here -->
+              </div>
+            </div>
+
+            <button type="submit" class="btn-modern btn-modern-primary w-100" id="savePermissionsBtn">
+              <i class="bi bi-shield-check me-2"></i>Guardar Permisos
+            </button>
+          </form>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card-modern mt-3">
+          <h6 class="text-gray-700 mb-3">Acciones Rápidas</h6>
+          <div class="quick-actions">
+            <button class="btn-modern btn-modern-outline w-100 mb-2" id="exportPermissions">
+              <i class="bi bi-download me-2"></i>Exportar Permisos
+            </button>
+            <button class="btn-modern btn-modern-outline w-100 mb-2" id="importPermissions">
+              <i class="bi bi-upload me-2"></i>Importar Permisos
+            </button>
+            <button class="btn-modern btn-modern-outline w-100" id="refreshPermissions">
+              <i class="bi bi-arrow-clockwise me-2"></i>Actualizar
+            </button>
+          </div>
+        </div>
+
+        <!-- Permission Templates -->
+        <div class="card-modern mt-3">
+          <h6 class="text-gray-700 mb-3">Plantillas de Permisos</h6>
+          <div class="permission-templates">
+            <div class="template-item" data-template="admin">
+              <i class="bi bi-person-fill-gear"></i>
+              <span>Administrador</span>
+            </div>
+            <div class="template-item" data-template="editor">
+              <i class="bi bi-pencil-square"></i>
+              <span>Editor</span>
+            </div>
+            <div class="template-item" data-template="viewer">
+              <i class="bi bi-eye"></i>
+              <span>Visualizador</span>
+            </div>
+            <div class="template-item" data-template="guest">
+              <i class="bi bi-person"></i>
+              <span>Invitado</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="permissionMessage" class="alert d-none mt-3"></div>
+  </div>
+
+  <!-- Modals -->
+  <!-- Add User Modal -->
+  <div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Agregar Nuevo Usuario</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="addUserForm">
+            <div class="mb-3">
+              <label for="userName" class="form-label">Nombre de Usuario</label>
+              <input type="text" class="form-control" id="userName" required>
+            </div>
+            <div class="mb-3">
+              <label for="userEmail" class="form-label">Email</label>
+              <input type="email" class="form-control" id="userEmail" required>
+            </div>
+            <div class="mb-3">
+              <label for="userRole" class="form-label">Rol Inicial</label>
+              <select id="userRole" class="form-select" required>
+                <option value="">Seleccionar rol...</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="saveUserBtn">Guardar Usuario</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Role Modal -->
+  <div class="modal fade" id="addRoleModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Crear Nuevo Rol</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="addRoleForm">
+            <div class="mb-3">
+              <label for="roleName" class="form-label">Nombre del Rol</label>
+              <input type="text" class="form-control" id="roleName" required>
+            </div>
+            <div class="mb-3">
+              <label for="roleDescription" class="form-label">Descripción</label>
+              <textarea class="form-control" id="roleDescription" rows="3"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Permisos del Rol</label>
+              <div id="rolePermissionsList">
+                <!-- Role permissions will be rendered here -->
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="saveRoleBtn">Guardar Rol</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="permissionsController.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

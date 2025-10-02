@@ -1,486 +1,391 @@
-import { docuFlowAPI } from '../../shared/services/apiClient.js';
-import { store } from '../../shared/services/store.js';
-import { initializeNavbar, showNotification, FormValidator } from '../../shared/utils/uiHelpers.js';
+// permissionsControllerSimple.js - Controlador simplificado para gestión de permisos
+import { docuFlowAPI } from '../../shared/services/apiClientSimple.js';
+import authService from '../../shared/services/authServiceSimple.js';
+import { showNotification } from '../../shared/utils/uiHelpers.js';
 
-class PermissionsController {
+class SimplePermissionsController {
   constructor() {
+    this.permissions = [];
     this.users = [];
-    this.roles = [];
-    this.currentUser = null;
-    this.availablePermissions = [
-      { id: 'download', name: 'Descargar archivos', icon: 'bi-download', category: 'files' },
-      { id: 'delete', name: 'Eliminar archivos', icon: 'bi-trash', category: 'files' },
-      { id: 'comment', name: 'Comentar documentos', icon: 'bi-chat-text', category: 'collaboration' },
-      { id: 'edit', name: 'Editar documentos', icon: 'bi-pencil-square', category: 'collaboration' },
-      { id: 'share', name: 'Compartir documentos', icon: 'bi-share', category: 'collaboration' },
-      { id: 'admin', name: 'Acceso administrativo', icon: 'bi-shield-check', category: 'administration' },
-      { id: 'view_logs', name: 'Ver registros del sistema', icon: 'bi-list-ul', category: 'administration' },
-      { id: 'manage_users', name: 'Gestionar usuarios', icon: 'bi-people', category: 'administration' }
-    ];
-    
-    this.initializeComponents();
+    this.files = [];
+    this.init();
+  }
+
+  async init() {
+    if (!authService.isLoggedIn()) {
+      window.location.href = '../auth/login.html';
+      return;
+    }
+
+    if (!authService.isAdmin()) {
+      showNotification('Solo los administradores pueden gestionar permisos', 'error');
+      window.location.href = '../dashboard/dashboard.html';
+      return;
+    }
+
     this.setupEventListeners();
-    this.loadData();
-  }
-
-  initializeComponents() {
-    // Create navbar
-    initializeNavbar('permissions');
-    
-    // Setup form validation
-    this.setupFormValidation();
-    
-    // Render permission categories
-    this.renderPermissionCategories();
-  }
-
-  setupFormValidation() {
-    this.validator = new FormValidator('permissionsForm', {
-      userSelect: {
-        required: true,
-        message: 'Debe seleccionar un usuario'
-      }
-    });
+    await this.loadData();
+    this.updateUI();
   }
 
   setupEventListeners() {
-    // User selection
-    const userSelect = document.getElementById('userSelect');
-    if (userSelect) {
-      userSelect.addEventListener('change', (e) => {
-        this.loadUserData(e.target.value);
-      });
+    // Formulario de nuevo permiso
+    const permissionForm = document.getElementById('permissionForm');
+    if (permissionForm) {
+      permissionForm.addEventListener('submit', (e) => this.handleSubmitPermission(e));
     }
 
-    // Role selection
-    const roleSelect = document.getElementById('roleSelect');
-    if (roleSelect) {
-      roleSelect.addEventListener('change', (e) => {
-        this.updateUserRole(e.target.value);
-      });
+    // Filtros
+    const userFilter = document.getElementById('userFilter');
+    if (userFilter) {
+      userFilter.addEventListener('change', (e) => this.filterByUser(e.target.value));
     }
 
-    // Quick actions
-    const saveAllBtn = document.getElementById('saveAllPermissions');
-    const resetBtn = document.getElementById('resetPermissions');
-    const copyPermissionsBtn = document.getElementById('copyPermissions');
-
-    if (saveAllBtn) {
-      saveAllBtn.addEventListener('click', () => this.saveAllPermissions());
+    const fileFilter = document.getElementById('fileFilter');
+    if (fileFilter) {
+      fileFilter.addEventListener('change', (e) => this.filterByFile(e.target.value));
     }
 
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => this.resetPermissions());
+    const permissionFilter = document.getElementById('permissionFilter');
+    if (permissionFilter) {
+      permissionFilter.addEventListener('change', (e) => this.filterByPermission(e.target.value));
     }
 
-    if (copyPermissionsBtn) {
-      copyPermissionsBtn.addEventListener('click', () => this.showCopyModal());
+    // Refresh
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.loadData());
     }
 
-    // Permission checkboxes
-    this.setupPermissionListeners();
-  }
-
-  setupPermissionListeners() {
-    const permissionsContainer = document.getElementById('permissionsContainer');
-    if (permissionsContainer) {
-      permissionsContainer.addEventListener('change', (e) => {
-        if (e.target.type === 'checkbox') {
-          this.handlePermissionChange(e.target);
-        }
-      });
+    // Limpiar filtros
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    if (clearFiltersBtn) {
+      clearFiltersBtn.addEventListener('click', () => this.clearFilters());
     }
-
-    // Category toggles
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('category-toggle')) {
-        this.toggleCategoryPermissions(e.target);
-      }
-    });
   }
 
   async loadData() {
     try {
-      // Load users and roles
-      const [usersResponse, rolesResponse] = await Promise.all([
+      showNotification('Cargando datos...', 'info', 1000);
+
+      // Cargar permisos, usuarios y archivos (en modo demo)
+      const [permissionsResponse, usersResponse, filesResponse] = await Promise.all([
+        docuFlowAPI.permissions.list(),
         this.getDemoUsers(),
-        this.getDemoRoles()
+        docuFlowAPI.files.list()
       ]);
 
-      this.users = usersResponse;
-      this.roles = rolesResponse;
-
-      this.renderUserSelect();
-      this.renderRoleSelect();
-
-      // Load first user by default
-      if (this.users.length > 0) {
-        await this.loadUserData(this.users[0].id);
+      if (permissionsResponse.success) {
+        this.permissions = permissionsResponse.data.permissions || [];
       }
 
+      this.users = usersResponse;
+      this.files = filesResponse.success ? filesResponse.data.files || [] : [];
+
+      this.renderPermissionsList();
+      this.populateSelects();
+      this.updateStats();
+
     } catch (error) {
-      console.error('Error loading data:', error);
-      showNotification('Error al cargar los datos', 'error');
+      console.error('Error cargando datos:', error);
+      showNotification('Error cargando datos', 'error');
     }
   }
 
   getDemoUsers() {
-    // Demo users for development
+    // Usuarios de demostración
     return [
-      {
-        id: '1',
-        username: 'admin@docuflow.com',
-        name: 'Administrador',
-        role: 'admin',
-        status: 'active',
-        lastLogin: '2024-03-15T10:30:00Z'
-      },
-      {
-        id: '2',
-        username: 'editor@docuflow.com',
-        name: 'Editor Principal',
-        role: 'editor',
-        status: 'active',
-        lastLogin: '2024-03-15T09:15:00Z'
-      },
-      {
-        id: '3',
-        username: 'viewer@docuflow.com',
-        name: 'Usuario Viewer',
-        role: 'viewer',
-        status: 'active',
-        lastLogin: '2024-03-14T16:45:00Z'
-      },
-      {
-        id: '4',
-        username: 'guest@docuflow.com',
-        name: 'Invitado',
-        role: 'guest',
-        status: 'inactive',
-        lastLogin: '2024-03-10T14:20:00Z'
-      }
+      { id: 1, email: 'admin@docuflow.com', name: 'Administrador', role: 'admin' },
+      { id: 2, email: 'user@docuflow.com', name: 'Usuario Regular', role: 'user' },
+      { id: 3, email: 'guest@docuflow.com', name: 'Invitado', role: 'guest' }
     ];
   }
 
-  getDemoRoles() {
-    return [
-      {
-        id: 'admin',
-        name: 'Administrador',
-        description: 'Acceso completo al sistema',
-        permissions: ['download', 'delete', 'comment', 'edit', 'share', 'admin', 'view_logs', 'manage_users']
-      },
-      {
-        id: 'editor',
-        name: 'Editor',
-        description: 'Puede crear, editar y compartir documentos',
-        permissions: ['download', 'comment', 'edit', 'share']
-      },
-      {
-        id: 'viewer',
-        name: 'Visualizador',
-        description: 'Solo puede ver y comentar documentos',
-        permissions: ['download', 'comment']
-      },
-      {
-        id: 'guest',
-        name: 'Invitado',
-        description: 'Acceso limitado solo para visualizar',
-        permissions: ['download']
+  async handleSubmitPermission(event) {
+    event.preventDefault();
+
+    const userId = document.getElementById('selectUser').value;
+    const fileId = document.getElementById('selectFile').value;
+    const permission = document.getElementById('selectPermission').value;
+
+    if (!userId || !fileId || !permission) {
+      showNotification('Todos los campos son obligatorios', 'error');
+      return;
+    }
+
+    // Verificar si el permiso ya existe
+    const existingPermission = this.permissions.find(p => 
+      p.userId == userId && p.fileId == fileId && p.permission === permission
+    );
+
+    if (existingPermission) {
+      showNotification('Este permiso ya existe', 'warning');
+      return;
+    }
+
+    const permissionData = {
+      userId: parseInt(userId),
+      fileId: parseInt(fileId),
+      permission,
+      grantedBy: authService.getCurrentUser().email,
+      grantedAt: new Date().toISOString()
+    };
+
+    try {
+      const response = await docuFlowAPI.permissions.grant(permissionData);
+      
+      if (response.success) {
+        showNotification('Permiso otorgado correctamente', 'success');
+        
+        // Limpiar formulario
+        document.getElementById('permissionForm').reset();
+        
+        // Recargar permisos
+        await this.loadData();
       }
-    ];
+
+    } catch (error) {
+      console.error('Error otorgando permiso:', error);
+      showNotification('Error otorgando permiso', 'error');
+    }
   }
 
-  renderUserSelect() {
-    const userSelect = document.getElementById('userSelect');
-    if (!userSelect) return;
+  async revokePermission(permissionId) {
+    if (!confirm('¿Estás seguro de revocar este permiso?')) return;
 
-    userSelect.innerHTML = `
-      <option value="">Seleccionar usuario...</option>
-      ${this.users.map(user => `
-        <option value="${user.id}">
-          ${user.name} (${user.username}) - ${user.role}
-        </option>
-      `).join('')}
-    `;
+    try {
+      const response = await docuFlowAPI.permissions.revoke(permissionId);
+      
+      if (response.success) {
+        showNotification('Permiso revocado correctamente', 'success');
+        await this.loadData();
+      }
+
+    } catch (error) {
+      console.error('Error revocando permiso:', error);
+      showNotification('Error revocando permiso', 'error');
+    }
   }
 
-  renderRoleSelect() {
-    const roleSelect = document.getElementById('roleSelect');
-    if (!roleSelect) return;
-
-    roleSelect.innerHTML = `
-      <option value="">Seleccionar rol...</option>
-      ${this.roles.map(role => `
-        <option value="${role.id}">
-          ${role.name} - ${role.description}
-        </option>
-      `).join('')}
-    `;
+  filterByUser(userId) {
+    if (userId === 'all') {
+      this.renderPermissionsList();
+    } else {
+      const filtered = this.permissions.filter(p => p.userId == userId);
+      this.renderPermissionsList(filtered);
+    }
   }
 
-  renderPermissionCategories() {
-    const container = document.getElementById('permissionsContainer');
+  filterByFile(fileId) {
+    if (fileId === 'all') {
+      this.renderPermissionsList();
+    } else {
+      const filtered = this.permissions.filter(p => p.fileId == fileId);
+      this.renderPermissionsList(filtered);
+    }
+  }
+
+  filterByPermission(permission) {
+    if (permission === 'all') {
+      this.renderPermissionsList();
+    } else {
+      const filtered = this.permissions.filter(p => p.permission === permission);
+      this.renderPermissionsList(filtered);
+    }
+  }
+
+  clearFilters() {
+    const userFilter = document.getElementById('userFilter');
+    const fileFilter = document.getElementById('fileFilter');
+    const permissionFilter = document.getElementById('permissionFilter');
+    
+    if (userFilter) userFilter.value = 'all';
+    if (fileFilter) fileFilter.value = 'all';
+    if (permissionFilter) permissionFilter.value = 'all';
+
+    this.renderPermissionsList();
+    showNotification('Filtros limpiados', 'info', 2000);
+  }
+
+  renderPermissionsList(permissionsToRender = this.permissions) {
+    const container = document.getElementById('permissionsList');
     if (!container) return;
 
-    const categories = [...new Set(this.availablePermissions.map(p => p.category))];
-    
-    container.innerHTML = categories.map(category => {
-      const categoryPermissions = this.availablePermissions.filter(p => p.category === category);
-      const categoryName = this.getCategoryName(category);
+    if (permissionsToRender.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-5">
+          <i class="bi bi-shield-x" style="font-size: 3rem; color: #ccc;"></i>
+          <p class="text-muted mt-3">No hay permisos para mostrar</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = permissionsToRender.map(permission => {
+      const user = this.users.find(u => u.id === permission.userId);
+      const file = this.files.find(f => f.id === permission.fileId);
       
       return `
-        <div class="permission-category mb-4">
-          <div class="category-header d-flex justify-content-between align-items-center mb-3">
-            <h6 class="category-title mb-0">
-              <i class="bi bi-${this.getCategoryIcon(category)} me-2"></i>
-              ${categoryName}
-            </h6>
-            <div class="category-actions">
-              <button class="btn btn-sm btn-outline-primary category-toggle" 
-                      data-category="${category}" 
-                      data-action="toggle">
-                <i class="bi bi-check-square me-1"></i>
-                Alternar todos
-              </button>
+        <div class="permission-item card mb-2">
+          <div class="card-body d-flex align-items-center">
+            <div class="permission-icon me-3">
+              <i class="bi ${this.getPermissionIcon(permission.permission)} ${this.getPermissionColor(permission.permission)}" style="font-size: 1.5rem;"></i>
             </div>
-          </div>
-          <div class="row">
-            ${categoryPermissions.map(permission => `
-              <div class="col-md-6 col-lg-4 mb-2">
-                <div class="form-check permission-item">
-                  <input class="form-check-input" 
-                         type="checkbox" 
-                         id="perm-${permission.id}" 
-                         value="${permission.id}"
-                         data-category="${category}">
-                  <label class="form-check-label" for="perm-${permission.id}">
-                    <i class="bi ${permission.icon} me-2"></i>
-                    ${permission.name}
-                  </label>
+            <div class="permission-info flex-grow-1">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h6 class="mb-1">
+                    <strong>${user?.name || 'Usuario desconocido'}</strong>
+                    <span class="text-muted">puede</span>
+                    <span class="badge bg-primary">${this.getPermissionText(permission.permission)}</span>
+                  </h6>
+                  <p class="mb-1 text-muted">
+                    <i class="bi bi-file-earmark me-1"></i>
+                    ${file?.name || 'Archivo desconocido'}
+                  </p>
+                  <small class="text-muted">
+                    Otorgado por: ${permission.grantedBy} • 
+                    ${permission.grantedAt ? this.formatDate(permission.grantedAt) : 'Fecha desconocida'}
+                  </small>
+                </div>
+                <div class="permission-actions">
+                  <button class="btn btn-sm btn-outline-danger" onclick="permissionsController.revokePermission(${permission.id})">
+                    <i class="bi bi-x-circle"></i> Revocar
+                  </button>
                 </div>
               </div>
-            `).join('')}
+            </div>
           </div>
         </div>
       `;
     }).join('');
   }
 
-  getCategoryName(category) {
-    const names = {
-      files: 'Gestión de Archivos',
-      collaboration: 'Colaboración',
-      administration: 'Administración'
-    };
-    return names[category] || category;
-  }
-
-  getCategoryIcon(category) {
-    const icons = {
-      files: 'folder',
-      collaboration: 'people',
-      administration: 'gear'
-    };
-    return icons[category] || 'circle';
-  }
-
-  async loadUserData(userId) {
-    if (!userId) {
-      this.currentUser = null;
-      this.clearPermissions();
-      return;
+  populateSelects() {
+    // Poblar select de usuarios
+    const userSelect = document.getElementById('selectUser');
+    if (userSelect) {
+      userSelect.innerHTML = '<option value="">Selecciona un usuario</option>' + 
+        this.users.map(user => `<option value="${user.id}">${user.name} (${user.email})</option>`).join('');
     }
 
-    try {
-      const user = this.users.find(u => u.id === userId);
-      if (!user) return;
+    // Poblar select de archivos
+    const fileSelect = document.getElementById('selectFile');
+    if (fileSelect) {
+      fileSelect.innerHTML = '<option value="">Selecciona un archivo</option>' + 
+        this.files.map(file => `<option value="${file.id}">${file.name}</option>`).join('');
+    }
 
-      this.currentUser = user;
-      
-      // Set role
-      const roleSelect = document.getElementById('roleSelect');
-      if (roleSelect) {
-        roleSelect.value = user.role;
-      }
+    // Poblar filtros
+    const userFilter = document.getElementById('userFilter');
+    if (userFilter) {
+      userFilter.innerHTML = '<option value="all">Todos los usuarios</option>' + 
+        this.users.map(user => `<option value="${user.id}">${user.name}</option>`).join('');
+    }
 
-      // Get user permissions
-      const permissions = await this.getUserPermissions(userId);
-      this.updatePermissionsDisplay(permissions);
-      
-      // Update user info
-      this.updateUserInfo(user);
-
-    } catch (error) {
-      console.error('Error loading user data:', error);
-      showNotification('Error al cargar datos del usuario', 'error');
+    const fileFilter = document.getElementById('fileFilter');
+    if (fileFilter) {
+      fileFilter.innerHTML = '<option value="all">Todos los archivos</option>' + 
+        this.files.map(file => `<option value="${file.id}">${file.name}</option>`).join('');
     }
   }
 
-  async getUserPermissions(userId) {
-    // In a real app, this would be an API call
-    const user = this.users.find(u => u.id === userId);
-    const role = this.roles.find(r => r.id === user?.role);
-    return role?.permissions || [];
-  }
+  updateStats() {
+    const totalPermissions = this.permissions.length;
+    const readPermissions = this.permissions.filter(p => p.permission === 'read').length;
+    const writePermissions = this.permissions.filter(p => p.permission === 'write').length;
+    const deletePermissions = this.permissions.filter(p => p.permission === 'delete').length;
 
-  updatePermissionsDisplay(permissions) {
-    this.availablePermissions.forEach(permission => {
-      const checkbox = document.getElementById(`perm-${permission.id}`);
-      if (checkbox) {
-        checkbox.checked = permissions.includes(permission.id);
-      }
-    });
-  }
-
-  updateUserInfo(user) {
-    const userInfoContainer = document.getElementById('userInfo');
-    if (!userInfoContainer) return;
-
-    userInfoContainer.innerHTML = `
-      <div class="user-info-card">
-        <div class="d-flex align-items-center gap-3">
-          <div class="user-avatar">
-            <i class="bi bi-person-circle fs-1"></i>
+    const statsContainer = document.getElementById('permissionsStats');
+    if (statsContainer) {
+      statsContainer.innerHTML = `
+        <div class="row">
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Total Permisos</h6>
+              <span class="stat-number">${totalPermissions}</span>
+            </div>
           </div>
-          <div class="user-details">
-            <h6 class="mb-1">${user.name}</h6>
-            <p class="text-muted mb-1">${user.username}</p>
-            <span class="badge bg-${this.getStatusColor(user.status)}">${user.status === 'active' ? 'Activo' : 'Inactivo'}</span>
-            ${user.lastLogin ? `<p class="text-muted small mt-1">Último acceso: ${this.formatDate(user.lastLogin)}</p>` : ''}
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Lectura</h6>
+              <span class="stat-number text-info">${readPermissions}</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Escritura</h6>
+              <span class="stat-number text-warning">${writePermissions}</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <h6>Eliminación</h6>
+              <span class="stat-number text-danger">${deletePermissions}</span>
+            </div>
           </div>
         </div>
-      </div>
-    `;
+      `;
+    }
   }
 
-  getStatusColor(status) {
-    return status === 'active' ? 'success' : 'secondary';
+  updateUI() {
+    const user = authService.getCurrentUser();
+    const userInfo = document.getElementById('userInfo');
+    
+    if (userInfo) {
+      userInfo.innerHTML = `
+        <span>Bienvenido, ${user.name} (Administrador)</span>
+        <button class="btn btn-sm btn-outline-secondary ms-2" onclick="authService.logout().then(() => location.href = '../auth/login.html')">
+          Cerrar Sesión
+        </button>
+      `;
+    }
+  }
+
+  // Utilidades
+  getPermissionIcon(permission) {
+    const icons = {
+      read: 'bi-eye',
+      write: 'bi-pencil',
+      delete: 'bi-trash'
+    };
+    return icons[permission] || 'bi-question-circle';
+  }
+
+  getPermissionColor(permission) {
+    const colors = {
+      read: 'text-info',
+      write: 'text-warning',
+      delete: 'text-danger'
+    };
+    return colors[permission] || 'text-muted';
+  }
+
+  getPermissionText(permission) {
+    const texts = {
+      read: 'Leer',
+      write: 'Escribir',
+      delete: 'Eliminar'
+    };
+    return texts[permission] || permission;
   }
 
   formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
+    return new Date(dateString).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
-      month: 'short',
-      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
   }
-
-  clearPermissions() {
-    this.availablePermissions.forEach(permission => {
-      const checkbox = document.getElementById(`perm-${permission.id}`);
-      if (checkbox) {
-        checkbox.checked = false;
-      }
-    });
-  }
-
-  async updateUserRole(roleId) {
-    if (!this.currentUser || !roleId) return;
-
-    try {
-      // Update role
-      this.currentUser.role = roleId;
-      
-      // Update permissions based on role
-      const role = this.roles.find(r => r.id === roleId);
-      if (role) {
-        this.updatePermissionsDisplay(role.permissions);
-      }
-
-      showNotification('Rol actualizado correctamente', 'success');
-    } catch (error) {
-      console.error('Error updating role:', error);
-      showNotification('Error al actualizar el rol', 'error');
-    }
-  }
-
-  handlePermissionChange(checkbox) {
-    // Here you could implement logic to handle permission dependencies
-    // For example, if admin is unchecked, uncheck all admin-related permissions
-    if (checkbox.value === 'admin' && !checkbox.checked) {
-      ['view_logs', 'manage_users'].forEach(permId => {
-        const permCheckbox = document.getElementById(`perm-${permId}`);
-        if (permCheckbox) {
-          permCheckbox.checked = false;
-        }
-      });
-    }
-  }
-
-  toggleCategoryPermissions(button) {
-    const category = button.dataset.category;
-    const categoryCheckboxes = document.querySelectorAll(`input[data-category="${category}"]`);
-    
-    // Check if any checkbox in category is unchecked
-    const hasUnchecked = Array.from(categoryCheckboxes).some(cb => !cb.checked);
-    
-    // Toggle all checkboxes in category
-    categoryCheckboxes.forEach(checkbox => {
-      checkbox.checked = hasUnchecked;
-      this.handlePermissionChange(checkbox);
-    });
-  }
-
-  async saveAllPermissions() {
-    if (!this.currentUser) {
-      showNotification('Debe seleccionar un usuario', 'warning');
-      return;
-    }
-
-    try {
-      const selectedPermissions = Array.from(
-        document.querySelectorAll('input[type="checkbox"]:checked')
-      ).map(cb => cb.value);
-
-      // In a real app, make API call here
-      console.log('Saving permissions for user:', this.currentUser.id, selectedPermissions);
-
-      showNotification('Permisos guardados correctamente', 'success');
-    } catch (error) {
-      console.error('Error saving permissions:', error);
-      showNotification('Error al guardar los permisos', 'error');
-    }
-  }
-
-  resetPermissions() {
-    if (!this.currentUser) return;
-
-    if (confirm('¿Restablecer permisos a los valores por defecto del rol?')) {
-      const role = this.roles.find(r => r.id === this.currentUser.role);
-      if (role) {
-        this.updatePermissionsDisplay(role.permissions);
-        showNotification('Permisos restablecidos', 'info');
-      }
-    }
-  }
-
-  showCopyModal() {
-    // Simple implementation - in a real app, you'd use a proper modal
-    const sourceUserId = prompt('ID del usuario desde el cual copiar permisos:');
-    if (sourceUserId && this.users.find(u => u.id === sourceUserId)) {
-      this.copyPermissionsFrom(sourceUserId);
-    }
-  }
-
-  async copyPermissionsFrom(sourceUserId) {
-    try {
-      const sourcePermissions = await this.getUserPermissions(sourceUserId);
-      this.updatePermissionsDisplay(sourcePermissions);
-      showNotification('Permisos copiados correctamente', 'success');
-    } catch (error) {
-      console.error('Error copying permissions:', error);
-      showNotification('Error al copiar permisos', 'error');
-    }
-  }
 }
 
-// Initialize controller and make it globally available
-let permissionsController;
-document.addEventListener('DOMContentLoaded', () => {
-  permissionsController = new PermissionsController();
-});
+// Instancia global
+const permissionsController = new SimplePermissionsController();
 
+// Hacer disponible globalmente
+window.permissionsController = permissionsController;
+
+export default permissionsController;

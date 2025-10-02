@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logs del Sistema - DocuFlow</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="../../shared/styles/styles.css">
+  <link rel="stylesheet" href="logs.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body class="modern-body">
+  <!-- Navbar será generado por JavaScript -->
+  <div id="navbar-container" class="container-fluid mt-4 mb-4"></div>
+
+  <div class="logs-container">
+    <!-- Header Section -->
+    <div class="card-modern logs-header">
+      <div class="d-flex align-items-center justify-content-between flex-wrap">
+        <div class="d-flex align-items-center gap-3">
+          <div class="header-icon">
+            <i class="bi bi-activity"></i>
+          </div>
+          <div>
+            <h1 class="h3 mb-1 text-gray-800">Logs del Sistema</h1>
+            <p class="mb-0 text-gray-600">Monitoreo y seguimiento de actividades del sistema</p>
+          </div>
+        </div>
+        <div class="logs-stats d-flex">
+          <div class="stat-item text-info">
+            <i class="bi bi-clock-history"></i>
+            <span id="todayLogsCount">-</span>
+            <small>Hoy</small>
+          </div>
+          <div class="stat-item text-warning">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span id="errorsCount">-</span>
+            <small>Errores</small>
+          </div>
+          <div class="stat-item text-success">
+            <i class="bi bi-check-circle"></i>
+            <span id="successCount">-</span>
+            <small>Exitosos</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <div class="row g-4">
+      <!-- Logs Table Section -->
+      <div class="col-lg-9">
+        <div class="card-modern logs-table-section">
+          <div class="logs-table-header d-flex align-items-center justify-content-between flex-wrap">
+            <h5 class="mb-0 text-gray-800">
+              <i class="bi bi-list-ul me-2"></i>Historial de Actividades
+            </h5>
+            <div class="d-flex gap-2 align-items-center">
+              <button class="btn-modern btn-modern-outline btn-sm" id="refreshLogs">
+                <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+              </button>
+              <button class="btn-modern btn-modern-primary btn-sm" id="downloadLogs">
+                <i class="bi bi-download me-1"></i>Exportar
+              </button>
+            </div>
+          </div>
+
+          <!-- Filters Section -->
+          <div class="logs-filters">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label text-gray-700">Fecha</label>
+                <div class="input-group">
+                  <input type="date" id="filterDate" class="form-control form-control-sm">
+                  <button class="btn btn-outline-secondary btn-sm" type="button" id="clearDate">
+                    <i class="bi bi-x"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label text-gray-700">Usuario</label>
+                <div class="search-box">
+                  <input type="text" id="filterUser" class="form-control form-control-sm" placeholder="Buscar usuario...">
+                </div>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label text-gray-700">Acción</label>
+                <select id="filterAction" class="form-select form-select-sm">
+                  <option value="">Todas las acciones</option>
+                  <option value="login">Inicio de sesión</option>
+                  <option value="upload">Subida de archivo</option>
+                  <option value="download">Descarga</option>
+                  <option value="delete">Eliminación</option>
+                  <option value="comment">Comentario</option>
+                  <option value="permission">Permisos</option>
+                  <option value="error">Error del sistema</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label text-gray-700">Nivel</label>
+                <select id="filterLevel" class="form-select form-select-sm">
+                  <option value="">Todos los niveles</option>
+                  <option value="info">Información</option>
+                  <option value="warning">Advertencia</option>
+                  <option value="error">Error</option>
+                  <option value="success">Éxito</option>
+                </select>
+              </div>
+            </div>
+            <div class="filter-actions mt-3">
+              <button class="btn-modern btn-modern-outline btn-sm" id="clearAllFilters">
+                <i class="bi bi-funnel me-1"></i>Limpiar Filtros
+              </button>
+              <button class="btn-modern btn-modern-outline btn-sm" id="applyFilters">
+                <i class="bi bi-search me-1"></i>Aplicar Filtros
+              </button>
+            </div>
+          </div>
+
+          <!-- Logs Table -->
+          <div class="table-container">
+            <div class="table-responsive">
+              <table class="table" id="logsTable">
+                <thead>
+                  <tr>
+                    <th>
+                      <input type="checkbox" class="form-check-input" id="selectAllLogs">
+                    </th>
+                    <th>Fecha y Hora</th>
+                    <th>Nivel</th>
+                    <th>Acción</th>
+                    <th>Usuario</th>
+                    <th>Detalles</th>
+                    <th>IP</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="logsTableBody">
+                  <!-- Logs will be rendered here -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="logsEmptyState" class="empty-state d-none">
+              <i class="bi bi-activity display-1 text-gray-400"></i>
+              <h5 class="text-gray-600 mt-3">No hay logs disponibles</h5>
+              <p class="text-gray-500">Los logs de actividad aparecerán aquí</p>
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex align-items-center justify-content-between mt-4">
+              <div class="pagination-info text-gray-600 small">
+                Mostrando <span id="showingLogsCount">0</span> de <span id="totalLogsCount">0</span> registros
+              </div>
+              <div id="logsPaginationContainer"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Log Details & Analytics -->
+      <div class="col-lg-3">
+        <!-- Log Details Panel -->
+        <div class="card-modern log-details sticky-top">
+          <div class="details-header">
+            <h5 class="mb-0 text-gray-800">
+              <i class="bi bi-info-circle me-2"></i>Detalles del Log
+            </h5>
+          </div>
+          
+          <div id="logDetailsContent">
+            <div class="empty-details">
+              <i class="bi bi-mouse2 text-gray-400 mb-2"></i>
+              <p class="text-gray-500 small">Selecciona un log para ver los detalles</p>
+            </div>
+          </div>
+
+          <div id="logDetails" class="log-details-content d-none">
+            <div class="detail-item">
+              <label class="detail-label">ID:</label>
+              <span class="detail-value" id="detailId">-</span>
+            </div>
+            <div class="detail-item">
+              <label class="detail-label">Timestamp:</label>
+              <span class="detail-value" id="detailTimestamp">-</span>
+            </div>
+            <div class="detail-item">
+              <label class="detail-label">Usuario:</label>
+              <span class="detail-value" id="detailUser">-</span>
+            </div>
+            <div class="detail-item">
+              <label class="detail-label">IP:</label>
+              <span class="detail-value" id="detailIp">-</span>
+            </div>
+            <div class="detail-item">
+              <label class="detail-label">User Agent:</label>
+              <span class="detail-value small" id="detailUserAgent">-</span>
+            </div>
+            <div class="detail-item">
+              <label class="detail-label">Detalles:</label>
+              <div class="detail-value" id="detailMessage">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Analytics -->
+        <div class="card-modern mt-3">
+          <h6 class="text-gray-700 mb-3">Análisis Rápido</h6>
+          <div class="analytics-grid">
+            <div class="analytics-item">
+              <div class="analytics-icon text-info">
+                <i class="bi bi-person-check"></i>
+              </div>
+              <div>
+                <div class="analytics-value" id="uniqueUsers">-</div>
+                <div class="analytics-label">Usuarios Únicos</div>
+              </div>
+            </div>
+            <div class="analytics-item">
+              <div class="analytics-icon text-success">
+                <i class="bi bi-arrow-up-circle"></i>
+              </div>
+              <div>
+                <div class="analytics-value" id="uploadsCount">-</div>
+                <div class="analytics-label">Subidas</div>
+              </div>
+            </div>
+            <div class="analytics-item">
+              <div class="analytics-icon text-warning">
+                <i class="bi bi-arrow-down-circle"></i>
+              </div>
+              <div>
+                <div class="analytics-value" id="downloadsCount">-</div>
+                <div class="analytics-label">Descargas</div>
+              </div>
+            </div>
+            <div class="analytics-item">
+              <div class="analytics-icon text-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+              </div>
+              <div>
+                <div class="analytics-value" id="errorsToday">-</div>
+                <div class="analytics-label">Errores Hoy</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card-modern mt-3">
+          <h6 class="text-gray-700 mb-3">Acciones Rápidas</h6>
+          <div class="quick-actions">
+            <button class="btn-modern btn-modern-outline w-100 mb-2" id="clearOldLogs">
+              <i class="bi bi-trash me-2"></i>Limpiar Logs Antiguos
+            </button>
+            <button class="btn-modern btn-modern-outline w-100 mb-2" id="exportAnalytics">
+              <i class="bi bi-bar-chart me-2"></i>Exportar Análisis
+            </button>
+            <button class="btn-modern btn-modern-outline w-100" id="systemHealth">
+              <i class="bi bi-heart-pulse me-2"></i>Estado del Sistema
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="logsController.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
