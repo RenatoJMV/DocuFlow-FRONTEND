@@ -486,10 +486,10 @@ class ApiError extends Error {
   }
 }
 
-// Crear instancia del cliente API
+// API Created
 const apiClient = new ApiClient();
 
-// Interceptor de autenticación
+// Auth
 apiClient.addRequestInterceptor((config, endpoint) => {
   const token = localStorage.getItem('token');
   if (token && !config.headers['Authorization']) {
@@ -498,9 +498,9 @@ apiClient.addRequestInterceptor((config, endpoint) => {
   return config;
 });
 
-// Interceptor para manejar respuestas de autenticación
+// Authy Interceptor
 apiClient.addResponseInterceptor((response, config, endpoint) => {
-  // Si recibimos un nuevo token en los headers, guardarlo
+  // Token Save
   const newToken = response.headers.get('x-new-token');
   if (newToken) {
     localStorage.setItem('token', newToken);
@@ -508,14 +508,14 @@ apiClient.addResponseInterceptor((response, config, endpoint) => {
   return response;
 });
 
-// Interceptor para manejar errores de autenticación
+// Error handler
 apiClient.addErrorInterceptor((error, endpoint, options) => {
   if (error.isAuthError && !endpoint.includes('/auth/')) {
     // Token expirado o inválido
     localStorage.removeItem('token');
     store.logout();
     
-    // Redirigir al login solo si no estamos ya ahí
+    // Login Redirect
     if (!window.location.pathname.includes('login.html')) {
       showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
       setTimeout(() => {
