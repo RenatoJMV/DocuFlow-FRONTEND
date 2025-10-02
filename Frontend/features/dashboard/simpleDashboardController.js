@@ -17,13 +17,13 @@ class SimpleDashboardController {
   async testConnection() {
     try {
       console.log('🔗 Probando conexión con backend...');
-      const response = await fetch('http://localhost:8080/health/simple');
+      const response = await docuFlowAPI.health.check();
       
-      if (response.ok) {
-        console.log('✅ Backend conectado correctamente');
+      if (response) {
+        console.log('✅ Backend conectado correctamente:', response);
         showNotification('Conectado al servidor', 'success', 2000);
       } else {
-        console.warn('⚠️ Backend responde con error:', response.status);
+        console.warn('⚠️ Backend responde con error');
         showNotification('Servidor disponible pero con errores', 'warning');
       }
     } catch (error) {
