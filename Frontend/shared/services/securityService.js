@@ -103,14 +103,22 @@ class SecurityService {
   setupXSSProtection() {
     if (!this.config.xssProtection) return;
     
-    // Configurar sanitizadores
+    this.setupInputSanitizers();
+    this.interceptDOMManipulation();
+  }
+
+  setupInputSanitizers() {
+    if (this._sanitizersConfigured) {
+      return;
+    }
+
     this.sanitizers.set('html', this.sanitizeHTML.bind(this));
     this.sanitizers.set('script', this.sanitizeScript.bind(this));
     this.sanitizers.set('url', this.sanitizeURL.bind(this));
     this.sanitizers.set('attribute', this.sanitizeAttribute.bind(this));
-    
-    // Interceptar innerHTML y similares
-    this.interceptDOMManipulation();
+    this.sanitizers.set('text', (value) => typeof value === 'string' ? value.trim() : value);
+
+    this._sanitizersConfigured = true;
   }
 
   sanitizeHTML(input) {
