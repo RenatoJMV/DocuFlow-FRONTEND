@@ -8,7 +8,7 @@ const getAuthToken = () => localStorage.getItem("authToken") || localStorage.get
 // Obtener roles disponibles
 export async function apiGetRoles() {
   try {
-  const response = await apiClient.get('/api/users/roles');
+  const response = await apiClient.get('/users/roles');
     return { 
       success: true, 
       roles: response.roles || response.data || response || [] 
@@ -26,7 +26,7 @@ export async function apiGetRoles() {
 // Cambiar el rol de un usuario
 export async function apiSetUserRole(userId, role) {
   try {
-  await apiClient.put(`/api/users/${userId}/role`, { role });
+  await apiClient.put(`/users/${userId}/role`, { role });
     return { success: true };
   } catch (error) {
     console.error('Error cambiando rol de usuario:', error);
@@ -42,7 +42,7 @@ export async function apiGetUserPermissions(userId) {
   const token = getAuthToken();
   if (!token) return { success: false, permissions: [] };
   try {
-  const response = await fetch(`${BACKEND_URL}/api/users/${userId}/permissions`, {
+  const response = await fetch(`${BACKEND_URL}/users/${userId}/permissions`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -62,7 +62,7 @@ export async function apiSetUserPermissions(userId, permissions) {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-  const response = await fetch(`${BACKEND_URL}/api/users/${userId}/permissions`, {
+  const response = await fetch(`${BACKEND_URL}/users/${userId}/permissions`, {
       method: "PUT",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -83,7 +83,7 @@ export async function apiSetUserPermissions(userId, permissions) {
 // Obtener lista de usuarios
 export async function apiGetUsers() {
   try {
-  const response = await apiClient.get('/api/users');
+  const response = await apiClient.get('/users');
     const users = response.users || response.data || response;
     
     return { 
@@ -120,7 +120,7 @@ export async function apiCreateUser(userData) {
 // Actualizar usuario existente
 export async function apiUpdateUser(userId, userData) {
   try {
-  const response = await apiClient.put(`/api/users/${userId}`, userData);
+  const response = await apiClient.put(`/users/${userId}`, userData);
     return { 
       success: true, 
       user: response.user || response.data || response 
@@ -137,7 +137,7 @@ export async function apiUpdateUser(userId, userData) {
 // Eliminar usuario
 export async function apiDeleteUser(userId) {
   try {
-  await apiClient.delete(`/api/users/${userId}`);
+  await apiClient.delete(`/users/${userId}`);
     return { success: true };
   } catch (error) {
     console.error('Error eliminando usuario:', error);

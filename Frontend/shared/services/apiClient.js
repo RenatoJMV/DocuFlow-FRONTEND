@@ -238,7 +238,7 @@ if (window.location.hostname === 'localhost' || window.location.search.includes(
 
 // 🚀 MÉTODOS ESPECÍFICOS PARA TODOS LOS ENDPOINTS DE DOCUFLOW
 const AUTH_PREFIX = '/auth';
-const API_PREFIX = '/api';
+const API_PREFIX = '';
 const FILES_PREFIX = `${API_PREFIX}/files`;
 const COMMENTS_PREFIX = `${API_PREFIX}/comments`;
 const DASHBOARD_PREFIX = `${API_PREFIX}/dashboard`;

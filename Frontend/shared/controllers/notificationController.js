@@ -30,7 +30,7 @@ class NotificationController {
 
   async loadNotifications() {
     try {
-      const response = await apiClient.get('/api/notifications', {
+  const response = await apiClient.get('/notifications', {
         showErrorNotification: false
       });
 
@@ -119,7 +119,7 @@ class NotificationController {
 
   async createNotification(notificationData) {
     try {
-  const newNotification = await apiClient.post('/api/notifications', notificationData);
+  const newNotification = await apiClient.post('/notifications', notificationData);
       
       if (newNotification) {
         this.notifications.unshift(newNotification);
@@ -135,7 +135,7 @@ class NotificationController {
 
   async deactivateNotification(notificationId) {
     try {
-  await apiClient.put(`/api/notifications/${notificationId}/deactivate`);
+  await apiClient.put(`/notifications/${notificationId}/deactivate`);
       
       this.notifications = this.notifications.filter(n => n.id !== notificationId);
       this.updateNotificationBadge();

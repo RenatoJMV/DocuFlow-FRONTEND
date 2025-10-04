@@ -7,7 +7,7 @@ export async function apiGetCommentsByDocument(documentId) {
   const token = getAuthToken();
   if (!token) return { success: false, comments: [] };
   try {
-    const response = await fetch(`${BACKEND_URL}/api/comments/document/${documentId}`, {
+  const response = await fetch(`${BACKEND_URL}/comments/document/${documentId}`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -27,7 +27,7 @@ export async function apiCreateComment(comment) {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/api/comments`, {
+  const response = await fetch(`${BACKEND_URL}/comments`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -47,7 +47,7 @@ export async function apiEditComment(id, comment) {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/api/comments/${id}`, {
+  const response = await fetch(`${BACKEND_URL}/comments/${id}`, {
       method: "PUT",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -67,7 +67,7 @@ export async function apiAssignUsersToComment(id, assignees) {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/api/comments/${id}/assign`, {
+  const response = await fetch(`${BACKEND_URL}/comments/${id}/assign`, {
       method: "PUT",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -87,7 +87,7 @@ export async function apiDeleteComment(id) {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/api/comments/${id}`, {
+  const response = await fetch(`${BACKEND_URL}/comments/${id}`, {
       method: "DELETE",
       headers: { "Authorization": `Bearer ${token}` }
     });

@@ -177,8 +177,8 @@ class CommentsController {
 
   async loadComments(silent = false) {
     try {
-      console.log('📝 Cargando comentarios desde /api/comments...');
-      const response = await apiClient.get('/api/comments', { showLoading: false, showErrorNotification: false });
+  console.log('📝 Cargando comentarios desde /comments...');
+  const response = await apiClient.get('/comments', { showLoading: false, showErrorNotification: false });
       const comments = this.extractArray(response, ['comments', 'data']);
 
       if (Array.isArray(comments) && comments.length > 0) {
