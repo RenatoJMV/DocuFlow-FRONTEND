@@ -29,11 +29,11 @@
           </div>
         </div>
         <div class="d-flex gap-2">
-          <button class="btn btn-modern btn-outline-modern" onclick="refreshDashboard()">
+          <button class="btn btn-modern btn-outline-modern" type="button" data-dashboard-action="refresh">
             <i class="bi bi-arrow-clockwise"></i>
             Actualizar
           </button>
-          <button class="btn btn-modern btn-primary-modern" onclick="showQuickActions()">
+          <button class="btn btn-modern btn-primary-modern" type="button" data-dashboard-action="show-quick-actions">
             <i class="bi bi-plus-lg"></i>
             Acción Rápida
           </button>
@@ -116,7 +116,7 @@
               <i class="bi bi-heart-pulse text-primary me-2"></i>
               Estado del Sistema
             </h6>
-            <button class="btn btn-sm btn-outline-primary" onclick="showSystemHealth()">
+            <button class="btn btn-sm btn-outline-primary" type="button" data-dashboard-action="show-system-health">
               <i class="bi bi-fullscreen"></i> Ver Detalles
             </button>
           </div>
@@ -141,7 +141,7 @@
             </h6>
             <div class="d-flex gap-2">
               <span class="badge bg-primary" id="dashboard-notification-count">0</span>
-              <button class="btn btn-sm btn-outline-info" onclick="showAllNotifications()">
+              <button class="btn btn-sm btn-outline-info" type="button" data-dashboard-action="show-all-notifications">
                 <i class="bi bi-list"></i> Ver Todas
               </button>
             </div>
@@ -168,13 +168,13 @@
           </div>
           <div class="card-body p-3">
             <div class="d-grid gap-2">
-              <button class="btn btn-outline-primary btn-sm" onclick="refreshDashboard()">
+              <button class="btn btn-outline-primary btn-sm" type="button" data-dashboard-action="refresh">
                 <i class="bi bi-arrow-clockwise me-2"></i>Actualizar Dashboard
               </button>
-              <button class="btn btn-outline-info btn-sm" onclick="exportStats()">
+              <button class="btn btn-outline-info btn-sm" type="button" data-dashboard-action="export-stats">
                 <i class="bi bi-download me-2"></i>Exportar Estadísticas
               </button>
-              <button class="btn btn-outline-warning btn-sm" onclick="cleanupSystem()">
+              <button class="btn btn-outline-warning btn-sm" type="button" data-dashboard-action="cleanup-system">
                 <i class="bi bi-trash me-2"></i>Limpiar Sistema
               </button>
             </div>
@@ -189,11 +189,11 @@
           <div class="table-header d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Actividad Reciente</h5>
             <div class="d-flex gap-2">
-              <button class="btn btn-sm btn-outline-modern" onclick="exportActivity()">
+              <button class="btn btn-sm btn-outline-modern" type="button" data-dashboard-action="export-activity">
                 <i class="bi bi-download"></i>
                 Exportar
               </button>
-              <button class="btn btn-sm btn-outline-modern" onclick="filterActivity()">
+              <button class="btn btn-sm btn-outline-modern" type="button" data-dashboard-action="filter-activity">
                 <i class="bi bi-funnel"></i>
                 Filtrar
               </button>
@@ -272,19 +272,19 @@
         <div class="quick-actions card-modern">
           <h6 class="mb-3"><i class="bi bi-lightning-fill me-2"></i>Acciones Rápidas</h6>
           <div class="d-grid gap-2">
-            <button class="btn btn-modern btn-primary-modern btn-sm" onclick="window.location.href='../files/upload.html'">
+            <button class="btn btn-modern btn-primary-modern btn-sm" type="button" data-navigate="../files/upload.html">
               <i class="bi bi-cloud-upload"></i>
               Subir Archivo
             </button>
-            <button class="btn btn-modern btn-success-modern btn-sm" onclick="window.location.href='../comments/comments.html'">
+            <button class="btn btn-modern btn-success-modern btn-sm" type="button" data-navigate="../comments/comments.html">
               <i class="bi bi-chat-square-text"></i>
               Ver Comentarios
             </button>
-            <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.location.href='../permissions/permissions.html'">
+            <button class="btn btn-modern btn-outline-modern btn-sm" type="button" data-navigate="../permissions/permissions.html">
               <i class="bi bi-shield-check"></i>
               Gestionar Permisos
             </button>
-            <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.location.href='../logs/logs.html'">
+            <button class="btn btn-modern btn-outline-modern btn-sm" type="button" data-navigate="../logs/logs.html">
               <i class="bi bi-list-ul"></i>
               Ver Logs
             </button>

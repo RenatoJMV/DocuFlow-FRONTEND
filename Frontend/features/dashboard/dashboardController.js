@@ -11,6 +11,7 @@ class DashboardController {
     this.unsubscribers = [];
     this.healthController = null;
     this.notificationController = null;
+    this.onDocumentClick = this.onDocumentClick.bind(this);
 
     this.init();
   }
@@ -105,7 +106,7 @@ class DashboardController {
       ] = await Promise.allSettled([
         docuFlowAPI.dashboard.getStats(),
         docuFlowAPI.files.getAll(),
-  apiClient.get('/api/comments', { showLoading: false, showErrorNotification: false }),
+        apiClient.get('/api/comments', { showLoading: false, showErrorNotification: false }),
         docuFlowAPI.logs.getAll()
       ]);
 
@@ -204,16 +205,10 @@ class DashboardController {
         combined.downloadsToday = downloads.length || combined.downloadsToday;
 
         combined.recentActivity = logs
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          .sort((a, b) => new Date(b.timestamp || b.createdAt || Date.now()) - new Date(a.timestamp || a.createdAt || Date.now()))
           .slice(0, 10)
-          .map((log) => ({
-            type: (log.action || 'activity').toLowerCase(),
-            action: this.getLogActionLabel(log.action),
-            user: log.user || log.username || 'Usuario',
-            file: log.file || log.details || 'N/A',
-            timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
-            status: log.status || 'info'
-          }));
+          .map((log) => this.normalizeActivityLog(log))
+          .filter(Boolean);
       }
     }
 
@@ -286,6 +281,45 @@ class DashboardController {
     return labels[action] || action.replace(/_/g, ' ').toLowerCase();
   }
 
+  normalizeActivityLog(log = {}) {
+    const rawAction = (log.action || log.type || '').toString().trim();
+    const upperAction = rawAction.toUpperCase();
+    const actionLabel = this.getLogActionLabel(upperAction || rawAction || 'Actividad');
+
+    const fileName = log.fileName
+      || log.documentName
+      || log.file
+      || (typeof log.details === 'object' ? log.details?.fileName : undefined)
+      || '—';
+
+    const description = typeof log.details === 'string'
+      ? log.details
+      : log.message || log.summary || actionLabel;
+
+    const user = log.user
+      || log.username
+      || log.account
+      || log.performedBy
+      || 'Usuario desconocido';
+
+    const timestamp = log.timestamp
+      || log.createdAt
+      || log.date
+      || new Date().toISOString();
+
+    const status = (log.level || log.status || 'info').toString().toLowerCase();
+
+    return {
+      type: (upperAction || 'ACTIVIDAD').toLowerCase(),
+      actionLabel,
+      description,
+      file: fileName,
+      user,
+      timestamp,
+      status
+    };
+  }
+
   updateWidgets(stats) {
     if (!stats) return;
     // Actualizar valores de widgets principales
@@ -341,27 +375,39 @@ class DashboardController {
       return;
     }
 
-    tbody.innerHTML = activities.map((activity) => `
-      <tr>
-        <td>${activity.file || 'N/A'}</td>
-        <td>
-          <span class="badge bg-${this.getActionColor(activity.type)}">
-            ${activity.action || 'Actividad'}
-          </span>
-        </td>
-        <td>${activity.user || 'Usuario desconocido'}</td>
-        <td>
-          <small class="text-muted">
-            ${formatRelativeTime(activity.timestamp)}
-          </small>
-        </td>
-        <td>
-          <span class="status-${activity.status || 'info'}">
-            ${this.getStatusText(activity.status)}
-          </span>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = activities.map((activity) => {
+      const fileLabel = this.escapeHtml(activity.file || '—');
+      const description = activity.description && activity.description.toLowerCase() !== (activity.file || '').toLowerCase()
+        ? `<small class="text-muted d-block">${this.escapeHtml(activity.description)}</small>`
+        : '';
+      const userLabel = this.escapeHtml(activity.user || 'Usuario desconocido');
+      const statusClass = activity.status || 'info';
+
+      return `
+        <tr>
+          <td>
+            <div class="fw-semibold">${fileLabel}</div>
+            ${description}
+          </td>
+          <td>
+            <span class="badge bg-${this.getActionColor(activity.type)}">
+              ${this.escapeHtml(activity.actionLabel || 'Actividad')}
+            </span>
+          </td>
+          <td>${userLabel}</td>
+          <td>
+            <small class="text-muted">
+              ${formatRelativeTime(activity.timestamp)}
+            </small>
+          </td>
+          <td>
+            <span class="status-${statusClass}">
+              ${this.escapeHtml(this.getStatusText(statusClass))}
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
 
   getActionColor(type) {
@@ -387,6 +433,21 @@ class DashboardController {
     return statusMap[status] || (status ? status.toString() : 'Info');
   }
 
+  escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  escapeCsv(value) {
+    const stringValue = String(value ?? '');
+    const escaped = stringValue.replace(/"/g, '""');
+    return `"${escaped}"`;
+  }
+
   formatNumber(value) {
     if (typeof value !== 'number' || Number.isNaN(value)) return '0';
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -403,14 +464,109 @@ class DashboardController {
   }
 
   setupEventListeners() {
-    // Configurar funciones globales para los botones
-    window.refreshDashboard = () => this.refreshDashboard();
-    window.exportActivity = () => this.exportActivity();
-    window.exportStats = () => this.exportStats();
-    window.cleanupSystem = () => this.cleanupSystem();
-    window.showSystemHealth = () => this.showSystemHealth();
-    window.showQuickActions = () => this.showQuickActions();
-    window.filterActivity = () => this.filterActivity();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('click', this.onDocumentClick);
+    }
+  }
+
+  onDocumentClick(event) {
+    const actionTrigger = event.target.closest('[data-dashboard-action]');
+    if (actionTrigger) {
+      event.preventDefault();
+      const action = actionTrigger.dataset.dashboardAction;
+      if (action) {
+        this.handleDashboardAction(action, actionTrigger)
+          .catch((error) => console.error('Dashboard action error:', error));
+      }
+      return;
+    }
+
+    const navigateTrigger = event.target.closest('[data-navigate]');
+    if (navigateTrigger) {
+      event.preventDefault();
+      this.navigateTo(navigateTrigger.dataset.navigate);
+    }
+  }
+
+  async handleDashboardAction(action, trigger) {
+    switch (action) {
+      case 'refresh':
+        await this.refreshDashboard();
+        break;
+      case 'show-quick-actions':
+        this.showQuickActions();
+        break;
+      case 'show-system-health':
+        this.showSystemHealth();
+        break;
+      case 'show-all-notifications':
+        this.showAllNotifications();
+        break;
+      case 'export-stats':
+        await this.exportStats();
+        break;
+      case 'cleanup-system':
+        await this.cleanupSystem();
+        break;
+      case 'export-activity':
+        this.exportActivity();
+        break;
+      case 'filter-activity':
+        this.filterActivity();
+        break;
+      case 'mark-all-read':
+        this.markAllNotificationsAsRead();
+        break;
+      case 'mark-notification-read': {
+        const id = Number(trigger?.dataset.notificationId);
+        if (!Number.isNaN(id) && this.notificationController) {
+          await this.notificationController.markAsRead(id);
+          this.updateNotificationWidget();
+          await this.loadAllNotifications();
+        }
+        break;
+      }
+      case 'delete-notification': {
+        const id = Number(trigger?.dataset.notificationId);
+        if (!Number.isNaN(id) && this.notificationController) {
+          await this.notificationController.deactivateNotification(id);
+          this.updateNotificationWidget();
+          await this.loadAllNotifications();
+        }
+        break;
+      }
+      default:
+        console.warn(`Acción de dashboard no reconocida: ${action}`);
+    }
+  }
+
+  navigateTo(url) {
+    if (url) {
+      window.location.href = url;
+    }
+  }
+
+  markAllNotificationsAsRead() {
+    if (!this.notificationController) return;
+
+    let unreadFound = false;
+    this.notificationController.notifications.forEach((notification) => {
+      if (!notification.read) {
+        unreadFound = true;
+        this.notificationController.markAsRead(notification.id);
+      }
+    });
+
+    if (unreadFound) {
+      showNotification('Notificaciones marcadas como leídas', 'success', 2000);
+    } else {
+      showNotification('Todas las notificaciones ya estaban leídas', 'info', 2000);
+    }
+
+    this.updateNotificationWidget();
+    this.loadAllNotifications().catch((error) => {
+      console.error('Error recargando notificaciones:', error);
+    });
   }
 
   async refreshDashboard() {
@@ -441,11 +597,17 @@ class DashboardController {
         return;
       }
 
+      const csvHeader = 'Archivo,Acción,Usuario,Fecha,Estado';
+      const csvRows = activities.map((activity) => [
+        activity.file || '—',
+        activity.actionLabel || activity.description || 'Actividad',
+        activity.user || 'Usuario desconocido',
+        formatDate(activity.timestamp),
+        this.getStatusText(activity.status)
+      ].map((value) => this.escapeCsv(value)).join(','));
+
       const csvContent = 'data:text/csv;charset=utf-8,'
-        + 'Archivo,Acción,Usuario,Fecha,Estado\n'
-        + activities.map((activity) => (
-          `"${activity.file}","${activity.action}","${activity.user}","${formatDate(activity.timestamp)}","${this.getStatusText(activity.status)}"`
-        )).join('\n');
+        + [csvHeader, ...csvRows].join('\n');
 
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
@@ -619,7 +781,7 @@ class DashboardController {
             <p class="notification-message-mini mb-0">${this.notificationController.truncateMessage(notification.message, 40)}</p>
           </div>
           ${!notification.read ? `
-            <button class="btn btn-sm btn-link p-0 ms-1" onclick="notificationController.markAsRead(${notification.id})" title="Marcar como leída">
+            <button class="btn btn-sm btn-link p-0 ms-1" type="button" data-dashboard-action="mark-notification-read" data-notification-id="${notification.id}" title="Marcar como leída">
               <i class="bi bi-check2 text-primary"></i>
             </button>` : ''}
         </div>
@@ -650,7 +812,7 @@ class DashboardController {
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-warning" onclick="markAllAsRead()">
+            <button type="button" class="btn btn-outline-warning" data-dashboard-action="mark-all-read">
               <i class="bi bi-check2-all me-2"></i>Marcar todas como leídas
             </button>
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -696,7 +858,7 @@ class DashboardController {
             <div class="notification-content flex-grow-1">
               <div class="d-flex align-items-center gap-2 mb-2">
                 <span class="badge bg-${this.notificationController.getTypeColor(notification.type)}">
-                  ${notification.type}
+                  ${this.escapeHtml(notification.type || 'General')}
                 </span>
                 ${notification.priority > 1 ? `
                   <span class="priority-indicator text-warning">
@@ -705,15 +867,15 @@ class DashboardController {
                 ` : ''}
                 <small class="text-muted">${this.notificationController.formatTimeAgo(notification.createdAt)}</small>
               </div>
-              <h6 class="notification-title mb-2">${notification.title || 'Notificación'}</h6>
-              <p class="notification-message mb-0">${notification.message}</p>
+              <h6 class="notification-title mb-2">${this.escapeHtml(notification.title || 'Notificación')}</h6>
+              <p class="notification-message mb-0">${this.escapeHtml(notification.message || '')}</p>
             </div>
             <div class="notification-actions ms-3">
               ${!notification.read ? `
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="notificationController.markAsRead(${notification.id})" title="Marcar como leída">
+                <button class="btn btn-sm btn-outline-primary me-1" type="button" data-dashboard-action="mark-notification-read" data-notification-id="${notification.id}" title="Marcar como leída">
                   <i class="bi bi-check2"></i>
                 </button>` : ''}
-              <button class="btn btn-sm btn-outline-danger" onclick="notificationController.deactivateNotification(${notification.id})" title="Eliminar">
+              <button class="btn btn-sm btn-outline-danger" type="button" data-dashboard-action="delete-notification" data-notification-id="${notification.id}" title="Eliminar">
                 <i class="bi bi-trash"></i>
               </button>
             </div>
@@ -765,38 +927,17 @@ class DashboardController {
       this.refreshInterval = null;
     }
     
-    // Limpiar funciones globales
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('click', this.onDocumentClick);
+    }
+
+    // Limpiar referencias globales
     if (typeof window !== 'undefined') {
-      delete window.refreshDashboard;
-      delete window.exportActivity;
-      delete window.exportStats;
-      delete window.cleanupSystem;
-      delete window.showSystemHealth;
-      delete window.showAllNotifications;
-      delete window.markAllAsRead;
       delete window.systemHealthController;
       delete window.notificationController;
     }
   }
 }
-
-// Funciones globales
-window.showAllNotifications = function() {
-  if (window.dashboardController) {
-    window.dashboardController.showAllNotifications();
-  }
-};
-
-window.markAllAsRead = function() {
-  if (window.notificationController) {
-    window.notificationController.notifications.forEach((notification) => {
-      if (!notification.read) {
-        window.notificationController.markAsRead(notification.id);
-      }
-    });
-    window.dashboardController?.updateNotificationWidget();
-  }
-};
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
