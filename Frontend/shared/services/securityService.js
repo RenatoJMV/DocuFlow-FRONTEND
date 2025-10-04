@@ -8,6 +8,11 @@ class SecurityService {
     this.sanitizers = new Map();
     this.validators = new Map();
     this.encryptionKey = null;
+
+  // Asegurar el contexto de métodos críticos antes de inicializar
+  this.setupInputSanitizers = this.setupInputSanitizers.bind(this);
+  this.setupXSSProtection = this.setupXSSProtection.bind(this);
+  this.interceptDOMManipulation = this.interceptDOMManipulation.bind(this);
     
     // Configuración de seguridad
     this.config = {
