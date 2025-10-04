@@ -12,6 +12,8 @@ class ApiClient {
       response: [],
       error: []
     };
+    this.activeRequests = 0;
+    this.loadingTimer = null;
     
     // Configuración por defecto
     this.defaults = {
@@ -64,16 +66,14 @@ class ApiClient {
       }
     }
 
+    const shouldShowLoader = config.showLoading !== false;
+
     try {
-      if (config.showLoading !== false) {
-        showLoading(true);
+      if (shouldShowLoader) {
+        this.incrementLoader();
       }
 
       const response = await fetch(url, config);
-      
-      if (config.showLoading !== false) {
-        showLoading(false);
-      }
 
       // Aplicar interceptores de response
       for (const interceptor of this.interceptors.response) {
@@ -108,10 +108,6 @@ class ApiClient {
       return response.text();
 
     } catch (error) {
-      if (config.showLoading !== false) {
-        showLoading(false);
-      }
-
       // Aplicar interceptores de error
       for (const interceptor of this.interceptors.error) {
         try {
@@ -128,6 +124,36 @@ class ApiClient {
       }
 
       throw error;
+    } finally {
+      if (shouldShowLoader) {
+        this.decrementLoader();
+      }
+    }
+  }
+
+  incrementLoader() {
+    this.activeRequests += 1;
+    if (this.activeRequests === 1) {
+      this.loadingTimer = setTimeout(() => {
+        showLoading(true);
+        this.loadingTimer = null;
+      }, 180);
+    }
+  }
+
+  decrementLoader() {
+    if (this.activeRequests === 0) {
+      return;
+    }
+
+    this.activeRequests = Math.max(0, this.activeRequests - 1);
+
+    if (this.activeRequests === 0) {
+      if (this.loadingTimer) {
+        clearTimeout(this.loadingTimer);
+        this.loadingTimer = null;
+      }
+      showLoading(false);
     }
   }
 

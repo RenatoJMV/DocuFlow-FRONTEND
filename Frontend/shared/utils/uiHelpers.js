@@ -102,7 +102,7 @@ export function createNavbar(currentPage = '') {
             
             <!-- Widget de Estado del Sistema -->
             <div class="nav-item">
-              <a class="nav-link position-relative d-flex align-items-center" href="#" onclick="showSystemHealth()" title="Estado del sistema">
+              <a class="nav-link position-relative d-flex align-items-center" href="#" data-nav-action="show-system-health" title="Estado del sistema">
                 <i class="bi bi-heart-pulse"></i>
                 <span class="status-dot status-down" id="system-status-indicator"></span>
               </a>
@@ -135,7 +135,7 @@ export function createNavbar(currentPage = '') {
                 <li><a class="dropdown-item" href="../profile/profile.html"><i class="bi bi-person me-2"></i>Perfil</a></li>
                 <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Configuración</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger" href="#" onclick="logout()"><i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión</a></li>
+                <li><a class="dropdown-item text-danger" href="#" data-nav-action="logout"><i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión</a></li>
               </ul>
             </div>
           </div>
@@ -165,8 +165,36 @@ function createNavItem(page, title, icon, currentPage) {
   `;
 }
 
-// Función de logout global
-window.logout = async function() {
+function bindNavbarEvents(root) {
+  if (!root || root.dataset.navEventsBound === 'true') return;
+
+  root.addEventListener('click', async (event) => {
+    const trigger = event.target.closest('[data-nav-action]');
+    if (!trigger) return;
+
+    event.preventDefault();
+    const action = trigger.dataset.navAction;
+
+    switch (action) {
+      case 'logout':
+        await handleLogout();
+        break;
+      case 'show-system-health':
+        if (window.systemHealthController?.showHealthModal) {
+          window.systemHealthController.showHealthModal();
+        } else {
+          showNotification('Sistema de monitoreo no disponible', 'warning');
+        }
+        break;
+      default:
+        console.warn(`Acción de navbar no reconocida: ${action}`);
+    }
+  }, true);
+
+  root.dataset.navEventsBound = 'true';
+}
+
+async function handleLogout() {
   showNotification('Cerrando sesión...', 'info', 1000);
   try {
     const { authService } = await import('../services/authService.js');
@@ -178,19 +206,26 @@ window.logout = async function() {
       window.location.href = '../auth/login.html';
     }, 600);
   }
-};
+
+  return null;
+}
+
+// Función de logout global (compatibilidad con handlers antiguos)
+window.logout = handleLogout;
 
 // Función para inicializar navbar en una página
 export function initializeNavbar(currentPage) {
   const navbarContainer = document.getElementById('navbar-container');
   if (navbarContainer) {
     navbarContainer.innerHTML = createNavbar(currentPage);
+    bindNavbarEvents(navbarContainer);
   } else {
     // Si no existe el contenedor, lo creamos después del body
     const navbar = document.createElement('div');
     navbar.id = 'navbar-container';
     navbar.innerHTML = createNavbar(currentPage);
     document.body.insertBefore(navbar, document.body.firstChild);
+    bindNavbarEvents(navbar);
   }
 }
 

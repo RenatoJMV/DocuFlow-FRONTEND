@@ -364,50 +364,64 @@ class DashboardController {
     const tbody = document.getElementById('activity-table');
     if (!tbody) return;
 
+    tbody.innerHTML = '';
+
     if (!Array.isArray(activities) || activities.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="5" class="text-center text-muted py-4">
-            <p>Sin actividad reciente</p>
-          </td>
-        </tr>
-      `;
+      const emptyRow = document.createElement('tr');
+      const emptyCell = document.createElement('td');
+      emptyCell.colSpan = 5;
+      emptyCell.className = 'text-center text-muted py-4';
+      emptyCell.innerHTML = '<p>Sin actividad reciente</p>';
+      emptyRow.appendChild(emptyCell);
+      tbody.appendChild(emptyRow);
       return;
     }
 
-    tbody.innerHTML = activities.map((activity) => {
-      const fileLabel = this.escapeHtml(activity.file || '—');
-      const description = activity.description && activity.description.toLowerCase() !== (activity.file || '').toLowerCase()
-        ? `<small class="text-muted d-block">${this.escapeHtml(activity.description)}</small>`
-        : '';
-      const userLabel = this.escapeHtml(activity.user || 'Usuario desconocido');
-      const statusClass = activity.status || 'info';
+    const fragment = document.createDocumentFragment();
 
-      return `
-        <tr>
-          <td>
-            <div class="fw-semibold">${fileLabel}</div>
-            ${description}
-          </td>
-          <td>
-            <span class="badge bg-${this.getActionColor(activity.type)}">
-              ${this.escapeHtml(activity.actionLabel || 'Actividad')}
-            </span>
-          </td>
-          <td>${userLabel}</td>
-          <td>
-            <small class="text-muted">
-              ${formatRelativeTime(activity.timestamp)}
-            </small>
-          </td>
-          <td>
-            <span class="status-${statusClass}">
-              ${this.escapeHtml(this.getStatusText(statusClass))}
-            </span>
-          </td>
-        </tr>
-      `;
-    }).join('');
+    activities.forEach((activity) => {
+      const row = document.createElement('tr');
+
+      const fileCell = document.createElement('td');
+      const fileTitle = document.createElement('div');
+      fileTitle.className = 'fw-semibold';
+      fileTitle.textContent = activity.file || '—';
+      fileCell.appendChild(fileTitle);
+
+      if (activity.description && activity.description.toLowerCase() !== (activity.file || '').toLowerCase()) {
+        const description = document.createElement('small');
+        description.className = 'text-muted d-block';
+        description.textContent = activity.description;
+        fileCell.appendChild(description);
+      }
+
+      const actionCell = document.createElement('td');
+      const actionBadge = document.createElement('span');
+      actionBadge.className = `badge bg-${this.getActionColor(activity.type)}`;
+      actionBadge.textContent = activity.actionLabel || 'Actividad';
+      actionCell.appendChild(actionBadge);
+
+      const userCell = document.createElement('td');
+      userCell.textContent = activity.user || 'Usuario desconocido';
+
+      const timeCell = document.createElement('td');
+      const timeText = document.createElement('small');
+      timeText.className = 'text-muted';
+      timeText.textContent = formatRelativeTime(activity.timestamp);
+      timeCell.appendChild(timeText);
+
+      const statusCell = document.createElement('td');
+      const statusClass = activity.status || 'info';
+      const statusText = document.createElement('span');
+      statusText.className = `status-${statusClass}`;
+      statusText.textContent = this.getStatusText(statusClass);
+      statusCell.appendChild(statusText);
+
+      row.append(fileCell, actionCell, userCell, timeCell, statusCell);
+      fragment.appendChild(row);
+    });
+
+    tbody.appendChild(fragment);
   }
 
   getActionColor(type) {

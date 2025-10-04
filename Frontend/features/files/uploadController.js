@@ -10,6 +10,7 @@ class UploadController {
     this.itemsPerPage = 10;
     this.allFiles = [];
     this.filteredFiles = [];
+    this.boundDocumentClick = this.handleDocumentClick.bind(this);
     this.pagination = new Pagination('paginationContainer', {
       itemsPerPage: this.itemsPerPage,
       onPageChange: (page) => {
@@ -19,6 +20,7 @@ class UploadController {
       }
     });
     this.itemsPerPage = this.pagination.getItemsPerPage();
+    document.addEventListener('click', this.boundDocumentClick, true);
     
     this.initializeComponents();
     this.setupEventListeners();
@@ -118,23 +120,35 @@ class UploadController {
     this.selectedFiles.forEach((file, index) => {
       const fileElement = document.createElement('div');
       fileElement.className = 'file-item';
-      
+
       const fileIcon = this.getFileIcon(file.type);
       const fileSize = this.formatFileSize(file.size);
-      
-      fileElement.innerHTML = `
-        <div class="file-info">
-          <div class="file-icon ${fileIcon.class}">${fileIcon.icon}</div>
-          <div class="file-details">
-            <h6>${file.name}</h6>
-            <small>${fileSize}</small>
-          </div>
-        </div>
-        <button class="file-remove" onclick="uploadController.removeFile(${index})">
-          <i class="bi bi-x"></i>
-        </button>
-      `;
-      
+
+      const info = document.createElement('div');
+      info.className = 'file-info';
+
+      const iconWrapper = document.createElement('div');
+      iconWrapper.className = `file-icon ${fileIcon.class}`;
+      iconWrapper.innerHTML = fileIcon.icon;
+
+      const details = document.createElement('div');
+      details.className = 'file-details';
+      const title = document.createElement('h6');
+      title.textContent = file.name;
+      const size = document.createElement('small');
+      size.textContent = fileSize;
+      details.append(title, size);
+
+      info.append(iconWrapper, details);
+
+      const removeButton = document.createElement('button');
+      removeButton.className = 'file-remove';
+      removeButton.type = 'button';
+      removeButton.dataset.uploadAction = 'remove-selected';
+      removeButton.dataset.index = String(index);
+      removeButton.innerHTML = '<i class="bi bi-x"></i>';
+
+      fileElement.append(info, removeButton);
       container.appendChild(fileElement);
     });
   }
@@ -381,33 +395,66 @@ class UploadController {
 
     files.forEach(file => {
       const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>
-          <input type="checkbox" class="form-check-input file-checkbox" data-file-id="${file.id}">
-        </td>
-        <td>
-          <div class="file-name">
-            <i class="${this.getFileIconClass(file.filename)}"></i>
-            <span>${file.filename}</span>
-          </div>
-        </td>
-        <td>${this.formatFileSize(file.size || 0)}</td>
-        <td>${new Date(file.uploadDate || Date.now()).toLocaleDateString()}</td>
-        <td>${file.uploader || 'Usuario'}</td>
-        <td>
-          <div class="file-actions">
-            <button class="action-btn download" onclick="uploadController.downloadFile('${file.id}', '${file.filename}')" title="Descargar">
-              <i class="bi bi-download"></i>
-            </button>
-            <button class="action-btn preview" onclick="uploadController.previewFile('${file.id}')" title="Vista previa">
-              <i class="bi bi-eye"></i>
-            </button>
-            <button class="action-btn delete" onclick="uploadController.deleteFile('${file.id}')" title="Eliminar">
-              <i class="bi bi-trash"></i>
-            </button>
-          </div>
-        </td>
-      `;
+
+      const selectCell = document.createElement('td');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'form-check-input file-checkbox';
+      checkbox.dataset.fileId = file.id;
+      selectCell.appendChild(checkbox);
+
+      const nameCell = document.createElement('td');
+      const nameWrapper = document.createElement('div');
+      nameWrapper.className = 'file-name';
+      const icon = document.createElement('i');
+      icon.className = this.getFileIconClass(file.filename);
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = file.filename;
+      nameWrapper.append(icon, nameSpan);
+      nameCell.appendChild(nameWrapper);
+
+      const sizeCell = document.createElement('td');
+      sizeCell.textContent = this.formatFileSize(file.size || 0);
+
+      const dateCell = document.createElement('td');
+      dateCell.textContent = new Date(file.uploadDate || Date.now()).toLocaleDateString();
+
+      const uploaderCell = document.createElement('td');
+      uploaderCell.textContent = file.uploader || 'Usuario';
+
+      const actionsCell = document.createElement('td');
+      const actionsWrapper = document.createElement('div');
+      actionsWrapper.className = 'file-actions';
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.type = 'button';
+      downloadBtn.className = 'action-btn download';
+      downloadBtn.title = 'Descargar';
+      downloadBtn.dataset.uploadAction = 'download';
+      downloadBtn.dataset.fileId = file.id;
+      downloadBtn.dataset.fileName = file.filename;
+      downloadBtn.innerHTML = '<i class="bi bi-download"></i>';
+
+      const previewBtn = document.createElement('button');
+      previewBtn.type = 'button';
+      previewBtn.className = 'action-btn preview';
+      previewBtn.title = 'Vista previa';
+      previewBtn.dataset.uploadAction = 'preview';
+      previewBtn.dataset.fileId = file.id;
+      previewBtn.innerHTML = '<i class="bi bi-eye"></i>';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'action-btn delete';
+      deleteBtn.title = 'Eliminar';
+      deleteBtn.dataset.uploadAction = 'delete';
+      deleteBtn.dataset.fileId = file.id;
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+
+      actionsWrapper.append(downloadBtn, previewBtn, deleteBtn);
+      actionsCell.appendChild(actionsWrapper);
+
+      row.append(selectCell, nameCell, sizeCell, dateCell, uploaderCell, actionsCell);
       tbody.appendChild(row);
     });
   }
@@ -441,36 +488,110 @@ class UploadController {
     }
 
     files.forEach(file => {
+      const cardColumn = document.createElement('div');
+      cardColumn.className = 'col-md-6 col-xl-4 mb-3';
+
       const card = document.createElement('div');
-      card.className = 'col-md-6 col-xl-4 mb-3';
-      card.innerHTML = `
-        <div class="file-card card-modern h-100">
-          <div class="file-card-header d-flex align-items-center gap-2">
-            <i class="${this.getFileIconClass(file.filename)}"></i>
-            <div class="file-card-title">
-              <h6 class="mb-0">${file.filename}</h6>
-              <small class="text-muted">${this.formatFileSize(file.size || 0)}</small>
-            </div>
-          </div>
-          <div class="file-card-body">
-            <p class="mb-1"><i class="bi bi-person me-2"></i>${file.uploader || 'Usuario'}</p>
-            <p class="mb-1"><i class="bi bi-calendar me-2"></i>${new Date(file.uploadDate || Date.now()).toLocaleDateString()}</p>
-          </div>
-          <div class="file-card-actions d-flex gap-2">
-            <button class="btn btn-sm btn-outline-modern flex-fill" onclick="uploadController.downloadFile('${file.id}', '${file.filename}')">
-              <i class="bi bi-download"></i> Descargar
-            </button>
-            <button class="btn btn-sm btn-outline-modern flex-fill" onclick="uploadController.previewFile('${file.id}')">
-              <i class="bi bi-eye"></i> Vista previa
-            </button>
-            <button class="btn btn-sm btn-outline-danger flex-fill" onclick="uploadController.deleteFile('${file.id}')">
-              <i class="bi bi-trash"></i> Eliminar
-            </button>
-          </div>
-        </div>
-      `;
-      grid.appendChild(card);
+      card.className = 'file-card card-modern h-100';
+
+      const header = document.createElement('div');
+      header.className = 'file-card-header d-flex align-items-center gap-2';
+      const icon = document.createElement('i');
+      icon.className = this.getFileIconClass(file.filename);
+      const titleWrapper = document.createElement('div');
+      titleWrapper.className = 'file-card-title';
+      const title = document.createElement('h6');
+      title.className = 'mb-0';
+      title.textContent = file.filename;
+      const size = document.createElement('small');
+      size.className = 'text-muted';
+      size.textContent = this.formatFileSize(file.size || 0);
+      titleWrapper.append(title, size);
+      header.append(icon, titleWrapper);
+
+      const body = document.createElement('div');
+      body.className = 'file-card-body';
+      const uploader = document.createElement('p');
+      uploader.className = 'mb-1';
+      uploader.innerHTML = `<i class="bi bi-person me-2"></i>${file.uploader || 'Usuario'}`;
+      const date = document.createElement('p');
+      date.className = 'mb-1';
+      date.innerHTML = `<i class="bi bi-calendar me-2"></i>${new Date(file.uploadDate || Date.now()).toLocaleDateString()}`;
+      body.append(uploader, date);
+
+      const actions = document.createElement('div');
+      actions.className = 'file-card-actions d-flex gap-2';
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.type = 'button';
+      downloadBtn.className = 'btn btn-sm btn-outline-modern flex-fill';
+      downloadBtn.dataset.uploadAction = 'download';
+      downloadBtn.dataset.fileId = file.id;
+      downloadBtn.dataset.fileName = file.filename;
+      downloadBtn.innerHTML = '<i class="bi bi-download"></i> Descargar';
+
+      const previewBtn = document.createElement('button');
+      previewBtn.type = 'button';
+      previewBtn.className = 'btn btn-sm btn-outline-modern flex-fill';
+      previewBtn.dataset.uploadAction = 'preview';
+      previewBtn.dataset.fileId = file.id;
+      previewBtn.innerHTML = '<i class="bi bi-eye"></i> Vista previa';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn btn-sm btn-outline-danger flex-fill';
+      deleteBtn.dataset.uploadAction = 'delete';
+      deleteBtn.dataset.fileId = file.id;
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i> Eliminar';
+
+      actions.append(downloadBtn, previewBtn, deleteBtn);
+
+      card.append(header, body, actions);
+      cardColumn.appendChild(card);
+      grid.appendChild(cardColumn);
     });
+  }
+
+  handleDocumentClick(event) {
+    const trigger = event.target.closest('[data-upload-action]');
+    if (!trigger) return;
+
+    const action = trigger.dataset.uploadAction;
+    const fileId = trigger.dataset.fileId;
+    const fileName = trigger.dataset.fileName;
+
+    switch (action) {
+      case 'remove-selected': {
+        const index = Number(trigger.dataset.index);
+        if (!Number.isNaN(index)) {
+          this.removeFile(index);
+        }
+        break;
+      }
+      case 'download':
+        if (fileId) {
+          this.downloadFile(fileId, fileName);
+        }
+        break;
+      case 'preview':
+        if (fileId) {
+          this.previewFile(fileId);
+        }
+        break;
+      case 'delete':
+        if (fileId) {
+          this.deleteFile(fileId);
+        }
+        break;
+      case 'cleanup-orphans':
+        this.cleanupOrphanedFiles();
+        break;
+      case 'update-stats':
+        this.updateStats();
+        break;
+      default:
+        break;
+    }
   }
 
   getFileIconClass(filename) {
@@ -845,7 +966,7 @@ class UploadController {
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-            <button type="button" class="btn btn-warning" onclick="uploadController.cleanupOrphanedFiles()">
+            <button type="button" class="btn btn-warning" data-upload-action="cleanup-orphans">
               <i class="bi bi-trash me-2"></i>Limpiar Archivos Huérfanos
             </button>
           </div>
@@ -989,12 +1110,11 @@ class UploadController {
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
               ${orphans.length > 0 ? `
-                <button type="button" class="btn btn-warning" 
-                        onclick="uploadController.showOrphanedFilesModal(${JSON.stringify(orphans).replace(/"/g, '&quot;')})">
+                <button type="button" class="btn btn-warning" id="view-orphaned-files-btn">
                   <i class="bi bi-search me-2"></i>Ver Archivos Huérfanos
                 </button>
               ` : ''}
-              <button type="button" class="btn btn-primary" onclick="uploadController.updateStats()">
+              <button type="button" class="btn btn-primary" data-upload-action="update-stats">
                 <i class="bi bi-arrow-clockwise me-2"></i>Actualizar
               </button>
             </div>
@@ -1005,6 +1125,11 @@ class UploadController {
       document.body.appendChild(modal);
       const bsModal = new bootstrap.Modal(modal);
       bsModal.show();
+
+      const viewOrphansBtn = modal.querySelector('#view-orphaned-files-btn');
+      if (viewOrphansBtn) {
+        viewOrphansBtn.addEventListener('click', () => this.showOrphanedFilesModal(orphans));
+      }
       
       modal.addEventListener('hidden.bs.modal', () => {
         modal.remove();
@@ -1116,4 +1241,7 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadAllSelected: () => uploadController.downloadAllSelected(),
     showFileStatsModal: () => uploadController.showFileStatsModal()
   };
+  window.addEventListener('beforeunload', () => {
+    document.removeEventListener('click', uploadController.boundDocumentClick, true);
+  });
 });
