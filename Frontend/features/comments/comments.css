@@ -9,6 +9,17 @@
 /* Header específico */
 .comments-header {
   padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+}
+
+.comments-container .row > [class*='col-'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.comments-container .row > [class*='col-'] > * {
+  width: 100%;
 }
 
 .header-icon {

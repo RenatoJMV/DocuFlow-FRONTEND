@@ -232,11 +232,6 @@ class CommentsController {
     };
   }
 
-  getDemoComments() {
-    console.warn('getDemoComments ha sido deshabilitado. Asegúrate de que el backend proporcione datos reales.');
-    return [];
-  }
-
   filterComments() {
     const searchTerm = document.getElementById('searchComments')?.value.toLowerCase() || '';
 

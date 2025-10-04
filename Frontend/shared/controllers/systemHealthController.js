@@ -1,23 +1,57 @@
 // Controlador de monitoreo de salud del sistema
-import { apiClient } from '../../shared/services/apiClient.js';
-import { showNotification } from '../../shared/utils/uiHelpers.js';
+import apiClient from '../services/apiClient.js';
+import { showNotification } from '../utils/uiHelpers.js';
+
+let systemHealthControllerInstance = null;
 
 class SystemHealthController {
   constructor() {
+    if (systemHealthControllerInstance) {
+      return systemHealthControllerInstance;
+    }
+
     this.healthData = null;
     this.refreshInterval = null;
     this.isMonitoring = false;
+    this._initialized = false;
+    this._initializingPromise = null;
+
+    systemHealthControllerInstance = this;
+
+    if (typeof window !== 'undefined') {
+      window.systemHealthController = this;
+    }
   }
 
   async init() {
-    try {
-      await this.loadSystemHealth();
-      this.startAutoRefresh();
-      this.setupHealthIndicators();
-      console.log('✅ Sistema de monitoreo de salud iniciado');
-    } catch (error) {
-      console.error('❌ Error inicializando monitoreo de salud:', error);
+    if (this._initialized) {
+      if (!this.isMonitoring) {
+        this.startAutoRefresh();
+      }
+      return this.healthData;
     }
+
+    if (this._initializingPromise) {
+      return this._initializingPromise;
+    }
+
+    this._initializingPromise = (async () => {
+      try {
+        await this.loadSystemHealth();
+        this.startAutoRefresh();
+        this.setupHealthIndicators();
+        this._initialized = true;
+        console.log('✅ Sistema de monitoreo de salud iniciado');
+      } catch (error) {
+        console.error('❌ Error inicializando monitoreo de salud:', error);
+        throw error;
+      } finally {
+        this._initializingPromise = null;
+      }
+      return this.healthData;
+    })();
+
+    return this._initializingPromise;
   }
 
   async loadSystemHealth() {
@@ -49,6 +83,8 @@ class SystemHealthController {
       this.updateHealthDisplay();
       console.log('📊 Estado del sistema actualizado:', this.healthData);
 
+      return this.healthData;
+
     } catch (error) {
       console.error('❌ Error obteniendo estado del sistema:', error);
       this.healthData = {
@@ -58,6 +94,7 @@ class SystemHealthController {
         overallStatus: 'DOWN'
       };
       this.updateHealthDisplay();
+      return this.healthData;
     }
   }
 
@@ -361,20 +398,26 @@ class SystemHealthController {
     console.log('⏹️ Monitoreo automático detenido');
   }
 
-  showHealthModal() {
-    // Crear modal si no existe
+  async showHealthModal() {
+    const bootstrapLib = (typeof window !== 'undefined') ? window.bootstrap : null;
+
+    if (!bootstrapLib?.Modal) {
+      console.warn('⚠️ Bootstrap Modal no disponible en el contexto actual');
+      showNotification('No se pudo abrir el monitor del sistema (Bootstrap no disponible)', 'warning');
+      return;
+    }
+
     let modal = document.getElementById('system-health-modal');
     if (!modal) {
       modal = this.createHealthModal();
       document.body.appendChild(modal);
     }
-    
-    // Actualizar contenido
+
+    await this.loadSystemHealth();
     this.updateHealthModal();
-    
-    // Mostrar modal
-    const bsModal = new bootstrap.Modal(modal);
-    bsModal.show();
+
+    const modalInstance = bootstrapLib.Modal.getOrCreateInstance(modal);
+    modalInstance.show();
   }
 
   createHealthModal() {
@@ -402,13 +445,21 @@ class SystemHealthController {
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
               Cerrar
             </button>
-            <button type="button" class="btn btn-primary" onclick="systemHealthController.loadSystemHealth()">
+            <button type="button" class="btn btn-primary" data-health-action="refresh">
               <i class="bi bi-arrow-clockwise"></i> Actualizar
             </button>
           </div>
         </div>
       </div>
     `;
+
+    const refreshButton = modal.querySelector('[data-health-action="refresh"]');
+    if (refreshButton) {
+      refreshButton.addEventListener('click', () => {
+        this.loadSystemHealth();
+      });
+    }
+
     return modal;
   }
 
@@ -418,20 +469,43 @@ class SystemHealthController {
     if (modal) {
       modal.remove();
     }
+    this._initialized = false;
+    this._initializingPromise = null;
+
+    if (systemHealthControllerInstance === this) {
+      systemHealthControllerInstance = null;
+      if (typeof window !== 'undefined' && window.systemHealthController === this) {
+        delete window.systemHealthController;
+      }
+    }
+
     console.log('🗑️ SystemHealthController destruido');
   }
 }
 
-// Instancia global
-let systemHealthController = null;
+export async function getSystemHealthController({ refresh = false } = {}) {
+  const controller = systemHealthControllerInstance || new SystemHealthController();
+  await controller.init();
 
-// Función global para mostrar el modal
-window.showSystemHealth = function() {
-  if (systemHealthController) {
-    systemHealthController.showHealthModal();
-  } else {
-    showNotification('Sistema de monitoreo no disponible', 'warning');
+  if (refresh) {
+    await controller.loadSystemHealth();
   }
-};
+
+  return controller;
+}
+
+export async function openSystemHealthModal() {
+  try {
+    const controller = await getSystemHealthController();
+    await controller.showHealthModal();
+  } catch (error) {
+    console.error('❌ No se pudo abrir el monitor del sistema:', error);
+    showNotification('No se pudo abrir el monitor del sistema', 'error');
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.showSystemHealth = openSystemHealthModal;
+}
 
 export { SystemHealthController };

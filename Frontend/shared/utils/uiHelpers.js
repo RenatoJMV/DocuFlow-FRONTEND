@@ -180,10 +180,13 @@ function bindNavbarEvents(root) {
         await handleLogout();
         break;
       case 'show-system-health':
-        if (window.systemHealthController?.showHealthModal) {
-          window.systemHealthController.showHealthModal();
-        } else {
-          showNotification('Sistema de monitoreo no disponible', 'warning');
+        {
+          const controller = await ensureSystemHealthController();
+          if (controller?.showHealthModal) {
+            await controller.showHealthModal();
+          } else {
+            showNotification('Sistema de monitoreo no disponible', 'warning');
+          }
         }
         break;
       default:
@@ -192,6 +195,34 @@ function bindNavbarEvents(root) {
   }, true);
 
   root.dataset.navEventsBound = 'true';
+}
+
+async function ensureSystemHealthController(forceRefresh = false) {
+  try {
+    if (window.systemHealthController?.showHealthModal) {
+      if (forceRefresh && typeof window.systemHealthController.loadSystemHealth === 'function') {
+        await window.systemHealthController.loadSystemHealth();
+      } else if (typeof window.systemHealthController.init === 'function') {
+        await window.systemHealthController.init();
+      }
+      return window.systemHealthController;
+    }
+
+    const module = await import('../controllers/systemHealthController.js');
+
+    if (typeof module.getSystemHealthController === 'function') {
+      return await module.getSystemHealthController({ refresh: forceRefresh });
+    }
+
+    const controller = new module.SystemHealthController();
+    if (typeof controller.init === 'function') {
+      await controller.init();
+    }
+    return controller;
+  } catch (error) {
+    console.error('Error asegurando monitor del sistema:', error);
+    return null;
+  }
 }
 
 async function handleLogout() {

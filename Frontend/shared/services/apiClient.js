@@ -369,6 +369,33 @@ const docuFlowAPI = {
     download: (fileName) => apiClient.get(`${GCS_PREFIX}/download/${fileName}`, { responseType: 'blob' }),
     delete: (fileName) => apiClient.delete(`${GCS_PREFIX}/delete/${fileName}`),
     list: () => apiClient.get(`${GCS_PREFIX}/list`),
+    getStats: () => apiClient.get(`${GCS_PREFIX}/stats`, {
+      showErrorNotification: false
+    }),
+    getOrphanedFiles: async () => {
+      try {
+        return await apiClient.get(`${GCS_PREFIX}/orphaned-files`);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          return apiClient.get(`${GCS_PREFIX}/files/orphaned`);
+        }
+        throw error;
+      }
+    },
+    cleanupOrphaned: async (fileIds = []) => {
+      try {
+        return await apiClient.post(`${GCS_PREFIX}/cleanup-orphaned`, { fileIds }, {
+          successMessage: 'Archivos huérfanos limpiados exitosamente'
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          return apiClient.post(`${GCS_PREFIX}/files/cleanup`, { fileIds }, {
+            successMessage: 'Archivos huérfanos limpiados exitosamente'
+          });
+        }
+        throw error;
+      }
+    },
     getOrphaned: () => apiClient.get(`${GCS_PREFIX}/files/orphaned`)
   },
 

@@ -510,7 +510,7 @@ class DashboardController {
         this.showQuickActions();
         break;
       case 'show-system-health':
-        this.showSystemHealth();
+        await this.showSystemHealth();
         break;
       case 'show-all-notifications':
         this.showAllNotifications();
@@ -683,11 +683,18 @@ class DashboardController {
     }
   }
 
-  showSystemHealth() {
-    if (this.healthController) {
-      this.healthController.showHealthModal();
-    } else {
+  async showSystemHealth() {
+    if (!this.healthController) {
       showNotification('Sistema de monitoreo no disponible', 'warning');
+      return;
+    }
+
+    try {
+      await this.healthController.init();
+      await this.healthController.showHealthModal();
+    } catch (error) {
+      console.error('Error mostrando estado del sistema:', error);
+      showNotification('No se pudo mostrar el estado del sistema', 'error');
     }
   }
 

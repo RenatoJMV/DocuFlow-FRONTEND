@@ -209,11 +209,6 @@ class LogsController {
     return actionLevelMap[action] || 'info';
   }
 
-  getDemoLogs() {
-    console.warn('getDemoLogs ha sido deshabilitado. Asegúrate de que el backend proporcione datos reales.');
-    return [];
-  }
-
   generateLogDetails(action) {
     const details = {
       login: 'Usuario inició sesión exitosamente',
