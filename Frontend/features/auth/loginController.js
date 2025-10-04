@@ -121,13 +121,21 @@ class LoginController {
           window.location.href = '../dashboard/dashboard.html';
         }, 800);
       } else {
-        const errorMessage = loginResult?.error || loginResult?.data?.message || 'Credenciales inválidas';
-        throw new Error(errorMessage);
+        let errorMessage = loginResult?.error || loginResult?.data?.message || 'Credenciales inválidas';
+        if (/401/.test(errorMessage) || loginResult?.status === 401) {
+          errorMessage = 'Credenciales inválidas. Verifica tu usuario y contraseña.';
+        }
+        const enrichedError = new Error(errorMessage);
+        enrichedError.status = loginResult?.status || 401;
+        throw enrichedError;
       }
 
     } catch (error) {
       console.error('Login error:', error);
-      showNotification(error.message || 'Error al iniciar sesión', 'error');
+      const message = (error?.status === 401)
+        ? 'Credenciales inválidas. Verifica tu usuario y contraseña.'
+        : error?.message || 'Error al iniciar sesión';
+      showNotification(message, 'error');
     } finally {
       // Restore button state
       this.setButtonLoading(false);

@@ -128,14 +128,57 @@ class SecurityService {
 
   sanitizeHTML(input) {
     if (typeof input !== 'string') return '';
-    
-    const tempDiv = document.createElement('div');
-    tempDiv.textContent = input;
-    return tempDiv.innerHTML
-      .replace(/&lt;script\b[^&lt;]*(?:(?!&lt;\/script&gt;)&lt;[^&lt;]*)*&lt;\/script&gt;/gi, '')
-      .replace(/javascript:/gi, '')
-      .replace(/on\w+\s*=/gi, '')
-      .replace(/data:text\/html/gi, 'data:text/plain');
+
+    const container = document.createElement('div');
+    const originalDescriptor = this._originalInnerHTMLDescriptor;
+
+    try {
+      if (originalDescriptor?.set) {
+        originalDescriptor.set.call(container, input);
+      } else {
+        container.innerHTML = input;
+      }
+    } catch (error) {
+      console.warn('No se pudo aplicar sanitización estructural, degradando a texto plano.', error);
+      return input.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    const blockedSelectors = 'script, iframe, object, embed, link[rel="import"], style';
+    container.querySelectorAll(blockedSelectors).forEach((el) => el.remove());
+
+    const dangerousAttrNames = new Set(['src', 'href', 'xlink:href', 'formaction', 'action']);
+
+    container.querySelectorAll('*').forEach((element) => {
+      [...element.attributes].forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        const value = attr.value;
+
+        if (name.startsWith('on')) {
+          element.removeAttribute(attr.name);
+          return;
+        }
+
+        if (dangerousAttrNames.has(name) && /^javascript:/i.test(value)) {
+          element.setAttribute(attr.name, '#');
+          return;
+        }
+
+        if (name === 'style') {
+          element.removeAttribute(attr.name);
+          return;
+        }
+
+        if (/^data:text\/html/i.test(value)) {
+          element.setAttribute(attr.name, value.replace(/data:text\/html/gi, 'data:text/plain'));
+        }
+      });
+    });
+
+    if (originalDescriptor?.get) {
+      return originalDescriptor.get.call(container);
+    }
+
+    return container.innerHTML;
   }
 
   sanitizeScript(input) {
@@ -183,6 +226,10 @@ class SecurityService {
     if (!descriptor || typeof descriptor.set !== 'function' || typeof descriptor.get !== 'function') {
       console.warn('No se pudo interceptar innerHTML de manera segura');
       return;
+    }
+
+    if (!this._originalInnerHTMLDescriptor) {
+      this._originalInnerHTMLDescriptor = descriptor;
     }
 
     const securityInstance = this;
