@@ -1,8 +1,15 @@
 // Test rápido de conexión al backend
 console.log('🔗 Verificando conexión al backend...');
 
+const isLocalEnv = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
 // Test básico de conectividad
 async function testBackendConnection() {
+  if (!isLocalEnv) {
+    console.log('ℹ️ Saltando prueba de backend en este entorno (no es localhost).');
+    return null;
+  }
+
   const testUrls = [
     'http://localhost:8080/health/simple',
     'http://localhost:8080/health',
@@ -32,11 +39,13 @@ async function testBackendConnection() {
   return null;
 }
 
-// Ejecutar test al cargar la página
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', testBackendConnection);
-} else {
-  testBackendConnection();
+// Ejecutar test al cargar la página solo en local
+if (isLocalEnv) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', testBackendConnection);
+  } else {
+    testBackendConnection();
+  }
 }
 
 // También hacer disponible globalmente

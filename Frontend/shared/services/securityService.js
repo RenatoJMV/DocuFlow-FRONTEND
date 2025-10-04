@@ -350,13 +350,18 @@ class SecurityService {
   setupContentSecurityPolicy() {
     if (!this.config.contentSecurityPolicy) return;
     
+    const connectSources = ["'self'", 'https:'];
+    if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      connectSources.push('http://localhost:8080');
+    }
+
     const csp = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
       "img-src 'self' data: https:",
       "font-src 'self' https://cdnjs.cloudflare.com",
-      "connect-src 'self' https:",
+      `connect-src ${connectSources.join(' ')}`,
       "frame-src 'none'",
       "object-src 'none'",
       "base-uri 'self'"
