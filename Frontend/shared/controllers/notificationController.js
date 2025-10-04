@@ -30,13 +30,15 @@ class NotificationController {
 
   async loadNotifications() {
     try {
-  const response = await apiClient.get('/api/notifications');
-      this.notifications = response?.notifications || response?.data || response || [];
-      
+      const response = await apiClient.get('/api/notifications', {
+        showErrorNotification: false
+      });
+
+      this.notifications = this.normalizeNotifications(response);
+
       console.log(`📩 ${this.notifications.length} notificaciones cargadas`);
       this.updateNotificationBadge();
       this.updateNavbarNotifications();
-      
     } catch (error) {
       console.error('❌ Error cargando notificaciones:', error);
       this.notifications = this.getDemoNotifications();
@@ -46,7 +48,8 @@ class NotificationController {
   }
 
   updateNotificationBadge() {
-    const unreadCount = this.notifications.filter(n => !n.read).length;
+    const unreadCount = (Array.isArray(this.notifications) ? this.notifications : [])
+      .filter(n => !n.read).length;
     const badge = document.getElementById('notification-badge');
     
     if (badge) {
@@ -256,6 +259,41 @@ class NotificationController {
     return message.length > maxLength 
       ? message.substring(0, maxLength) + '...' 
       : message;
+  }
+
+  normalizeNotifications(payload) {
+    if (!payload) {
+      return [];
+    }
+
+    if (payload instanceof Error || payload?.status >= 400 || payload?.isServerError) {
+      throw payload;
+    }
+
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (Array.isArray(payload.notifications)) {
+      return payload.notifications;
+    }
+
+    if (Array.isArray(payload.data)) {
+      return payload.data;
+    }
+
+    if (Array.isArray(payload.results)) {
+      return payload.results;
+    }
+
+    if (typeof payload === 'object') {
+      const values = Object.values(payload);
+      if (values.length && values.every(item => typeof item === 'object')) {
+        return values;
+      }
+    }
+
+    return [];
   }
 
   formatTimeAgo(dateString) {

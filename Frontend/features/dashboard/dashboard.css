@@ -711,6 +711,7 @@ body {
   min-height: 200px; /* ✅ Altura mínima */
   display: flex;
   flex-direction: column;
+  overflow-x: hidden; /* Evita scroll horizontal indeseado */
 }
 
 /* Corrección: Widget de estado del sistema */
@@ -757,7 +758,7 @@ body {
 
 /* Corrección: Widget de notificaciones */
 .notification-item-mini {
-  padding: 0.75rem 0;
+  padding: 0.75rem;
   border-bottom: 1px solid var(--gray-100);
 }
 
@@ -768,9 +769,7 @@ body {
 .notification-item-mini.unread {
   background-color: rgba(79, 140, 255, 0.05);
   border-left: 3px solid var(--primary-blue);
-  padding-left: 0.75rem;
-  margin-left: -1.25rem;
-  margin-right: -1.25rem;
+  padding-left: calc(0.75rem + 6px);
 }
 
 .notification-title-mini {
