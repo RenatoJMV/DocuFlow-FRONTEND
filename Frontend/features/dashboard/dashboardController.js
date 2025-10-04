@@ -119,7 +119,6 @@ class DashboardController {
     } catch (error) {
       console.error('❌ Error cargando datos del dashboard:', error);
       showNotification('Error de conexión con el servidor', 'error');
-      this.loadDemoData();
     } finally {
       store.setLoading(false);
     }
@@ -697,60 +696,6 @@ class DashboardController {
     this.refreshInterval = setInterval(() => {
       this.loadDashboardData();
     }, 5 * 60 * 1000);
-  }
-
-  loadDemoData() {
-    const demoStats = {
-      totalFiles: 156,
-      totalUsers: 23,
-      totalComments: 89,
-      downloadsToday: 12,
-      uploadsToday: 8,
-      commentsToday: 15,
-      totalStorage: '2.4 GB',
-      storageUsed: '2.1 GB'
-    };
-
-    this.applyDashboardData({
-      ...demoStats,
-      storageLimit: '10 GB',
-      filesTrend: 12,
-      usersTrend: 8,
-      commentsTrend: -2,
-      downloadsTrend: 15,
-      recentActivity: this.loadDemoActivity()
-    });
-  }
-
-  loadDemoActivity() {
-    const demoActivity = [
-      {
-        type: 'file_upload',
-        file: 'Documento_Importante.pdf',
-        action: 'Subida',
-        user: 'Juan Pérez',
-        timestamp: new Date(Date.now() - 10 * 60000).toISOString(),
-        status: 'success'
-      },
-      {
-        type: 'comment_added',
-        file: 'Presentación_Q4.pptx',
-        action: 'Comentario',
-        user: 'María García',
-        timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
-        status: 'info'
-      },
-      {
-        type: 'file_download',
-        file: 'Informe_Anual.xlsx',
-        action: 'Descarga',
-        user: 'Carlos López',
-        timestamp: new Date(Date.now() - 45 * 60000).toISOString(),
-        status: 'success'
-      }
-    ];
-
-    return demoActivity;
   }
 
   updateNotificationWidget() {

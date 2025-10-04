@@ -37,7 +37,6 @@ class SecureLoginController {
       this.setupSecurityMeasures();
       this.setupFormValidation();
       this.setupPasswordToggle();
-      this.setupDemoUsers(); // Solo para desarrollo
     } else {
       console.error('Login form not found');
     }
@@ -406,61 +405,7 @@ class SecureLoginController {
   // DEMO USERS (SOLO PARA DESARROLLO)
   // ============================================================================
 
-  setupDemoUsers() {
-    // Solo mostrar en desarrollo
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      const demoContainer = document.createElement('div');
-      demoContainer.className = 'demo-users mt-3';
-      demoContainer.innerHTML = `
-        <div class="alert alert-warning">
-          <small><strong>Demo Users (Development Only):</strong></small>
-          <div class="btn-group w-100 mt-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm" data-demo="admin">
-              Admin User
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" data-demo="user">
-              Regular User
-            </button>
-          </div>
-        </div>
-      `;
-      
-      // Agregar después del formulario
-      this.loginForm.parentNode.appendChild(demoContainer);
-      
-      // Eventos para demo users
-      demoContainer.addEventListener('click', (e) => {
-        if (e.target.hasAttribute('data-demo')) {
-          const demoType = e.target.getAttribute('data-demo');
-          this.fillDemoCredentials(demoType);
-        }
-      });
-    }
-  }
-
-  fillDemoCredentials(type) {
-    // ADVERTENCIA: Solo para desarrollo
-    const demoCredentials = {
-      admin: {
-        email: 'admin@docuflow.com',
-        password: 'AdminPass123!'
-      },
-      user: {
-        email: 'user@docuflow.com',
-        password: 'UserPass123!'
-      }
-    };
-    
-    const credentials = demoCredentials[type];
-    if (credentials && this.emailInput && this.passwordInput) {
-      this.emailInput.value = credentials.email;
-      this.passwordInput.value = credentials.password;
-      
-      // Validar los campos automáticamente
-      this.validateEmailInput({ target: this.emailInput });
-      this.validatePasswordInput({ target: this.passwordInput });
-    }
-  }
+  // Removed demo user related methods
 
   // ============================================================================
   // MÉTODOS DE UTILIDAD

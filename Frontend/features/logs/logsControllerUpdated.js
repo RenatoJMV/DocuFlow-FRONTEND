@@ -115,58 +115,12 @@ class LogsController {
     } catch (error) {
       console.error('Error loading logs:', error);
       showNotification('Error al cargar logs', 'error');
-      this.loadDemoLogs();
+      this.logs = [];
+      this.applyFilters();
+      this.updateStats();
     } finally {
       this.showLoading(false);
     }
-  }
-
-  loadDemoLogs() {
-    this.logs = [
-      {
-        id: 1,
-        type: 'INFO',
-        message: 'Usuario logueado correctamente',
-        userId: this.currentUser.id,
-        userName: this.currentUser.name || 'Usuario Demo',
-        timestamp: new Date().toISOString(),
-        ipAddress: '192.168.1.100',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      },
-      {
-        id: 2,
-        type: 'FILE',
-        message: 'Archivo subido: documento.pdf',
-        userId: this.currentUser.id,
-        userName: this.currentUser.name || 'Usuario Demo',
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        ipAddress: '192.168.1.100',
-        details: { fileName: 'documento.pdf', fileSize: '2.5MB' }
-      },
-      {
-        id: 3,
-        type: 'WARNING',
-        message: 'Intento de acceso no autorizado',
-        userId: null,
-        userName: 'Sistema',
-        timestamp: new Date(Date.now() - 7200000).toISOString(),
-        ipAddress: '192.168.1.200',
-        details: { reason: 'Token inválido' }
-      },
-      {
-        id: 4,
-        type: 'ERROR',
-        message: 'Error al procesar archivo',
-        userId: this.currentUser.id,
-        userName: this.currentUser.name || 'Usuario Demo',
-        timestamp: new Date(Date.now() - 10800000).toISOString(),
-        ipAddress: '192.168.1.100',
-        details: { error: 'Formato no soportado', fileName: 'archivo.xyz' }
-      }
-    ];
-    
-    this.applyFilters();
-    this.updateStats();
   }
 
   applyFilters() {

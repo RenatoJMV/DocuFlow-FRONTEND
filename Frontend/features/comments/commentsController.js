@@ -195,9 +195,9 @@ class CommentsController {
     } catch (error) {
       console.error('❌ Error cargando comentarios del backend:', error);
       if (!silent) {
-        showNotification('Error al cargar comentarios, usando datos demo', 'warning');
+        showNotification('No se pudieron cargar los comentarios. Verifique la API.', 'warning');
       }
-      this.comments = this.getDemoComments();
+      this.comments = [];
     }
 
     store.setComments(this.comments);
@@ -233,46 +233,8 @@ class CommentsController {
   }
 
   getDemoComments() {
-    return [
-      {
-        id: '1',
-        content: 'Este documento necesita revisión urgente en la sección de conclusiones.',
-        type: 'comment',
-        author: 'María González',
-        createdAt: '2024-03-15T10:30:00Z',
-        status: 'pending'
-      },
-      {
-        id: '2',
-        content: 'Completar la validación de datos antes del viernes.',
-        type: 'task',
-        author: 'Juan Pérez',
-        createdAt: '2024-03-14T15:45:00Z',
-        dueDate: '2024-03-22T17:00:00Z',
-        priority: 'high',
-        assignees: ['ana@docuflow.com', 'carlos@docuflow.com'],
-        status: 'pending'
-      },
-      {
-        id: '3',
-        content: 'Actualización de formato aplicada correctamente.',
-        type: 'comment',
-        author: 'Ana López',
-        createdAt: '2024-03-13T09:15:00Z',
-        status: 'completed'
-      },
-      {
-        id: '4',
-        content: 'Revisar y aprobar los cambios propuestos en el documento.',
-        type: 'task',
-        author: 'Carlos Ruiz',
-        createdAt: '2024-03-12T14:20:00Z',
-        dueDate: '2024-03-20T12:00:00Z',
-        priority: 'medium',
-        assignees: ['supervisor@docuflow.com'],
-        status: 'completed'
-      }
-    ];
+    console.warn('getDemoComments ha sido deshabilitado. Asegúrate de que el backend proporcione datos reales.');
+    return [];
   }
 
   filterComments() {

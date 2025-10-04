@@ -58,69 +58,13 @@ class NotificationsController {
     } catch (error) {
       console.error('Error loading notifications:', error);
       showNotification('Error al cargar notificaciones', 'error');
-      this.loadDemoNotifications();
+      this.notifications = [];
+      this.updateUnreadCount();
+      this.renderNotifications();
+      this.updateStats();
     } finally {
       this.showLoading(false);
     }
-  }
-
-  loadDemoNotifications() {
-    this.notifications = [
-      {
-        id: 1,
-        title: 'Nuevo archivo compartido',
-        message: 'Se ha compartido contigo el archivo "Informe_Mensual.pdf"',
-        type: 'FILE_SHARED',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        userId: this.currentUser.id,
-        data: { fileId: 123, fileName: 'Informe_Mensual.pdf' }
-      },
-      {
-        id: 2,
-        title: 'Comentario agregado',
-        message: 'Juan Pérez agregó un comentario en tu documento',
-        type: 'COMMENT_ADDED',
-        isRead: false,
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-        userId: this.currentUser.id,
-        data: { commentId: 456, documentId: 789 }
-      },
-      {
-        id: 3,
-        title: 'Archivo procesado',
-        message: 'Tu archivo "Presentacion.pptx" ha sido procesado exitosamente',
-        type: 'FILE_PROCESSED',
-        isRead: true,
-        createdAt: new Date(Date.now() - 7200000).toISOString(),
-        userId: this.currentUser.id,
-        data: { fileId: 321 }
-      },
-      {
-        id: 4,
-        title: 'Mantenimiento programado',
-        message: 'El sistema estará en mantenimiento el próximo domingo de 2:00 a 4:00 AM',
-        type: 'SYSTEM_MAINTENANCE',
-        isRead: true,
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        userId: this.currentUser.id,
-        data: { maintenanceDate: '2024-01-21T02:00:00Z' }
-      },
-      {
-        id: 5,
-        title: 'Nuevo usuario registrado',
-        message: 'Ana García se ha registrado en el sistema',
-        type: 'USER_REGISTERED',
-        isRead: false,
-        createdAt: new Date(Date.now() - 1800000).toISOString(),
-        userId: this.currentUser.id,
-        data: { newUserId: 555, userName: 'Ana García' }
-      }
-    ];
-    
-    this.updateUnreadCount();
-    this.renderNotifications();
-    this.updateStats();
   }
 
   renderNotifications() {

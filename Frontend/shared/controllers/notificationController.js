@@ -41,9 +41,10 @@ class NotificationController {
       this.updateNavbarNotifications();
     } catch (error) {
       console.error('❌ Error cargando notificaciones:', error);
-      this.notifications = this.getDemoNotifications();
+      this.notifications = [];
       this.updateNotificationBadge();
       this.updateNavbarNotifications();
+      showNotification('No se pudieron cargar las notificaciones. Verifique la conexión con el backend.', 'warning');
     }
   }
 
@@ -313,41 +314,6 @@ class NotificationController {
       month: 'short', 
       day: 'numeric' 
     });
-  }
-
-  getDemoNotifications() {
-    return [
-      {
-        id: 1,
-        type: 'SYSTEM',
-        title: 'Sistema iniciado',
-        message: 'DocuFlow se ha iniciado correctamente',
-        read: false,
-        priority: 1,
-        createdAt: new Date().toISOString(),
-        targetUserId: this.currentUser.id
-      },
-      {
-        id: 2,
-        type: 'FILE_UPLOAD',
-        title: 'Archivo subido',
-        message: 'Se ha subido un nuevo documento: informe.pdf',
-        read: false,
-        priority: 2,
-        createdAt: new Date(Date.now() - 300000).toISOString(),
-        targetUserId: this.currentUser.id
-      },
-      {
-        id: 3,
-        type: 'COMMENT',
-        title: 'Nuevo comentario',
-        message: 'Juan Pérez ha comentado en tu documento',
-        read: true,
-        priority: 2,
-        createdAt: new Date(Date.now() - 900000).toISOString(),
-        targetUserId: this.currentUser.id
-      }
-    ];
   }
 
   async createSystemNotification(type, title, message, priority = 1) {

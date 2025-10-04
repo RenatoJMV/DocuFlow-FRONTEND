@@ -82,11 +82,7 @@ class CommentsController {
     } catch (error) {
       console.error('Error loading documents:', error);
       showNotification('Error al cargar documentos', 'error');
-      // Cargar datos demo en caso de error
-      this.populateDocumentSelect([
-        { id: 1, title: 'Documento Demo 1', fileName: 'demo1.pdf' },
-        { id: 2, title: 'Documento Demo 2', fileName: 'demo2.pdf' }
-      ]);
+      this.populateDocumentSelect([]);
     }
   }
 
@@ -114,32 +110,12 @@ class CommentsController {
     } catch (error) {
       console.error('Error loading comments:', error);
       showNotification('Error al cargar comentarios', 'error');
-      // Cargar comentarios demo
-      this.loadDemoComments();
+      this.comments = [];
+      this.renderComments();
+      this.updateCommentsCount();
     } finally {
       this.showLoading(false);
     }
-  }
-
-  loadDemoComments() {
-    this.comments = [
-      {
-        id: 1,
-        content: 'Este es un comentario de ejemplo para mostrar la funcionalidad.',
-        author: { name: 'Usuario Demo', email: 'demo@example.com' },
-        createdAt: new Date().toISOString(),
-        documentId: this.currentDocumentId
-      },
-      {
-        id: 2,
-        content: 'Otro comentario de prueba con más contenido para ver cómo se renderiza.',
-        author: { name: 'Admin Demo', email: 'admin@example.com' },
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-        documentId: this.currentDocumentId
-      }
-    ];
-    this.renderComments();
-    this.updateCommentsCount();
   }
 
   renderComments() {

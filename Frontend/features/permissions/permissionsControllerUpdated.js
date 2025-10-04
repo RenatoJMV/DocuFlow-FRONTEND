@@ -92,10 +92,7 @@ class PermissionsController {
       this.files = files.data || files || [];
     } catch (error) {
       console.error('Error loading files:', error);
-      this.files = [
-        { id: 1, title: 'Documento Demo 1', fileName: 'demo1.pdf' },
-        { id: 2, title: 'Documento Demo 2', fileName: 'demo2.pdf' }
-      ];
+      this.files = [];
     }
   }
 
@@ -111,10 +108,7 @@ class PermissionsController {
       }
     } catch (error) {
       console.error('Error loading users:', error);
-      this.users = [
-        { id: 1, name: 'Usuario Demo 1', email: 'demo1@example.com' },
-        { id: 2, name: 'Usuario Demo 2', email: 'demo2@example.com' }
-      ];
+      this.users = this.currentUser?.id ? [this.currentUser] : [];
     }
   }
 
@@ -137,7 +131,8 @@ class PermissionsController {
     } catch (error) {
       console.error('Error loading permissions:', error);
       showNotification('Error al cargar permisos', 'error');
-      this.loadDemoPermissions();
+      this.permissions = [];
+      this.applyFilters();
     } finally {
       this.showLoading(false);
     }
@@ -165,49 +160,6 @@ class PermissionsController {
     }
     
     return allPermissions;
-  }
-
-  loadDemoPermissions() {
-    this.permissions = [
-      {
-        id: 1,
-        fileId: 1,
-        fileName: 'Documento Demo 1',
-        userId: this.currentUser.id,
-        userName: this.currentUser.name || 'Usuario Demo',
-        userEmail: this.currentUser.email || 'demo@example.com',
-        permissionType: 'READ',
-        grantedBy: 'admin@example.com',
-        grantedAt: new Date(Date.now() - 86400000).toISOString(),
-        expiresAt: null
-      },
-      {
-        id: 2,
-        fileId: 1,
-        fileName: 'Documento Demo 1',
-        userId: 2,
-        userName: 'Ana García',
-        userEmail: 'ana@example.com',
-        permissionType: 'WRITE',
-        grantedBy: this.currentUser.email,
-        grantedAt: new Date(Date.now() - 3600000).toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() // 30 días
-      },
-      {
-        id: 3,
-        fileId: 2,
-        fileName: 'Documento Demo 2',
-        userId: this.currentUser.id,
-        userName: this.currentUser.name || 'Usuario Demo',
-        userEmail: this.currentUser.email || 'demo@example.com',
-        permissionType: 'ADMIN',
-        grantedBy: 'system',
-        grantedAt: new Date(Date.now() - 172800000).toISOString(),
-        expiresAt: null
-      }
-    ];
-    
-    this.applyFilters();
   }
 
   populateSelects() {

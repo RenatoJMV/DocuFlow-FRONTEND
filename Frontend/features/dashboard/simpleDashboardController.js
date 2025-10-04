@@ -28,7 +28,7 @@ class SimpleDashboardController {
       }
     } catch (error) {
       console.error('❌ Error de conexión:', error);
-      showNotification('No se pudo conectar al servidor. Usando modo demo.', 'warning');
+      showNotification('No se pudo conectar al servidor. Revisa la API backend.', 'warning');
     }
   }
 
@@ -39,24 +39,10 @@ class SimpleDashboardController {
       this.updateWidgets(stats);
       console.log('✅ Datos cargados del backend:', stats);
     } catch (error) {
-      console.warn('⚠️ Usando datos demo:', error.message);
-      this.loadDemoData();
+      console.error('❌ Error obteniendo estadísticas del dashboard:', error);
+      showNotification('No se pudieron obtener las estadísticas del dashboard', 'error');
+      this.updateWidgets({});
     }
-  }
-
-  loadDemoData() {
-    const demoStats = {
-      totalFiles: 156,
-      totalUsers: 23,
-      totalComments: 89,
-      totalStorage: '2.4 GB',
-      downloadsToday: 12,
-      uploadsToday: 8,
-      commentsToday: 15
-    };
-
-    this.updateWidgets(demoStats);
-    console.log('📊 Datos demo cargados');
   }
 
   updateWidgets(stats) {

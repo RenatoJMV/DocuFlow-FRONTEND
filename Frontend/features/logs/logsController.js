@@ -187,11 +187,8 @@ class LogsController {
       
     } catch (error) {
       console.error('❌ Error cargando logs del backend:', error);
-      showNotification('Error al cargar registros, usando datos demo', 'warning');
-      
-      // Fallback a datos demo si hay error
-      console.log('🔄 Fallback a datos demo...');
-      this.allLogs = this.getDemoLogs();
+      showNotification('No se pudieron cargar los registros. Verifique la API.', 'warning');
+      this.allLogs = [];
       this.applyFilters();
       this.updateStats();
     }
@@ -213,34 +210,8 @@ class LogsController {
   }
 
   getDemoLogs() {
-    // Demo logs for development
-    const actions = this.getAvailableActions();
-    const levels = this.getAvailableLevels();
-    const users = ['admin@docuflow.com', 'editor@docuflow.com', 'viewer@docuflow.com', 'guest@docuflow.com'];
-    
-    const logs = [];
-    for (let i = 0; i < 150; i++) {
-      const randomAction = actions[Math.floor(Math.random() * actions.length)];
-      const randomLevel = levels[Math.floor(Math.random() * levels.length)];
-      const randomUser = users[Math.floor(Math.random() * users.length)];
-      const date = new Date();
-      date.setMinutes(date.getMinutes() - (i * 15)); // 15 minutes apart
-      
-      logs.push({
-        id: i + 1,
-        timestamp: date.toISOString(),
-        action: randomAction.id,
-        actionName: randomAction.name,
-        level: randomLevel.id,
-        username: randomUser,
-        details: this.generateLogDetails(randomAction.id),
-        ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        documentId: Math.random() > 0.5 ? Math.floor(Math.random() * 100) + 1 : null
-      });
-    }
-    
-    return logs.reverse(); // Most recent first
+    console.warn('getDemoLogs ha sido deshabilitado. Asegúrate de que el backend proporcione datos reales.');
+    return [];
   }
 
   generateLogDetails(action) {

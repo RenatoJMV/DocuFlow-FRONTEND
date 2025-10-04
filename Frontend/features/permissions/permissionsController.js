@@ -1,6 +1,11 @@
-import { docuFlowAPI } from '../../shared/services/apiClient.js';
-import { store } from '../../shared/services/store.js';
 import { initializeNavbar, showNotification, FormValidator } from '../../shared/utils/uiHelpers.js';
+import {
+  apiGetUsers,
+  apiGetRoles,
+  apiGetUserPermissions,
+  apiSetUserPermissions,
+  apiSetUserRole
+} from '../../shared/services/userService.js';
 
 class PermissionsController {
   constructor() {
@@ -101,105 +106,64 @@ class PermissionsController {
 
   async loadData() {
     try {
-      // Load users and roles
-      const [usersResponse, rolesResponse] = await Promise.all([
-        this.getDemoUsers(),
-        this.getDemoRoles()
+      const [usersResult, rolesResult] = await Promise.all([
+        apiGetUsers().catch(error => ({ success: false, users: [], error })),
+        apiGetRoles().catch(error => ({ success: false, roles: [], error }))
       ]);
 
-      this.users = usersResponse;
-      this.roles = rolesResponse;
+      const normalizedUsers = this.normalizeUsers(usersResult?.users || []);
+      const normalizedRoles = this.normalizeRoles(rolesResult?.roles || []);
+
+      this.users = normalizedUsers;
+      this.roles = normalizedRoles;
+
+      if (!usersResult?.success) {
+        console.warn('No se pudieron obtener los usuarios desde el backend', usersResult?.error);
+        showNotification('No se pudieron obtener los usuarios. Verifique la API.', 'warning');
+      }
+
+      if (!rolesResult?.success) {
+        console.warn('No se pudieron obtener los roles desde el backend', rolesResult?.error);
+        showNotification('No se pudieron obtener los roles. Verifique la API.', 'warning');
+      }
 
       this.renderUserSelect();
       this.renderRoleSelect();
 
-      // Load first user by default
-      if (this.users.length > 0) {
-        await this.loadUserData(this.users[0].id);
+      if (this.users.length === 0) {
+        showNotification('No hay usuarios disponibles. Crea usuarios en el backend.', 'info');
+        this.clearPermissions();
+        this.currentUser = null;
+        this.updateUserInfo(null);
+        return;
       }
 
+      await this.loadUserData(this.users[0].id);
     } catch (error) {
       console.error('Error loading data:', error);
-      showNotification('Error al cargar los datos', 'error');
+      this.users = [];
+      this.roles = [];
+      this.renderUserSelect();
+      this.renderRoleSelect();
+      this.clearPermissions();
+      showNotification('Error al cargar los datos desde el servidor', 'error');
     }
-  }
-
-  getDemoUsers() {
-    // Demo users for development
-    return [
-      {
-        id: '1',
-        username: 'admin@docuflow.com',
-        name: 'Administrador',
-        role: 'admin',
-        status: 'active',
-        lastLogin: '2024-03-15T10:30:00Z'
-      },
-      {
-        id: '2',
-        username: 'editor@docuflow.com',
-        name: 'Editor Principal',
-        role: 'editor',
-        status: 'active',
-        lastLogin: '2024-03-15T09:15:00Z'
-      },
-      {
-        id: '3',
-        username: 'viewer@docuflow.com',
-        name: 'Usuario Viewer',
-        role: 'viewer',
-        status: 'active',
-        lastLogin: '2024-03-14T16:45:00Z'
-      },
-      {
-        id: '4',
-        username: 'guest@docuflow.com',
-        name: 'Invitado',
-        role: 'guest',
-        status: 'inactive',
-        lastLogin: '2024-03-10T14:20:00Z'
-      }
-    ];
-  }
-
-  getDemoRoles() {
-    return [
-      {
-        id: 'admin',
-        name: 'Administrador',
-        description: 'Acceso completo al sistema',
-        permissions: ['download', 'delete', 'comment', 'edit', 'share', 'admin', 'view_logs', 'manage_users']
-      },
-      {
-        id: 'editor',
-        name: 'Editor',
-        description: 'Puede crear, editar y compartir documentos',
-        permissions: ['download', 'comment', 'edit', 'share']
-      },
-      {
-        id: 'viewer',
-        name: 'Visualizador',
-        description: 'Solo puede ver y comentar documentos',
-        permissions: ['download', 'comment']
-      },
-      {
-        id: 'guest',
-        name: 'Invitado',
-        description: 'Acceso limitado solo para visualizar',
-        permissions: ['download']
-      }
-    ];
   }
 
   renderUserSelect() {
     const userSelect = document.getElementById('userSelect');
     if (!userSelect) return;
 
+    if (this.users.length === 0) {
+      userSelect.innerHTML = '<option value="">No hay usuarios disponibles</option>';
+      return;
+    }
+
     userSelect.innerHTML = `
       <option value="">Seleccionar usuario...</option>
       ${this.users.map(user => `
         <option value="${user.id}">
-          ${user.name} (${user.username}) - ${user.role}
+          ${user.name} (${user.username}) - ${user.role || 'sin rol'}
         </option>
       `).join('')}
     `;
@@ -209,11 +173,16 @@ class PermissionsController {
     const roleSelect = document.getElementById('roleSelect');
     if (!roleSelect) return;
 
+    if (this.roles.length === 0) {
+      roleSelect.innerHTML = '<option value="">No hay roles disponibles</option>';
+      return;
+    }
+
     roleSelect.innerHTML = `
       <option value="">Seleccionar rol...</option>
       ${this.roles.map(role => `
         <option value="${role.id}">
-          ${role.name} - ${role.description}
+          ${role.name} ${role.description ? `- ${role.description}` : ''}
         </option>
       `).join('')}
     `;
@@ -294,7 +263,11 @@ class PermissionsController {
 
     try {
       const user = this.users.find(u => u.id === userId);
-      if (!user) return;
+      if (!user) {
+        console.warn('Usuario no encontrado en lista local, reintentando cargar');
+        await this.reloadUsers();
+        return;
+      }
 
       this.currentUser = user;
       
@@ -318,10 +291,29 @@ class PermissionsController {
   }
 
   async getUserPermissions(userId) {
-    // In a real app, this would be an API call
-    const user = this.users.find(u => u.id === userId);
-    const role = this.roles.find(r => r.id === user?.role);
-    return role?.permissions || [];
+    try {
+      const response = await apiGetUserPermissions(userId);
+      if (response?.success && Array.isArray(response.permissions)) {
+        return response.permissions;
+      }
+
+      if (Array.isArray(response)) {
+        return response;
+      }
+
+      if (Array.isArray(response?.data)) {
+        return response.data;
+      }
+
+      if (!response?.success) {
+        showNotification('No se pudieron obtener los permisos del usuario', 'warning');
+      }
+    } catch (error) {
+      console.error('Error obteniendo permisos del usuario:', error);
+      showNotification('Error al cargar permisos del usuario', 'error');
+    }
+
+    return [];
   }
 
   updatePermissionsDisplay(permissions) {
@@ -336,6 +328,15 @@ class PermissionsController {
   updateUserInfo(user) {
     const userInfoContainer = document.getElementById('userInfo');
     if (!userInfoContainer) return;
+
+    if (!user) {
+      userInfoContainer.innerHTML = `
+        <div class="user-info-card text-muted">
+          <p class="mb-0">Selecciona un usuario para ver sus detalles.</p>
+        </div>
+      `;
+      return;
+    }
 
     userInfoContainer.innerHTML = `
       <div class="user-info-card">
@@ -381,20 +382,29 @@ class PermissionsController {
   async updateUserRole(roleId) {
     if (!this.currentUser || !roleId) return;
 
+    const previousRole = this.currentUser.role;
+
     try {
-      // Update role
-      this.currentUser.role = roleId;
-      
-      // Update permissions based on role
-      const role = this.roles.find(r => r.id === roleId);
-      if (role) {
-        this.updatePermissionsDisplay(role.permissions);
+      const response = await apiSetUserRole(this.currentUser.id, roleId);
+      if (response?.success !== false) {
+        this.currentUser.role = roleId;
+        const role = this.roles.find(r => r.id === roleId);
+        if (role) {
+          this.updatePermissionsDisplay(role.permissions || []);
+        }
+        showNotification('Rol actualizado correctamente', 'success');
+        return;
       }
 
-      showNotification('Rol actualizado correctamente', 'success');
+      throw new Error(response?.error || 'Respuesta inválida del servidor');
     } catch (error) {
       console.error('Error updating role:', error);
-      showNotification('Error al actualizar el rol', 'error');
+      this.currentUser.role = previousRole;
+      const roleSelect = document.getElementById('roleSelect');
+      if (roleSelect) {
+        roleSelect.value = previousRole || '';
+      }
+      showNotification('Error al actualizar el rol del usuario', 'error');
     }
   }
 
@@ -436,10 +446,14 @@ class PermissionsController {
         document.querySelectorAll('input[type="checkbox"]:checked')
       ).map(cb => cb.value);
 
-      // In a real app, make API call here
-      console.log('Saving permissions for user:', this.currentUser.id, selectedPermissions);
+      const response = await apiSetUserPermissions(this.currentUser.id, selectedPermissions);
 
-      showNotification('Permisos guardados correctamente', 'success');
+      if (response?.success !== false) {
+        showNotification('Permisos guardados correctamente', 'success');
+        return;
+      }
+
+      throw new Error(response?.error || 'Respuesta inválida del servidor');
     } catch (error) {
       console.error('Error saving permissions:', error);
       showNotification('Error al guardar los permisos', 'error');
@@ -475,6 +489,68 @@ class PermissionsController {
       console.error('Error copying permissions:', error);
       showNotification('Error al copiar permisos', 'error');
     }
+  }
+
+  async reloadUsers() {
+    try {
+      const response = await apiGetUsers();
+      const normalizedUsers = this.normalizeUsers(response?.users || []);
+      if (normalizedUsers.length > 0) {
+        this.users = normalizedUsers;
+        this.renderUserSelect();
+      }
+    } catch (error) {
+      console.error('Error recargando usuarios:', error);
+    }
+  }
+
+  normalizeUsers(users) {
+    if (!Array.isArray(users)) {
+      return [];
+    }
+
+    return users.map((user, index) => {
+      const id = user?.id || user?._id || user?.userId || user?.uuid || user?.email || `user-${index}`;
+      const username = user?.username || user?.email || user?.userName || user?.login || id;
+      const name = user?.name || user?.fullName || user?.displayName || username;
+      const role = user?.role || (Array.isArray(user?.roles) ? user.roles[0] : undefined) || '';
+      const status = typeof user?.status === 'string'
+        ? user.status.toLowerCase()
+        : user?.active === false ? 'inactive' : 'active';
+
+      return {
+        id: String(id),
+        username: String(username),
+        name: String(name),
+        role: role ? String(role) : '',
+        status,
+        lastLogin: user?.lastLogin || user?.last_login || user?.lastAccessAt || user?.last_access_at || null
+      };
+    });
+  }
+
+  normalizeRoles(roles) {
+    if (!Array.isArray(roles)) {
+      return [];
+    }
+
+    return roles.map((role, index) => {
+      if (typeof role === 'string') {
+        return {
+          id: role,
+          name: role,
+          description: ''
+        };
+      }
+
+      const id = role?.id || role?._id || role?.roleId || role?.name || `role-${index}`;
+      return {
+        id: String(id),
+        name: role?.name || role?.displayName || String(id),
+  description: role?.description || role?.details || '',
+        permissions: Array.isArray(role?.permissions) ? role.permissions : []
+      };
+    });
   }
 }
 
