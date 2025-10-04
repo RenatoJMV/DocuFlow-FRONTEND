@@ -2,6 +2,8 @@
 import { apiClient } from '../../shared/services/apiClient.js';
 import { showNotification } from '../../shared/utils/uiHelpers.js';
 
+let notificationController = null;
+
 class NotificationController {
   constructor() {
     this.notifications = [];
@@ -16,6 +18,10 @@ class NotificationController {
       this.setupEventListeners();
       this.startPolling();
       this.updateNavbarNotifications();
+      notificationController = this;
+      if (typeof window !== 'undefined') {
+        window.notificationController = this;
+      }
       console.log('✅ Sistema de notificaciones iniciado');
     } catch (error) {
       console.error('❌ Error inicializando notificaciones:', error);
@@ -24,7 +30,7 @@ class NotificationController {
 
   async loadNotifications() {
     try {
-      const response = await apiClient.get('/notifications');
+  const response = await apiClient.get('/api/notifications');
       this.notifications = response?.notifications || response?.data || response || [];
       
       console.log(`📩 ${this.notifications.length} notificaciones cargadas`);
@@ -97,15 +103,11 @@ class NotificationController {
 
   async markAsRead(notificationId) {
     try {
-      // Marcar como leída localmente
       const notification = this.notifications.find(n => n.id === notificationId);
       if (notification) {
         notification.read = true;
         this.updateNotificationBadge();
         this.updateNavbarNotifications();
-        
-        // Actualizar en el servidor (si tienes el endpoint)
-        // await apiClient.put(`/notifications/${notificationId}/read`);
       }
     } catch (error) {
       console.error('Error marcando notificación como leída:', error);
@@ -114,7 +116,7 @@ class NotificationController {
 
   async createNotification(notificationData) {
     try {
-      const newNotification = await apiClient.post('/notifications', notificationData);
+  const newNotification = await apiClient.post('/api/notifications', notificationData);
       
       if (newNotification) {
         this.notifications.unshift(newNotification);
@@ -130,9 +132,8 @@ class NotificationController {
 
   async deactivateNotification(notificationId) {
     try {
-      await apiClient.put(`/notifications/${notificationId}/deactivate`);
+  await apiClient.put(`/api/notifications/${notificationId}/deactivate`);
       
-      // Remover de la lista local
       this.notifications = this.notifications.filter(n => n.id !== notificationId);
       this.updateNotificationBadge();
       this.updateNavbarNotifications();
@@ -145,7 +146,6 @@ class NotificationController {
   }
 
   setupEventListeners() {
-    // Agregar estilos CSS si no existen
     if (!document.getElementById('notification-styles')) {
       const styles = document.createElement('style');
       styles.id = 'notification-styles';
@@ -223,7 +223,7 @@ class NotificationController {
     this.isPolling = true;
     this.pollingInterval = setInterval(() => {
       this.loadNotifications();
-    }, 60000); // Polling cada 60 segundos
+    }, 60000);
     
     console.log('🔄 Polling de notificaciones iniciado (60s)');
   }
@@ -296,7 +296,7 @@ class NotificationController {
         message: 'Se ha subido un nuevo documento: informe.pdf',
         read: false,
         priority: 2,
-        createdAt: new Date(Date.now() - 300000).toISOString(), // 5 min ago
+        createdAt: new Date(Date.now() - 300000).toISOString(),
         targetUserId: this.currentUser.id
       },
       {
@@ -306,13 +306,12 @@ class NotificationController {
         message: 'Juan Pérez ha comentado en tu documento',
         read: true,
         priority: 2,
-        createdAt: new Date(Date.now() - 900000).toISOString(), // 15 min ago
+        createdAt: new Date(Date.now() - 900000).toISOString(),
         targetUserId: this.currentUser.id
       }
     ];
   }
 
-  // Método para crear notificaciones de sistema automáticamente
   async createSystemNotification(type, title, message, priority = 1) {
     const notification = {
       type: type,
@@ -336,17 +335,20 @@ class NotificationController {
     if (styles) {
       styles.remove();
     }
+    if (notificationController === this) {
+      notificationController = null;
+    }
+    if (typeof window !== 'undefined' && window.notificationController === this) {
+      delete window.notificationController;
+    }
     console.log('🗑️ NotificationController destruido');
   }
 }
 
-// Instancia global
-let notificationController = null;
-
-// Función global para crear notificaciones desde cualquier parte
 window.createNotification = function(type, title, message, priority = 1) {
-  if (notificationController) {
-    notificationController.createSystemNotification(type, title, message, priority);
+  const controller = window.notificationController || notificationController;
+  if (controller) {
+    controller.createSystemNotification(type, title, message, priority);
   }
 };
 

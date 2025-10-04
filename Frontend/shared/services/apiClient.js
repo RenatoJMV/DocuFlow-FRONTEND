@@ -237,22 +237,35 @@ if (window.location.hostname === 'localhost' || window.location.search.includes(
 }
 
 // 🚀 MÉTODOS ESPECÍFICOS PARA TODOS LOS ENDPOINTS DE DOCUFLOW
+const AUTH_PREFIX = '/auth';
+const API_PREFIX = '/api';
+const FILES_PREFIX = `${API_PREFIX}/files`;
+const COMMENTS_PREFIX = `${API_PREFIX}/comments`;
+const DASHBOARD_PREFIX = `${API_PREFIX}/dashboard`;
+const LOGS_PREFIX = `${API_PREFIX}/logs`;
+const GCS_PREFIX = `${API_PREFIX}/gcs`;
+const PROFILE_PREFIX = `${API_PREFIX}/profile`;
+const EXPORT_PREFIX = `${API_PREFIX}/export`;
+const PERMISSIONS_PREFIX = `${API_PREFIX}/permissions`;
+const NOTIFICATIONS_PREFIX = `${API_PREFIX}/notifications`;
+const ADMIN_PREFIX = `${API_PREFIX}/admin`;
+
 const docuFlowAPI = {
   // 🔐 AUTENTICACIÓN
   auth: {
-    register: (userData) => apiClient.post('/auth/register', userData, {
+    register: (userData) => apiClient.post(`${AUTH_PREFIX}/register`, userData, {
       _skipAuthRetry: true,
       successMessage: 'Usuario registrado exitosamente'
     }),
-    login: (credentials) => apiClient.post('/auth/login', credentials, {
+    login: (credentials) => apiClient.post(`${AUTH_PREFIX}/login`, credentials, {
       _skipAuthRetry: true,
       successMessage: '¡Bienvenido de vuelta!'
     }),
-    refresh: (refreshToken) => apiClient.post('/auth/refresh', { refreshToken }, {
+    refresh: (refreshToken) => apiClient.post(`${AUTH_PREFIX}/refresh`, { refreshToken }, {
       _skipAuthRetry: true,
       showLoading: false
     }),
-    logout: () => apiClient.post('/auth/logout', {}, {
+    logout: () => apiClient.post(`${AUTH_PREFIX}/logout`, {}, {
       showLoading: false
     })
   },
@@ -260,51 +273,58 @@ const docuFlowAPI = {
   // 📁 GESTIÓN DE ARCHIVOS
   files: {
     // Operaciones básicas
-    getAll: () => apiClient.get('/files'),
-    getById: (id) => apiClient.get(`/files/${id}`),
-    upload: (formData) => apiClient.request('/files/upload', {
+    getAll: () => apiClient.get(FILES_PREFIX),
+    getById: (id) => apiClient.get(`${FILES_PREFIX}/${id}`),
+    upload: (formData) => apiClient.request(`${FILES_PREFIX}/upload`, {
       method: 'POST',
       body: formData,
       headers: {} // No Content-Type para FormData
     }),
-    update: (id, documentData) => apiClient.put(`/files/${id}`, documentData),
-    delete: (id) => apiClient.delete(`/files/${id}`),
+    update: (id, documentData) => apiClient.put(`${FILES_PREFIX}/${id}`, documentData),
+    delete: (id) => apiClient.delete(`${FILES_PREFIX}/${id}`),
     
     // Descarga y búsqueda
-    download: (id) => apiClient.get(`/files/${id}/download`, { responseType: 'blob' }),
-    search: (query) => apiClient.get(`/files/search?query=${encodeURIComponent(query)}`),
-    getByUser: (userId) => apiClient.get(`/files/user/${userId}`),
-    getRecent: (limit = 10) => apiClient.get(`/files/recent?limit=${limit}`),
+    download: (id) => apiClient.get(`${FILES_PREFIX}/${id}/download`, { responseType: 'blob' }),
+    search: (query) => apiClient.get(`${FILES_PREFIX}/search?query=${encodeURIComponent(query)}`),
+    getByUser: (userId) => apiClient.get(`${FILES_PREFIX}/user/${userId}`),
+    getRecent: (limit = 10) => apiClient.get(`${FILES_PREFIX}/recent?limit=${limit}`),
     
     // Compartir y metadatos
-    share: (id, shareData) => apiClient.post(`/files/${id}/share`, shareData),
-    getMetadata: (id) => apiClient.get(`/files/${id}/metadata`),
-    updateMetadata: (id, metadata) => apiClient.put(`/files/${id}/metadata`, metadata),
-    getVersions: (id) => apiClient.get(`/files/${id}/versions`)
+    share: (id, shareData) => apiClient.post(`${FILES_PREFIX}/${id}/share`, shareData),
+    getMetadata: (id) => apiClient.get(`${FILES_PREFIX}/${id}/metadata`),
+    updateMetadata: (id, metadata) => apiClient.put(`${FILES_PREFIX}/${id}/metadata`, metadata),
+    getVersions: (id) => apiClient.get(`${FILES_PREFIX}/${id}/versions`),
+
+    // Estadísticas
+    getStats: () => apiClient.get(`${FILES_PREFIX}/stats`),
+    getCount: () => apiClient.get(`${FILES_PREFIX}/count`),
+    getTotalSize: () => apiClient.get(`${FILES_PREFIX}/total-size`)
   },
 
   // 💬 COMENTARIOS
   comments: {
-    create: (commentData) => apiClient.post('/comments', commentData),
-    getByDocument: (documentId) => apiClient.get(`/comments/document/${documentId}`),
-    update: (id, commentData) => apiClient.put(`/comments/${id}`, commentData),
-    delete: (id) => apiClient.delete(`/comments/${id}`)
+    create: (commentData) => apiClient.post(COMMENTS_PREFIX, commentData),
+    getByDocument: (documentId) => apiClient.get(`${COMMENTS_PREFIX}/document/${documentId}`),
+    update: (id, commentData) => apiClient.put(`${COMMENTS_PREFIX}/${id}`, commentData),
+    delete: (id) => apiClient.delete(`${COMMENTS_PREFIX}/${id}`),
+    assign: (id, assigneeData) => apiClient.put(`${COMMENTS_PREFIX}/${id}/assign`, assigneeData)
   },
 
   // 📊 DASHBOARD
   dashboard: {
-    getStats: () => apiClient.get('/dashboard/stats'),
-    getActivity: () => apiClient.get('/dashboard/activity'),
-    getPopularFiles: () => apiClient.get('/dashboard/popular-files'),
-    getUserSummary: () => apiClient.get('/dashboard/user-summary')
+    getStats: () => apiClient.get(`${DASHBOARD_PREFIX}/stats`),
+    getActivity: () => apiClient.get(`${DASHBOARD_PREFIX}/activity`),
+    getPopularFiles: () => apiClient.get(`${DASHBOARD_PREFIX}/popular-files`),
+    getUserSummary: () => apiClient.get(`${DASHBOARD_PREFIX}/user-summary`),
+    getDownloadsToday: () => apiClient.get(`${DASHBOARD_PREFIX}/downloads/today`)
   },
 
   // 📋 LOGS
   logs: {
-    getAll: () => apiClient.get('/logs'),
-    getByUser: (userId) => apiClient.get(`/logs/user/${userId}`),
-    getByType: (type) => apiClient.get(`/logs/type/${type}`),
-    create: (logData) => apiClient.post('/logs', logData)
+    getAll: () => apiClient.get(LOGS_PREFIX),
+    getByUser: (userId) => apiClient.get(`${LOGS_PREFIX}/user/${userId}`),
+    getByType: (type) => apiClient.get(`${LOGS_PREFIX}/type/${type}`),
+    create: (logData) => apiClient.post(LOGS_PREFIX, logData)
   },
 
   // ✅ SALUD DEL SISTEMA
@@ -315,22 +335,23 @@ const docuFlowAPI = {
 
   // ☁️ GOOGLE CLOUD STORAGE
   gcs: {
-    upload: (formData) => apiClient.request('/gcs/upload', {
+    upload: (formData) => apiClient.request(`${GCS_PREFIX}/upload`, {
       method: 'POST',
       body: formData,
       headers: {}
     }),
-    download: (fileName) => apiClient.get(`/gcs/download/${fileName}`, { responseType: 'blob' }),
-    delete: (fileName) => apiClient.delete(`/gcs/delete/${fileName}`),
-    list: () => apiClient.get('/gcs/list')
+    download: (fileName) => apiClient.get(`${GCS_PREFIX}/download/${fileName}`, { responseType: 'blob' }),
+    delete: (fileName) => apiClient.delete(`${GCS_PREFIX}/delete/${fileName}`),
+    list: () => apiClient.get(`${GCS_PREFIX}/list`),
+    getOrphaned: () => apiClient.get(`${GCS_PREFIX}/files/orphaned`)
   },
 
   // 👤 PERFIL DE USUARIO
   profile: {
-    get: () => apiClient.get('/profile'),
-    update: (profileData) => apiClient.put('/profile', profileData),
-    changePassword: (passwordData) => apiClient.put('/profile/password', passwordData),
-    uploadAvatar: (formData) => apiClient.request('/profile/avatar', {
+    get: () => apiClient.get(PROFILE_PREFIX),
+    update: (profileData) => apiClient.put(PROFILE_PREFIX, profileData),
+    changePassword: (passwordData) => apiClient.put(`${PROFILE_PREFIX}/password`, passwordData),
+    uploadAvatar: (formData) => apiClient.request(`${PROFILE_PREFIX}/avatar`, {
       method: 'POST',
       body: formData,
       headers: {}
@@ -341,51 +362,62 @@ const docuFlowAPI = {
   export: {
     files: (params = {}) => {
       const queryString = new URLSearchParams(params).toString();
-      return apiClient.get(`/export/files${queryString ? `?${queryString}` : ''}`);
+      return apiClient.get(`${EXPORT_PREFIX}/files${queryString ? `?${queryString}` : ''}`);
     },
     logs: (params = {}) => {
       const queryString = new URLSearchParams(params).toString();
-      return apiClient.get(`/export/logs${queryString ? `?${queryString}` : ''}`);
+      return apiClient.get(`${EXPORT_PREFIX}/logs${queryString ? `?${queryString}` : ''}`);
     },
-    stats: () => apiClient.get('/export/stats')
+    stats: () => apiClient.get(`${EXPORT_PREFIX}/stats`),
+    statsCsv: () => apiClient.request(`${EXPORT_PREFIX}/stats?format=csv`, {
+      method: 'GET',
+      responseType: 'blob',
+      headers: {
+        Accept: 'text/csv'
+      }
+    })
   },
 
   // 🔒 PERMISOS
   permissions: {
-    getFilePermissions: (fileId) => apiClient.get(`/permissions/file/${fileId}`),
-    assign: (permissionData) => apiClient.post('/permissions/assign', permissionData),
-    revoke: (permissionData) => apiClient.delete('/permissions/revoke', { data: permissionData }),
-    getUserPermissions: (userId) => apiClient.get(`/permissions/user/${userId}`)
+    getFilePermissions: (fileId) => apiClient.get(`${PERMISSIONS_PREFIX}/file/${fileId}`),
+    assign: (permissionData) => apiClient.post(`${PERMISSIONS_PREFIX}/assign`, permissionData),
+    revoke: (permissionData) => apiClient.request(`${PERMISSIONS_PREFIX}/revoke`, {
+      method: 'DELETE',
+      body: JSON.stringify(permissionData)
+    }),
+    getUserPermissions: (userId) => apiClient.get(`${PERMISSIONS_PREFIX}/user/${userId}`)
   },
 
   // 🔔 NOTIFICACIONES
   notifications: {
-    getAll: () => apiClient.get('/notifications'),
-    markAsRead: (id) => apiClient.put(`/notifications/${id}/read`),
-    create: (notificationData) => apiClient.post('/notifications', notificationData),
-    delete: (id) => apiClient.delete(`/notifications/${id}`)
+    getAll: () => apiClient.get(NOTIFICATIONS_PREFIX),
+    markAsRead: (id) => apiClient.put(`${NOTIFICATIONS_PREFIX}/${id}/read`),
+    create: (notificationData) => apiClient.post(NOTIFICATIONS_PREFIX, notificationData),
+    delete: (id) => apiClient.delete(`${NOTIFICATIONS_PREFIX}/${id}`),
+    deactivate: (id) => apiClient.put(`${NOTIFICATIONS_PREFIX}/${id}/deactivate`)
   },
 
   // 👥 ADMINISTRACIÓN DE USUARIOS
   admin: {
     users: {
-      getAll: () => apiClient.get('/admin/users'),
-      getById: (id) => apiClient.get(`/admin/users/${id}`),
-      create: (userData) => apiClient.post('/admin/users', userData),
-      update: (id, userData) => apiClient.put(`/admin/users/${id}`, userData),
-      delete: (id) => apiClient.delete(`/admin/users/${id}`),
-      updateStatus: (id, active) => apiClient.put(`/admin/users/${id}/status`, { active })
+      getAll: () => apiClient.get(`${ADMIN_PREFIX}/users`),
+      getById: (id) => apiClient.get(`${ADMIN_PREFIX}/users/${id}`),
+      create: (userData) => apiClient.post(`${ADMIN_PREFIX}/users`, userData),
+      update: (id, userData) => apiClient.put(`${ADMIN_PREFIX}/users/${id}`, userData),
+      delete: (id) => apiClient.delete(`${ADMIN_PREFIX}/users/${id}`),
+      updateStatus: (id, active) => apiClient.put(`${ADMIN_PREFIX}/users/${id}/status`, { active })
     }
   },
 
   // 📎 SUBIDA LEGACY
   upload: {
-    single: (formData) => apiClient.request('/upload', {
+    single: (formData) => apiClient.request(`${FILES_PREFIX}/upload`, {
       method: 'POST',
       body: formData,
       headers: {}
     }),
-    multiple: (formData) => apiClient.request('/upload/multiple', {
+    multiple: (formData) => apiClient.request(`${FILES_PREFIX}/upload/multiple`, {
       method: 'POST',
       body: formData,
       headers: {}

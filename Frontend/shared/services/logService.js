@@ -7,7 +7,7 @@ export async function apiGetLogs() {
   const token = getAuthToken();
   if (!token) return { success: false, logs: [] };
   try {
-    const response = await fetch(`${BACKEND_URL}/api/dashboard/logs`, {
+  const response = await fetch(`${BACKEND_URL}/api/logs`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });

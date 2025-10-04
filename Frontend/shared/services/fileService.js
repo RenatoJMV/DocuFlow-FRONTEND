@@ -6,7 +6,7 @@ export async function apiDeleteFile(fileId) {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/files/${fileId}`, {
+  const response = await fetch(`${BACKEND_URL}/api/files/${fileId}`, {
       method: "DELETE",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -21,7 +21,7 @@ export async function apiGetFiles() {
   const token = getAuthToken();
   if (!token) return { success: false, files: [] };
   try {
-    const response = await fetch(`${BACKEND_URL}/files`, {
+  const response = await fetch(`${BACKEND_URL}/api/files`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -43,7 +43,7 @@ export async function apiUploadFile(file, metadata = {}) {
   formData.append("file", file);
   Object.entries(metadata).forEach(([key, value]) => formData.append(key, value));
   try {
-    const response = await fetch(`${BACKEND_URL}/files`, {
+  const response = await fetch(`${BACKEND_URL}/api/files`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${token}` },
       body: formData
@@ -59,7 +59,7 @@ export async function apiDownloadFile(fileId, newName) {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/files/${fileId}/download`, {
+  const response = await fetch(`${BACKEND_URL}/api/files/${fileId}/download`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -83,7 +83,7 @@ export async function apiGetFileStats() {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/files/stats`, {
+  const response = await fetch(`${BACKEND_URL}/api/files/stats`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -98,7 +98,7 @@ export async function apiGetFileCount() {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/files/count`, {
+  const response = await fetch(`${BACKEND_URL}/api/files/count`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -113,7 +113,7 @@ export async function apiGetFileTotalSize() {
   const token = getAuthToken();
   if (!token) return { success: false };
   try {
-    const response = await fetch(`${BACKEND_URL}/files/total-size`, {
+  const response = await fetch(`${BACKEND_URL}/api/files/total-size`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
