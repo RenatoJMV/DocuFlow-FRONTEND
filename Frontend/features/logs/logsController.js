@@ -155,7 +155,7 @@ class LogsController {
       this.showLoadingState();
       
   // Cargar logs del endpoint real del backend Spring Boot
-  console.log('📋 Cargando logs desde el endpoint /logs...');
+  console.log('📋 Cargando logs desde el endpoint /api/logs...');
   const response = await docuFlowAPI.logs.getAll();
       
       // Extraer logs del response

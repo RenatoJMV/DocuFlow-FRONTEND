@@ -105,7 +105,7 @@ class DashboardController {
       ] = await Promise.allSettled([
         docuFlowAPI.dashboard.getStats(),
         docuFlowAPI.files.getAll(),
-  apiClient.get('/comments', { showLoading: false, showErrorNotification: false }),
+  apiClient.get('/api/comments', { showLoading: false, showErrorNotification: false }),
         docuFlowAPI.logs.getAll()
       ]);
 

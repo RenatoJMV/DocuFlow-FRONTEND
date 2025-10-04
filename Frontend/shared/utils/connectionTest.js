@@ -13,7 +13,7 @@ async function testBackendConnection() {
   const testUrls = [
     'http://localhost:8080/health/simple',
     'http://localhost:8080/health',
-    'http://localhost:8080/notifications'
+    'http://localhost:8080/api/health'
   ];
 
   for (const url of testUrls) {

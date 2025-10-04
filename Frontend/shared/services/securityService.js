@@ -626,7 +626,7 @@ class SecurityService {
 
   async reportSecurityIncident(event) {
     try {
-  await fetch('/security/incident', {
+  await fetch('/api/security/incident', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
