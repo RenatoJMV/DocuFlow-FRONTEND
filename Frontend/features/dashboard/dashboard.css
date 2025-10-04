@@ -5,6 +5,24 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+#navbar-container {
+  position: relative;
+  z-index: 1300;
+}
+
+#navbar-container .navbar {
+  position: relative;
+  z-index: 1300;
+  box-shadow: var(--shadow-md);
+  border-radius: var(--border-radius-xl);
+  backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+#navbar-container .dropdown-menu {
+  z-index: 2100;
+}
+
 .dashboard-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -521,19 +539,50 @@ body {
 /* Dropdown de notificaciones */
 .notification-dropdown {
   width: 320px;
-  max-height: 400px;
-  overflow-y: auto;
+  max-height: 420px;
+  overflow: hidden;
+  padding: 0.75rem 0;
+  border: none;
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(10px);
+  transform: translateY(8px);
 }
 
 .notification-list {
-  max-height: 250px;
+  max-height: 300px;
   overflow-y: auto;
+  padding: 0 1rem;
 }
 
 .notification-list .dropdown-item-text {
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0;
   font-size: 0.875rem;
   color: #6c757d;
+  text-align: center;
+}
+
+.notification-dropdown .dropdown-header {
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0 1rem 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  color: var(--gray-700);
+}
+
+.notification-dropdown .dropdown-divider {
+  margin: 0.5rem 0;
+}
+
+.notification-dropdown .dropdown-item {
+  font-size: 0.85rem;
+  padding: 0.65rem 1rem;
+  border-radius: var(--border-radius);
+}
+
+.notification-dropdown .dropdown-item:hover {
+  background-color: rgba(226, 232, 240, 0.6);
 }
 
 /* Modales de sistema */
@@ -564,34 +613,39 @@ body {
 }
 
 .notification-item-mini {
-  padding: 0.5rem;
-  border-radius: 6px;
-  border: 1px solid #f0f0f0;
-  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border-radius: var(--border-radius-lg);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  background: rgba(248, 250, 252, 0.6);
+  transition: all 0.25s ease;
 }
 
 .notification-item-mini:hover {
-  background-color: #f8f9fa;
-  border-color: #dee2e6;
+  background-color: rgba(241, 245, 249, 0.9);
+  border-color: rgba(209, 213, 219, 0.9);
+  transform: translateY(-2px);
 }
 
 .notification-item-mini.unread {
-  background-color: #fff3e0;
-  border-left: 3px solid #ff9800;
+  background: rgba(253, 232, 200, 0.55);
+  border-left: 3px solid #fbbf24;
 }
 
 .notification-title-mini {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 600;
   margin: 0;
   color: #495057;
 }
 
 .notification-message-mini {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: #6c757d;
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
 .notification-item-full {

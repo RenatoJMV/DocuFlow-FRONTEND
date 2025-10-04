@@ -409,6 +409,8 @@ class DashboardController {
     window.exportStats = () => this.exportStats();
     window.cleanupSystem = () => this.cleanupSystem();
     window.showSystemHealth = () => this.showSystemHealth();
+    window.showQuickActions = () => this.showQuickActions();
+    window.filterActivity = () => this.filterActivity();
   }
 
   async refreshDashboard() {
@@ -422,6 +424,13 @@ class DashboardController {
     }
   }
 
+  showQuickActions() {
+    showNotification('Acceso rápido disponible desde el panel lateral derecho.', 'info', 2500);
+  }
+
+  filterActivity() {
+    showNotification('Filtros avanzados de actividad estarán disponibles próximamente.', 'info', 2500);
+  }
   exportActivity() {
     try {
       const dashboard = store.getState('dashboard');
