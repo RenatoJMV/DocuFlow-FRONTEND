@@ -1,8 +1,15 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
+import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import { initializeNavbar, showNotification, formatDate } from '../../shared/utils/uiHelpers.js';
 
 class NotificationsController {
   constructor() {
+    if (!enforcePageAuth({
+      message: 'Inicia sesión para revisar tus notificaciones en DocuFlow.'
+    })) {
+      return;
+    }
+
     this.notifications = [];
     this.unreadCount = 0;
     this.currentUser = JSON.parse(localStorage.getItem('user') || '{}');

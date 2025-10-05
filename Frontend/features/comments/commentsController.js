@@ -1,9 +1,16 @@
 import apiClient, { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
+import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import { initializeNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
 
 class CommentsController {
   constructor() {
+    if (!enforcePageAuth({
+      message: 'Inicia sesión para colaborar en comentarios y tareas.'
+    })) {
+      return;
+    }
+
     this.comments = [];
     this.filteredComments = [];
     this.currentPage = 1;

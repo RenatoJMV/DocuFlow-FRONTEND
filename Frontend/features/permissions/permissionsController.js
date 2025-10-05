@@ -1,4 +1,5 @@
 import { initializeNavbar, showNotification, FormValidator } from '../../shared/utils/uiHelpers.js';
+import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import {
   apiGetUsers,
   apiGetRoles,
@@ -9,6 +10,12 @@ import {
 
 class PermissionsController {
   constructor() {
+    if (!enforcePageAuth({
+      message: 'Inicia sesión para administrar permisos y roles.'
+    })) {
+      return;
+    }
+
     this.users = [];
     this.roles = [];
     this.currentUser = null;

@@ -1,12 +1,19 @@
 // Dashboard Controller moderno con store y API client
 import apiClient, { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
+import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import { initializeNavbar, showNotification, formatDate, formatRelativeTime } from '../../shared/utils/uiHelpers.js';
 import { SystemHealthController } from '../../shared/controllers/systemHealthController.js';
 import { NotificationController } from '../../shared/controllers/notificationController.js';
 
 class DashboardController {
   constructor() {
+    if (!enforcePageAuth({
+      message: 'Inicia sesión para acceder al dashboard de DocuFlow.'
+    })) {
+      return;
+    }
+
     this.refreshInterval = null;
     this.unsubscribers = [];
     this.healthController = null;

@@ -1,15 +1,24 @@
-import { docuFlowAPI } from '../../shared/services/apiClient.js';
+import { docuFlowAPI, ApiError } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
+import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import { initializeNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
 
 class UploadController {
   constructor() {
+    if (!enforcePageAuth({
+      message: 'Inicia sesión para gestionar tus archivos en DocuFlow.'
+    })) {
+      return;
+    }
+
     this.selectedFiles = [];
     this.currentView = 'table'; // table or grid
     this.currentPage = 1;
     this.itemsPerPage = 10;
     this.allFiles = [];
     this.filteredFiles = [];
+  this.lastGcsStatsErrorAt = null;
+  this.gcsWarningShown = false;
     this.boundDocumentClick = this.handleDocumentClick.bind(this);
     this.pagination = new Pagination('paginationContainer', {
       itemsPerPage: this.itemsPerPage,
@@ -738,19 +747,40 @@ class UploadController {
 
   // Obtener estadísticas de Google Cloud Storage
   async getGcsStats() {
+    const cooldownMs = 5 * 60 * 1000; // 5 minutos
+
+    if (this.lastGcsStatsErrorAt && (Date.now() - this.lastGcsStatsErrorAt) < cooldownMs) {
+      return this.getGcsFallbackStats();
+    }
+
     try {
-      // Usar el nuevo GcsController endpoint
       const response = await docuFlowAPI.gcs.getStats();
+
+      if (response instanceof ApiError || response?.status >= 500) {
+        throw response;
+      }
+
+      this.lastGcsStatsErrorAt = null;
+      this.gcsWarningShown = false;
       return response.data || response;
     } catch (error) {
-      console.warn('⚠️ No se pudieron obtener estadísticas de GCS:', error);
-      return {
-        usedStorage: 0,
-        totalStorage: 10737418240, // 10GB por defecto
-        orphanedFiles: 0,
-        storageUsagePercent: 0
-      };
+      this.lastGcsStatsErrorAt = Date.now();
+      if (!this.gcsWarningShown) {
+        console.warn('⚠️ No se pudieron obtener estadísticas de GCS:', error);
+        showNotification('No pudimos consultar el uso de almacenamiento en la nube (se mostrará un estimado).', 'warning');
+        this.gcsWarningShown = true;
+      }
+      return this.getGcsFallbackStats();
     }
+  }
+
+  getGcsFallbackStats() {
+    return {
+      usedStorage: this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0),
+      totalStorage: 10737418240, // 10GB por defecto
+      orphanedFiles: 0,
+      storageUsagePercent: 0
+    };
   }
 
   // Detectar archivos huérfanos

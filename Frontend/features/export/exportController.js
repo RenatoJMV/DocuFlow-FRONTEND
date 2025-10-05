@@ -1,10 +1,17 @@
 // Controller completo para sistema de exportación de datos
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
+import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import { showNotification, showLoading, hideLoading } from '../../shared/utils/uiHelpers.js';
 
 class ExportController {
   constructor() {
+    if (!enforcePageAuth({
+      message: 'Debes iniciar sesión para generar exportaciones.'
+    })) {
+      return;
+    }
+
     this.currentExports = [];
     this.exportHistory = [];
     this.scheduledReports = [];

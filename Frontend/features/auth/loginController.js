@@ -1,4 +1,5 @@
 import { authService } from '../../shared/services/authService.js';
+import { consumeAuthRedirectMessage } from '../../shared/utils/authGuard.js';
 import { showNotification, FormValidator, validators } from '../../shared/utils/uiHelpers.js';
 
 class LoginController {
@@ -8,6 +9,7 @@ class LoginController {
     this.setupEventListeners();
     this.setupFormValidation();
     this.setButtonLoading(false);
+    this.showRedirectMessage();
   }
 
   cacheElements() {
@@ -117,8 +119,14 @@ class LoginController {
         const userName = loginResult.data?.user?.name || loginResult.data?.user?.username || username;
         showNotification(`Bienvenido ${userName}`, 'success');
 
+        const redirectUrl = this.consumeRedirectUrl();
+
         setTimeout(() => {
-          window.location.href = '../dashboard/dashboard.html';
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+          } else {
+            window.location.href = '../dashboard/dashboard.html';
+          }
         }, 800);
       } else {
         let errorMessage = loginResult?.error || loginResult?.data?.message || 'Credenciales inválidas';
@@ -140,6 +148,39 @@ class LoginController {
       // Restore button state
       this.setButtonLoading(false);
     }
+  }
+
+  showRedirectMessage() {
+    const { message, reason } = consumeAuthRedirectMessage();
+    if (!message) return;
+
+    const type = reason === 'session_timeout' ? 'error' : 'warning';
+    showNotification(message, type, 6000);
+  }
+
+  consumeRedirectUrl() {
+    const redirectUrl = sessionStorage.getItem('redirectUrl');
+    if (!redirectUrl) {
+      return null;
+    }
+
+    sessionStorage.removeItem('redirectUrl');
+
+    // Prevenir open-redirect: solo permitir rutas relativas
+    if (/^https?:/i.test(redirectUrl)) {
+      try {
+        const redirect = new URL(redirectUrl);
+        if (redirect.origin !== window.location.origin) {
+          return '../dashboard/dashboard.html';
+        }
+        return `${redirect.pathname}${redirect.search}${redirect.hash}`;
+      } catch (error) {
+        console.warn('URL de redirección inválida, usando dashboard por defecto.', error);
+        return '../dashboard/dashboard.html';
+      }
+    }
+
+    return redirectUrl;
   }
 
   // Función para mostrar modal de recuperación de contraseña

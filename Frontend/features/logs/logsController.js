@@ -1,9 +1,16 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
+import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import { initializeNavbar, showNotification, Pagination } from '../../shared/utils/uiHelpers.js';
 
 class LogsController {
   constructor() {
+    if (!enforcePageAuth({
+      message: 'Debes iniciar sesión para revisar los registros del sistema.'
+    })) {
+      return;
+    }
+
     this.allLogs = [];
     this.filteredLogs = [];
     this.currentPage = 1;

@@ -1,10 +1,18 @@
 // Controller completo para gestión de perfiles de usuario
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
+import { authService } from '../../shared/services/authService.js';
+import { enforcePageAuth, setAuthRedirectContext } from '../../shared/utils/authGuard.js';
 import { showNotification, showLoading, hideLoading } from '../../shared/utils/uiHelpers.js';
 
 class ProfileController {
   constructor() {
+    if (!enforcePageAuth({
+      message: 'Inicia sesión para revisar tu perfil de DocuFlow.'
+    })) {
+      return;
+    }
+
     this.currentUser = null;
     this.profileData = null;
     this.activityHistory = [];
@@ -163,6 +171,11 @@ class ProfileController {
       deleteAccountBtn.addEventListener('click', this.showDeleteAccountModal.bind(this));
     }
 
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', (event) => this.handleProfileLogout(event));
+    }
+
     // Formulario de preferencias
     this.preferencesForm = document.getElementById('preferences-form');
     if (this.preferencesForm) {
@@ -173,6 +186,27 @@ class ProfileController {
     const passwordForm = document.getElementById('change-password-form');
     if (passwordForm) {
       passwordForm.addEventListener('submit', this.handlePasswordChange.bind(this));
+    }
+  }
+
+  async handleProfileLogout(event) {
+    event?.preventDefault();
+    try {
+      showNotification('Cerrando sesión...', 'info', 1500);
+      await authService.logout();
+
+      setAuthRedirectContext({
+        message: 'Tu sesión se cerró correctamente. Vuelve a iniciar sesión para continuar.',
+        reason: 'manual_logout',
+        redirectUrl: '../dashboard/dashboard.html'
+      });
+
+      setTimeout(() => {
+        window.location.href = '../auth/login.html';
+      }, 600);
+    } catch (error) {
+      console.error('Error al cerrar sesión desde el perfil:', error);
+      showNotification('No se pudo cerrar sesión. Intenta nuevamente.', 'error');
     }
   }
 
