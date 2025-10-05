@@ -263,19 +263,18 @@ a:hover {
 
 .login-portal-body {
   min-height: 100vh;
+  height: 100vh;
   background: linear-gradient(135deg, rgba(18, 85, 255, 0.12), rgba(24, 160, 255, 0.12));
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  justify-content: center;
+  justify-content: stretch;
+  overflow: hidden;
 }
 
 .login-portal {
-  width: 100%;
-  max-width: 1200px;
-  display: grid;
-  grid-template-columns: 1fr;
-  min-height: 100vh;
-  background: transparent;
+  height: 100%;
+  padding: 0;
 }
 
 .portal-info {
@@ -341,10 +340,30 @@ a:hover {
 
 .portal-form {
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(245, 247, 255, 0.95));
+  position: relative;
+  padding: var(--spacing-3xl) var(--spacing-xl);
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-xl) var(--spacing-lg);
+  z-index: 0;
+}
+
+.portal-form::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(233, 239, 255, 0.35));
+  opacity: 0.6;
+  z-index: -1;
+}
+
+.portal-form-wrapper {
+  position: relative;
+  z-index: 2;
+  max-width: 460px;
+  margin: 0 auto;
 }
 
 .portal-form-card {
@@ -464,13 +483,23 @@ a:hover {
 }
 
 @media (max-width: 991.98px) {
-  .login-portal {
-    min-height: 100vh;
-    padding: var(--spacing-lg) var(--spacing-md);
+  .login-portal-body {
+    height: auto;
+    overflow: visible;
   }
 
   .portal-form {
-    padding: var(--spacing-lg) 0;
+    position: static;
+    height: auto;
+    padding: var(--spacing-xl) var(--spacing-lg);
+  }
+
+  .portal-form::after {
+    display: none;
+  }
+
+  .portal-form-wrapper {
+    max-width: 480px;
   }
 
   .portal-form-card {

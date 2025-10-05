@@ -1,4 +1,4 @@
-# Guía de implementación: Ocultar rutas detrás del dominio y exponer `/api/gcs/stats`
+ Guía de implementación: Ocultar rutas detrás del dominio y exponer `/api/gcs/stats`
 
 ## 1. Objetivo
 

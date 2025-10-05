@@ -6,7 +6,6 @@
   <meta name="description" content="DocuFlow - Acceso seguro unificado">
   <meta name="csrf-token" content="">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="X-Frame-Options" content="DENY">
   <meta http-equiv="X-XSS-Protection" content="1; mode=block">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
 
@@ -24,115 +23,119 @@
     Conexión segura
   </div>
 
-  <main class="login-portal">
-    <section class="portal-info d-none d-lg-flex">
-      <div class="portal-info-content text-white">
-        <div class="portal-logo">
-          <i class="fas fa-shield-check"></i>
-        </div>
-        <h1 class="fw-bold mb-2">DocuFlow Secure Suite</h1>
-        <p class="lead text-white-50 mb-4">
-          Gestiona y comparte documentos con la tranquilidad de una plataforma protegida, moderna y colaborativa.
-        </p>
-
-        <ul class="portal-feature-list">
-          <li><i class="fas fa-lock"></i> Encriptación y monitoreo continuo</li>
-          <li><i class="fas fa-user-shield"></i> Roles y permisos granulares</li>
-          <li><i class="fas fa-bolt"></i> Rendimiento optimizado en la nube</li>
-          <li><i class="fas fa-users"></i> Espacios colaborativos seguros</li>
-        </ul>
-
-        <div class="portal-compliance">
-          <span class="badge text-bg-light text-dark"><i class="fas fa-certificate me-1"></i> SOC2 Ready</span>
-          <span class="badge text-bg-light text-dark"><i class="fas fa-globe me-1"></i> GDPR compliant</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="portal-form">
-      <div class="portal-form-card shadow-lg">
-        <div class="text-center mb-4">
-          <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" alt="DocuFlow" class="portal-brand"> 
-          <h2 class="fw-bold">Bienvenido nuevamente</h2>
-          <p class="text-muted mb-0">Accede con tu usuario o correo electrónico</p>
-        </div>
-
-        <form id="loginForm" class="needs-validation" novalidate autocomplete="off">
-          <div class="mb-3">
-            <label for="identity" class="form-label fw-semibold">
-              <i class="fas fa-user-lock me-2"></i>Usuario o correo
-            </label>
-            <input
-              type="text"
-              class="form-control input-modern"
-              id="identity"
-              name="identity"
-              placeholder="ej. m.garcia o maria@empresa.com"
-              required
-              spellcheck="false"
-              autocomplete="username"
-              inputmode="email"
-            >
-            <div class="invalid-feedback" id="identityFeedback"></div>
+  <main class="login-portal container-fluid">
+    <div class="row min-vh-100 g-0">
+      <section class="portal-info col-lg-6 d-none d-lg-flex align-items-center justify-content-center order-lg-1 order-2">
+        <div class="portal-info-content text-white">
+          <div class="portal-logo">
+            <i class="fas fa-shield-check"></i>
           </div>
+          <h1 class="fw-bold mb-2">DocuFlow Secure Suite</h1>
+          <p class="lead text-white-50 mb-4">
+            Gestiona y comparte documentos con la tranquilidad de una plataforma protegida, moderna y colaborativa.
+          </p>
 
-          <div class="mb-3">
-            <label for="password" class="form-label fw-semibold">
-              <i class="fas fa-key me-2"></i>Contraseña
-            </label>
-            <div class="password-input-container">
-              <input
-                type="password"
-                class="form-control input-modern"
-                id="password"
-                name="password"
-                placeholder="Ingresa tu contraseña"
-                required
-                minlength="6"
-                autocomplete="current-password"
-              >
-              <button type="button" class="password-toggle" id="togglePassword" aria-label="Mostrar u ocultar contraseña">
-                <i class="fas fa-eye"></i>
+          <ul class="portal-feature-list">
+            <li><i class="fas fa-lock"></i> Encriptación y monitoreo continuo</li>
+            <li><i class="fas fa-user-shield"></i> Roles y permisos granulares</li>
+            <li><i class="fas fa-bolt"></i> Rendimiento optimizado en la nube</li>
+            <li><i class="fas fa-users"></i> Espacios colaborativos seguros</li>
+          </ul>
+
+          <div class="portal-compliance">
+            <span class="badge text-bg-light text-dark"><i class="fas fa-certificate me-1"></i> SOC2 Ready</span>
+            <span class="badge text-bg-light text-dark"><i class="fas fa-globe me-1"></i> GDPR compliant</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="portal-form col-12 col-lg-6 d-flex align-items-center justify-content-center order-lg-2 order-1">
+        <div class="portal-form-wrapper w-100">
+          <div class="portal-form-card shadow-lg mx-auto">
+            <div class="text-center mb-4">
+              <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" alt="DocuFlow" class="portal-brand">
+              <h2 class="fw-bold">Bienvenido nuevamente</h2>
+              <p class="text-muted mb-0">Accede con tu usuario o correo electrónico</p>
+            </div>
+
+            <form id="loginForm" class="needs-validation" novalidate autocomplete="off">
+              <div class="mb-3">
+                <label for="identity" class="form-label fw-semibold">
+                  <i class="fas fa-user-lock me-2"></i>Usuario o correo
+                </label>
+                <input
+                  type="text"
+                  class="form-control input-modern"
+                  id="identity"
+                  name="identity"
+                  placeholder="ej. m.garcia o maria@empresa.com"
+                  required
+                  spellcheck="false"
+                  autocomplete="username"
+                  inputmode="email"
+                >
+                <div class="invalid-feedback" id="identityFeedback"></div>
+              </div>
+
+              <div class="mb-3">
+                <label for="password" class="form-label fw-semibold">
+                  <i class="fas fa-key me-2"></i>Contraseña
+                </label>
+                <div class="password-input-container">
+                  <input
+                    type="password"
+                    class="form-control input-modern"
+                    id="password"
+                    name="password"
+                    placeholder="Ingresa tu contraseña"
+                    required
+                    minlength="6"
+                    autocomplete="current-password"
+                  >
+                  <button type="button" class="password-toggle" id="togglePassword" aria-label="Mostrar u ocultar contraseña">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                </div>
+                <div class="invalid-feedback" id="passwordFeedback"></div>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                <div class="form-check m-0">
+                  <input type="checkbox" class="form-check-input" id="rememberMe">
+                  <label class="form-check-label" for="rememberMe">Recordarme</label>
+                </div>
+                <button type="button" class="btn btn-link p-0" id="securityReportBtn">
+                  <i class="fas fa-shield-halved me-1"></i>Ver estado de seguridad
+                </button>
+              </div>
+
+              <button type="submit" class="btn btn-modern btn-primary-modern w-100" id="loginBtn">
+                <span class="btn-text">Iniciar sesión</span>
+                <span class="btn-loading d-none">
+                  <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  Validando credenciales...
+                </span>
               </button>
+            </form>
+
+            <div class="mt-4 text-center small text-muted">
+              <a href="#" id="forgotPasswordLink" class="text-decoration-none">¿Necesitas recuperar el acceso?</a>
             </div>
-            <div class="invalid-feedback" id="passwordFeedback"></div>
-          </div>
 
-          <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-            <div class="form-check m-0">
-              <input type="checkbox" class="form-check-input" id="rememberMe">
-              <label class="form-check-label" for="rememberMe">Recordarme</label>
+            <div class="portal-trust mt-4">
+              <div class="portal-trust-item">
+                <i class="fas fa-fingerprint"></i>
+                Auditoría continua de actividades sospechosas
+              </div>
+              <div class="portal-trust-item">
+                <i class="fas fa-database"></i>
+                Tokens y datos sensibles cifrados localmente
+              </div>
             </div>
-            <button type="button" class="btn btn-link p-0" id="securityReportBtn">
-              <i class="fas fa-shield-halved me-1"></i>Ver estado de seguridad
-            </button>
-          </div>
-
-          <button type="submit" class="btn btn-modern btn-primary-modern w-100" id="loginBtn">
-            <span class="btn-text">Iniciar sesión</span>
-            <span class="btn-loading d-none">
-              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-              Validando credenciales...
-            </span>
-          </button>
-        </form>
-
-        <div class="mt-4 text-center small text-muted">
-          <a href="#" id="forgotPasswordLink" class="text-decoration-none">¿Necesitas recuperar el acceso?</a>
-        </div>
-
-        <div class="portal-trust mt-4">
-          <div class="portal-trust-item">
-            <i class="fas fa-fingerprint"></i>
-            Auditoría continua de actividades sospechosas
-          </div>
-          <div class="portal-trust-item">
-            <i class="fas fa-database"></i>
-            Tokens y datos sensibles cifrados localmente
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </main>
 
   <div id="securityStatus" class="security-status" hidden>
