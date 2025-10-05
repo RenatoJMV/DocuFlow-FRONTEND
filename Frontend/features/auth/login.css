@@ -60,16 +60,22 @@
 
 .password-toggle {
   position: absolute;
-  right: 12px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   color: var(--gray-500);
   cursor: pointer;
-  padding: var(--spacing-xs);
+  padding: var(--spacing-2xs);
   border-radius: var(--border-radius-sm);
   transition: var(--transition-fast);
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  z-index: 1;
 }
 
 .password-toggle:hover {
@@ -282,6 +288,9 @@ a:hover {
   padding: var(--spacing-3xl);
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .portal-info::after {
@@ -297,6 +306,7 @@ a:hover {
   position: relative;
   z-index: 1;
   max-width: 420px;
+  text-align: center;
 }
 
 .portal-logo {
@@ -372,6 +382,8 @@ a:hover {
   padding: var(--spacing-2xl);
   width: min(440px, 100%);
   position: relative;
+  z-index: 1;
+  overflow: hidden;
 }
 
 .portal-form-card::before {
@@ -385,6 +397,8 @@ a:hover {
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .portal-brand {
