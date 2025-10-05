@@ -203,6 +203,203 @@
   padding: var(--spacing-xl);
 }
 
+.files-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.files-tab-btn {
+  border: 1px solid var(--gray-200);
+  background: var(--white);
+  color: var(--gray-700);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--border-radius-lg);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  transition: var(--transition-fast);
+}
+
+.files-tab-btn:hover {
+  color: var(--primary-blue);
+  border-color: var(--primary-blue);
+}
+
+.files-tab-btn.active {
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.12), rgba(16, 185, 129, 0.12));
+  border-color: rgba(79, 140, 255, 0.35);
+  color: var(--primary-blue);
+  box-shadow: inset 0 1px 0 rgba(79, 140, 255, 0.08);
+}
+
+.files-tab-content {
+  animation: fadeIn 0.25s ease-in;
+}
+
+.gcs-sync-header {
+  border-bottom: 1px solid var(--gray-200);
+  padding-bottom: var(--spacing-md);
+}
+
+.gcs-sync-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--border-radius-xl);
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.15), rgba(16, 185, 129, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  color: var(--primary-blue);
+}
+
+.gcs-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.gcs-stat-card {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.gcs-stat-card.warning {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.gcs-stat-card.danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.gcs-stat-label {
+  text-transform: uppercase;
+  font-size: var(--font-size-xs);
+  color: var(--gray-600);
+  letter-spacing: 0.05em;
+}
+
+.gcs-stat-card strong {
+  font-size: 1.8rem;
+  color: var(--gray-900);
+}
+
+.gcs-sync-body {
+  position: relative;
+  overflow: hidden;
+}
+
+.gcs-selection-info {
+  font-size: var(--font-size-sm);
+}
+
+.gcs-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.gcs-loading-overlay.d-none {
+  display: none !important;
+}
+
+.gcs-sync-body table tbody tr:hover {
+  background: var(--gray-50);
+}
+
+.gcs-sync-body table td:last-child {
+  text-align: right;
+}
+
+.gcs-tag-muted {
+  background: rgba(107, 114, 128, 0.12);
+  color: var(--gray-600);
+  border-radius: var(--border-radius);
+  padding: 0.25rem 0.5rem;
+  font-size: var(--font-size-xs);
+}
+
+.gcs-tag-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+}
+
+.gcs-tag-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.gcs-tag-info {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--info);
+}
+
+.gcs-tag-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+}
+
+.gcs-sync-body .table {
+  margin-bottom: 0;
+}
+
+.gcs-sync-body .empty-state {
+  border: 1px dashed var(--gray-300);
+  border-radius: var(--border-radius-lg);
+  margin-top: var(--spacing-lg);
+}
+
+.gcs-sync-body .empty-state i {
+  opacity: 0.4;
+}
+
+.gcs-sync-body .empty-state p {
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.gcs-sync-body .form-check-input {
+  cursor: pointer;
+}
+
+.gcs-sync-body .table thead th {
+  white-space: nowrap;
+}
+
+.gcs-sync-body .table td {
+  vertical-align: middle;
+}
+
+.gcs-sync-body .table td .btn-link {
+  padding: 0;
+  font-weight: 600;
+}
+
+.gcs-sync-body .table td .btn-link i {
+  margin-right: var(--spacing-xxs);
+}
+
+.gcs-sync-body .table td .badge {
+  font-size: var(--font-size-xs);
+  padding: 0.35em 0.6em;
+  border-radius: var(--border-radius);
+}
+
 .files-list-header {
   padding-bottom: var(--spacing-md);
   border-bottom: 1px solid var(--gray-200);

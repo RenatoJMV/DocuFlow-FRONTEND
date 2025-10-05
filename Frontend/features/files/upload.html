@@ -153,67 +153,175 @@
       <!-- Files List Section -->
       <div class="col-lg-8">
         <div class="files-list card-modern">
-          <div class="files-list-header d-flex justify-content-between align-items-center mb-3">
-            <h5><i class="bi bi-folder2-open me-2"></i>Mis Archivos</h5>
-            <div class="d-flex gap-2">
-              <div class="search-box">
-                <input type="text" class="form-control form-control-sm" id="searchFiles" placeholder="Buscar archivos...">
+          <div class="files-tabs">
+            <button type="button" class="files-tab-btn active" data-files-tab="library" id="libraryTabButton">
+              <i class="bi bi-folder2-open me-2"></i>Mis Archivos
+            </button>
+            <button type="button" class="files-tab-btn d-none" data-files-tab="gcs" id="gcsTabButton">
+              <i class="bi bi-cloud-check me-2"></i>Sincronización GCS
+            </button>
+          </div>
+
+          <div class="files-tab-content" id="libraryTabContent">
+            <div class="files-list-header d-flex justify-content-between align-items-center mb-3">
+              <div class="d-flex align-items-center gap-2">
+                <h5 class="mb-0"><i class="bi bi-folder2-open me-2"></i>Mis Archivos</h5>
               </div>
-              <div class="view-toggle btn-group" role="group">
-                <button type="button" class="btn btn-outline-secondary btn-sm active" id="listViewButton" data-view="table">
-                  <i class="bi bi-list"></i>
+              <div class="d-flex gap-2 flex-wrap justify-content-end">
+                <div class="search-box">
+                  <input type="text" class="form-control form-control-sm" id="searchFiles" placeholder="Buscar archivos...">
+                </div>
+                <div class="view-toggle btn-group" role="group">
+                  <button type="button" class="btn btn-outline-secondary btn-sm active" id="listViewButton" data-view="table">
+                    <i class="bi bi-list"></i>
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="gridViewButton" data-view="grid">
+                    <i class="bi bi-grid"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Files Table -->
+            <div class="table-container" id="tableView">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle" id="filesTable">
+                  <thead class="table-light">
+                    <tr>
+                      <th>
+                        <input type="checkbox" class="form-check-input" id="selectAll">
+                      </th>
+                      <th><i class="bi bi-file-earmark me-1"></i>Nombre</th>
+                      <th><i class="bi bi-hdd me-1"></i>Tamaño</th>
+                      <th><i class="bi bi-calendar me-1"></i>Fecha</th>
+                      <th><i class="bi bi-gear me-1"></i>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="filesTableBody">
+                    <!-- Los archivos se cargarán aquí -->
+                  </tbody>
+                </table>
+              </div>
+              
+              <!-- Empty State -->
+              <div class="empty-state text-center py-5 d-none" id="emptyState">
+                <i class="bi bi-folder-x display-4 text-muted mb-3"></i>
+                <h5 class="text-muted">Nada que ver por aquí…</h5>
+                <p class="text-muted">Cuando subas tus archivos, prometemos hacer fiesta.</p>
+              </div>
+            </div>
+
+            <!-- Grid View -->
+            <div class="files-grid" id="gridViewContainer" style="display: none;">
+              <div class="row" id="filesGrid">
+                <!-- Los archivos se cargarán aquí -->
+              </div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-2">
+              <div class="pagination-info">
+                <small class="text-muted">Mostrando <span id="showingCount">0</span> de <span id="totalCount">0</span> archivos</small>
+              </div>
+              <nav>
+                <div id="paginationContainer"></div>
+              </nav>
+            </div>
+          </div>
+
+          <div class="files-tab-content d-none" id="gcsSyncSection">
+            <div class="gcs-sync-header d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+              <div class="d-flex align-items-center gap-3">
+                <div class="gcs-sync-icon">
+                  <i class="bi bi-cloud-check"></i>
+                </div>
+                <div>
+                  <h5 class="mb-1">Sincronización con Google Cloud Storage</h5>
+                  <p class="text-muted mb-0">Visualiza discrepancias entre la base de datos y el bucket para mantenerlos alineados.</p>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-modern btn-outline-modern" id="gcsReconcileButton">
+                  <i class="bi bi-arrow-repeat me-2"></i>Reconciliar ahora
                 </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="gridViewButton" data-view="grid">
-                  <i class="bi bi-grid"></i>
+                <button type="button" class="btn btn-modern btn-danger-modern" id="gcsDeleteSelectedButton" disabled>
+                  <i class="bi bi-trash me-2"></i>Eliminar de GCS
                 </button>
               </div>
             </div>
-          </div>
 
-          <!-- Files Table -->
-          <div class="table-container" id="tableView">
-            <div class="table-responsive">
-              <table class="table table-hover align-middle" id="filesTable">
-                <thead class="table-light">
-                  <tr>
-                    <th>
-                      <input type="checkbox" class="form-check-input" id="selectAll">
-                    </th>
-                    <th><i class="bi bi-file-earmark me-1"></i>Nombre</th>
-                    <th><i class="bi bi-hdd me-1"></i>Tamaño</th>
-                    <th><i class="bi bi-calendar me-1"></i>Fecha</th>
-                    <th><i class="bi bi-gear me-1"></i>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="filesTableBody">
-                  <!-- Los archivos se cargarán aquí -->
-                </tbody>
-              </table>
+            <div class="gcs-stats-grid mb-4" id="gcsStatsGrid">
+              <article class="gcs-stat-card">
+                <span class="gcs-stat-label">Objetos en GCS</span>
+                <strong id="gcsStatTotalGcs">0</strong>
+                <small class="text-muted">Reportados por el bucket</small>
+              </article>
+              <article class="gcs-stat-card">
+                <span class="gcs-stat-label">Registros en BD</span>
+                <strong id="gcsStatTotalDb">0</strong>
+                <small class="text-muted">Entradas en la tabla de archivos</small>
+              </article>
+              <article class="gcs-stat-card warning">
+                <span class="gcs-stat-label">Faltan en BD</span>
+                <strong id="gcsStatMissingInDb">0</strong>
+                <small class="text-muted">Archivos detectados en GCS</small>
+              </article>
+              <article class="gcs-stat-card danger">
+                <span class="gcs-stat-label">Faltan en GCS</span>
+                <strong id="gcsStatMissingInGcs">0</strong>
+                <small class="text-muted">Registros sin objeto en el bucket</small>
+              </article>
             </div>
-            
-            <!-- Empty State -->
-            <div class="empty-state text-center py-5 d-none" id="emptyState">
-              <i class="bi bi-folder-x display-4 text-muted mb-3"></i>
-              <h5 class="text-muted">Nada que ver por aquí…</h5>
-              <p class="text-muted">Cuando subas tus archivos, prometemos hacer fiesta.</p>
-            </div>
-          </div>
 
-          <!-- Grid View -->
-          <div class="files-grid" id="gridViewContainer" style="display: none;">
-            <div class="row" id="filesGrid">
-              <!-- Los archivos se cargarán aquí -->
-            </div>
-          </div>
+            <div class="gcs-sync-body card-modern">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+                <div>
+                  <h6 class="mb-1">Objetos sin registrar</h6>
+                  <small class="text-muted">Selecciona los objetos huérfanos para eliminarlos del bucket.</small>
+                </div>
+                <div class="gcs-selection-info text-muted" id="gcsSelectedCount">0 seleccionados</div>
+              </div>
 
-          <!-- Pagination -->
-          <div class="d-flex justify-content-between align-items-center mt-4">
-            <div class="pagination-info">
-              <small class="text-muted">Mostrando <span id="showingCount">0</span> de <span id="totalCount">0</span> archivos</small>
+              <div class="table-responsive position-relative">
+                <div class="gcs-loading-overlay d-none" id="gcsSyncLoading">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                  </div>
+                </div>
+                <table class="table table-hover align-middle" id="gcsOrphanedTable">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 48px;">
+                        <input type="checkbox" class="form-check-input" id="gcsSelectAll">
+                      </th>
+                      <th>Nombre</th>
+                      <th>Tamaño</th>
+                      <th>Última modificación</th>
+                      <th>Tipo</th>
+                      <th class="text-end">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="gcsTableBody">
+                    <!-- Orphaned files -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="empty-state text-center py-5 d-none" id="gcsOrphanedEmptyState">
+                <i class="bi bi-cloud-check display-4 text-muted mb-3"></i>
+                <h5 class="text-muted">Sin discrepancias detectadas</h5>
+                <p class="text-muted">La base de datos y el bucket están sincronizados.</p>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
+                <div class="pagination-info">
+                  <small class="text-muted">Total potencial: <span id="gcsTotalOrphans">0</span> objetos</small>
+                </div>
+                <nav>
+                  <div id="gcsPaginationContainer"></div>
+                </nav>
+              </div>
             </div>
-            <nav>
-              <div id="paginationContainer"></div>
-            </nav>
           </div>
         </div>
       </div>

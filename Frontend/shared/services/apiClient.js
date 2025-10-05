@@ -372,31 +372,17 @@ const docuFlowAPI = {
     getStats: () => apiClient.get(`${GCS_PREFIX}/stats`, {
       showErrorNotification: false
     }),
-    getOrphanedFiles: async () => {
-      try {
-        return await apiClient.get(`${GCS_PREFIX}/orphaned-files`);
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404) {
-          return apiClient.get(`${GCS_PREFIX}/files/orphaned`);
-        }
-        throw error;
-      }
+    getOrphanedFiles: (params = {}) => {
+      const searchParams = new URLSearchParams(params);
+      const query = searchParams.toString();
+      return apiClient.get(`${GCS_PREFIX}/files/orphaned${query ? `?${query}` : ''}`);
     },
-    cleanupOrphaned: async (fileIds = []) => {
-      try {
-        return await apiClient.post(`${GCS_PREFIX}/cleanup-orphaned`, { fileIds }, {
-          successMessage: 'Archivos huérfanos limpiados exitosamente'
-        });
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404) {
-          return apiClient.post(`${GCS_PREFIX}/files/cleanup`, { fileIds }, {
-            successMessage: 'Archivos huérfanos limpiados exitosamente'
-          });
-        }
-        throw error;
-      }
-    },
-    getOrphaned: () => apiClient.get(`${GCS_PREFIX}/files/orphaned`)
+    reconcileFiles: () => apiClient.post(`${GCS_PREFIX}/files/reconcile`, {}, {
+      successMessage: 'Proceso de reconciliación iniciado'
+    }),
+    cleanupFiles: (fileNames = []) => apiClient.post(`${GCS_PREFIX}/files/cleanup`, { fileNames }, {
+      successMessage: fileNames.length ? 'Archivos seleccionados eliminados de GCS' : 'Limpieza de huérfanos completada'
+    })
   },
 
   // 👤 PERFIL DE USUARIO

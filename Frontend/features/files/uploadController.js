@@ -18,11 +18,22 @@ class UploadController {
     this.itemsPerPage = 10;
     this.allFiles = [];
     this.filteredFiles = [];
-  this.lastGcsStatsErrorAt = null;
-  this.gcsWarningShown = false;
-  this.gcsFeatureDisabledNoticeShown = false;
-  this.lastStorageUsageBand = null;
-  this.demoFilesFilteredNoticeShown = false;
+    this.lastGcsStatsErrorAt = null;
+    this.gcsWarningShown = false;
+    this.gcsFeatureDisabledNoticeShown = false;
+    this.lastStorageUsageBand = null;
+    this.demoFilesFilteredNoticeShown = false;
+
+    // Estado para la pestaña de sincronización con GCS
+    this.activeTab = 'library';
+    this.gcsSetupInitialized = false;
+    this.gcsDataLoaded = false;
+    this.gcsPageSize = 10;
+    this.gcsCurrentPage = 1;
+    this.gcsTotalOrphans = 0;
+    this.gcsOrphanedFiles = [];
+    this.gcsSelected = new Set();
+    this.gcsPagination = null;
     this.boundDocumentClick = this.handleDocumentClick.bind(this);
     this.pagination = new Pagination('paginationContainer', {
       itemsPerPage: this.itemsPerPage,
@@ -51,6 +62,9 @@ class UploadController {
     
     // Initialize drag & drop
     this.setupDragAndDrop();
+
+    // Configurar pestañas y sección de sincronización
+    this.initializeTabs();
   }
 
   setupDragAndDrop() {
@@ -82,6 +96,171 @@ class UploadController {
         this.handleFileSelection([...e.target.files]);
       }
     });
+  }
+
+  initializeTabs() {
+    this.libraryTabButton = document.getElementById('libraryTabButton');
+    this.gcsTabButton = document.getElementById('gcsTabButton');
+    this.libraryTabContent = document.getElementById('libraryTabContent');
+    this.gcsTabContent = document.getElementById('gcsSyncSection');
+
+    this.libraryTabButton?.addEventListener('click', () => this.switchTab('library'));
+
+    if (this.isAdminUser() && this.gcsTabButton && this.gcsTabContent) {
+      this.gcsTabButton.classList.remove('d-none');
+      this.gcsTabButton.addEventListener('click', () => this.switchTab('gcs'));
+      this.setupGcsSyncSection();
+    } else {
+      this.gcsTabContent?.classList.add('d-none');
+    }
+
+    this.updateTabVisibility();
+  }
+
+  isAdminUser() {
+    try {
+      const user = typeof store.getState === 'function'
+        ? (store.getState('user') ?? store.getState()?.user)
+        : (store.state?.user ?? null);
+
+      if (user) {
+        return this.evaluateAdminRole(user);
+      }
+
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser);
+          store.setUser?.(parsed);
+          return this.evaluateAdminRole(parsed);
+        } catch (parseError) {
+          console.warn('No fue posible leer el usuario almacenado:', parseError);
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.warn('No fue posible determinar el rol del usuario:', error);
+      return false;
+    }
+  }
+
+  evaluateAdminRole(user) {
+    if (!user) return false;
+
+    const directRole = typeof user.role === 'string' ? user.role.toLowerCase() : '';
+    if (directRole === 'admin' || directRole === 'administrator') {
+      return true;
+    }
+
+    const roles = Array.isArray(user.roles) ? user.roles : [];
+    if (roles.some(role => typeof role === 'string' && role.toLowerCase() === 'admin')) {
+      return true;
+    }
+
+    const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+    return permissions.includes('ADMIN') || permissions.includes('SUPER_ADMIN');
+  }
+
+  updateTabVisibility() {
+    const map = [
+      { key: 'library', button: this.libraryTabButton, content: this.libraryTabContent }
+    ];
+
+    if (this.gcsTabButton && this.gcsTabContent && this.isAdminUser()) {
+      map.push({ key: 'gcs', button: this.gcsTabButton, content: this.gcsTabContent });
+    }
+
+    map.forEach(({ key, button, content }) => {
+      if (!button || !content) return;
+      if (this.activeTab === key) {
+        button.classList.add('active');
+        content.classList.remove('d-none');
+      } else {
+        button.classList.remove('active');
+        content.classList.add('d-none');
+      }
+    });
+  }
+
+  switchTab(tabKey) {
+    if (this.activeTab === tabKey) {
+      this.updateTabVisibility();
+    } else {
+      this.activeTab = tabKey;
+      this.updateTabVisibility();
+    }
+
+    if (tabKey === 'gcs' && this.isAdminUser()) {
+      if (!this.gcsSetupInitialized) {
+        this.setupGcsSyncSection();
+      }
+      if (!this.gcsDataLoaded) {
+        this.loadGcsSyncData().catch(error => {
+          console.error('Error al cargar datos de sincronización GCS:', error);
+          showNotification('No se pudieron cargar los datos de sincronización', 'error');
+        });
+      }
+    }
+  }
+
+  setupGcsSyncSection() {
+    if (this.gcsSetupInitialized || !this.isAdminUser()) {
+      return;
+    }
+
+    this.gcsSetupInitialized = true;
+
+    this.gcsTabButton?.classList.remove('d-none');
+    this.gcsTabContent?.classList.remove('d-none');
+
+    this.gcsTableBody = document.getElementById('gcsTableBody');
+    this.gcsSelectAllCheckbox = document.getElementById('gcsSelectAll');
+    this.gcsSelectedCountEl = document.getElementById('gcsSelectedCount');
+    this.gcsTotalOrphansEl = document.getElementById('gcsTotalOrphans');
+    this.gcsEmptyState = document.getElementById('gcsOrphanedEmptyState');
+    this.gcsLoadingOverlay = document.getElementById('gcsSyncLoading');
+    this.gcsDeleteSelectedButton = document.getElementById('gcsDeleteSelectedButton');
+    this.gcsReconcileButton = document.getElementById('gcsReconcileButton');
+
+    this.gcsPagination = new Pagination('gcsPaginationContainer', {
+      itemsPerPage: this.gcsPageSize,
+      onPageChange: (page) => this.handleGcsPageChange(page)
+    });
+
+    this.gcsReconcileButton?.addEventListener('click', () => this.handleGcsReconcile());
+    this.gcsDeleteSelectedButton?.addEventListener('click', () => this.handleGcsCleanup());
+    this.gcsSelectAllCheckbox?.addEventListener('change', (event) => {
+      this.applyGcsSelectAll(event.target.checked);
+    });
+
+    this.gcsTableBody?.addEventListener('change', (event) => {
+      const checkbox = event.target.closest('input[type="checkbox"][data-file-name]');
+      if (!checkbox) return;
+
+      const { fileName } = checkbox.dataset;
+      if (!fileName) return;
+
+      if (checkbox.checked) {
+        this.gcsSelected.add(fileName);
+      } else {
+        this.gcsSelected.delete(fileName);
+      }
+
+      this.syncGcsSelectAllState();
+      this.updateGcsSelectionInfo();
+    });
+
+    this.gcsTableBody?.addEventListener('click', (event) => {
+      const actionBtn = event.target.closest('[data-gcs-action]');
+      if (!actionBtn) return;
+
+      const action = actionBtn.dataset.gcsAction;
+      const row = actionBtn.closest('tr');
+      this.handleGcsRowAction(action, row);
+    });
+
+    this.updateGcsSelectionInfo();
   }
 
   preventDefaults(e) {
@@ -919,9 +1098,11 @@ class UploadController {
     if (featureFlags.isEnabled('gcsStats')) {
       const gcsStats = await this.getGcsStats();
       this.applyGcsStats(gcsStats);
+      this.updateGcsStatsCards(gcsStats);
     } else {
       this.applyGcsStats(this.getGcsFallbackStats(), { disabled: true });
       this.notifyGcsFeatureDisabled();
+      this.updateGcsStatsCards(this.getGcsFallbackStats());
     }
   }
 
@@ -1007,6 +1188,422 @@ class UploadController {
       6000
     );
     this.gcsFeatureDisabledNoticeShown = true;
+  }
+
+  async loadGcsSyncData(options = {}) {
+    if (!this.isAdminUser()) return;
+
+    const { page = this.gcsCurrentPage || 1, refreshStats = true } = options;
+
+    try {
+      if (refreshStats) {
+        await this.loadGcsStatsCards();
+      }
+      await this.loadGcsOrphanedFiles(page);
+      this.gcsDataLoaded = true;
+    } catch (error) {
+      console.error('Error al cargar la sincronización GCS:', error);
+      showNotification('No pudimos completar la sincronización con GCS.', 'error');
+    }
+  }
+
+  async loadGcsStatsCards() {
+    if (!this.isAdminUser()) return;
+
+    try {
+      const response = await docuFlowAPI.gcs.getStats();
+      const stats = response?.data || response || {};
+      this.updateGcsStatsCards(stats);
+    } catch (error) {
+      console.warn('No fue posible obtener estadísticas detalladas de GCS.', error);
+      this.updateGcsStatsCards({});
+    }
+  }
+
+  updateGcsStatsCards(stats = {}) {
+    if (!this.gcsSetupInitialized) return;
+
+    const totalGcsEl = document.getElementById('gcsStatTotalGcs');
+    const totalDbEl = document.getElementById('gcsStatTotalDb');
+    const missingDbEl = document.getElementById('gcsStatMissingInDb');
+    const missingGcsEl = document.getElementById('gcsStatMissingInGcs');
+
+    const totalGcs = stats.totalGcsObjects ?? stats.totalObjects ?? stats.gcsCount ?? stats.bucketCount ?? 0;
+    const totalDb = stats.totalDatabaseRecords ?? stats.totalDbEntries ?? stats.dbCount ?? stats.databaseCount ?? 0;
+    const missingInDb = stats.missingInDatabase ?? stats.missingInDb ?? stats.orphanedInGcs ?? stats.orphaned ?? 0;
+    const missingInGcs = stats.missingInGcs ?? stats.missingObjects ?? stats.recordsWithoutObject ?? 0;
+
+    if (totalGcsEl) totalGcsEl.textContent = totalGcs;
+    if (totalDbEl) totalDbEl.textContent = totalDb;
+    if (missingDbEl) missingDbEl.textContent = missingInDb;
+    if (missingGcsEl) missingGcsEl.textContent = missingInGcs;
+  }
+
+  async handleGcsPageChange(page) {
+    this.gcsCurrentPage = page;
+    await this.loadGcsOrphanedFiles(page);
+  }
+
+  async loadGcsOrphanedFiles(page = 1) {
+    if (!this.isAdminUser()) return;
+
+    this.gcsCurrentPage = page;
+    this.toggleGcsLoading(true);
+
+    try {
+      const params = {
+        page,
+        size: this.gcsPageSize,
+        pageSize: this.gcsPageSize
+      };
+
+      const response = await docuFlowAPI.gcs.getOrphanedFiles(params);
+      const { items, total, size, pageNumber } = this.normalizeGcsOrphanedResponse(response, params);
+
+      const safeSize = Number(size) > 0 ? Number(size) : (params.size ?? this.gcsPageSize ?? 10);
+      const safePage = Number(pageNumber) > 0 ? Number(pageNumber) : (params.page ?? 1);
+
+      this.gcsOrphanedFiles = items;
+      this.gcsTotalOrphans = Number.isFinite(total) ? total : items.length;
+      this.gcsCurrentPage = safePage;
+      this.gcsPageSize = safeSize;
+
+      if (this.gcsPagination) {
+        this.gcsPagination.setItemsPerPage(safeSize);
+        this.gcsPagination.currentPage = safePage;
+        this.gcsPagination.render(this.gcsTotalOrphans);
+      }
+
+      this.renderGcsOrphanedTable(items);
+
+      if (this.gcsTotalOrphansEl) {
+        this.gcsTotalOrphansEl.textContent = this.gcsTotalOrphans;
+      }
+    } catch (error) {
+      console.error('Error al obtener archivos huérfanos de GCS:', error);
+      showNotification('No se pudieron obtener los archivos huérfanos.', 'error');
+      this.renderGcsOrphanedTable([]);
+    } finally {
+      this.toggleGcsLoading(false);
+    }
+  }
+
+  normalizeGcsOrphanedResponse(response, fallbackParams) {
+  const payload = response?.data ?? response ?? {};
+  const preferredSize = fallbackParams?.size ?? fallbackParams?.pageSize ?? this.gcsPageSize ?? 10;
+  const defaultSize = Number(preferredSize) > 0 ? Number(preferredSize) : 10;
+
+    if (Array.isArray(payload)) {
+      return {
+        items: payload,
+        total: payload.length,
+        size: defaultSize,
+        pageNumber: fallbackParams?.page ?? 1
+      };
+    }
+
+    if (Array.isArray(payload.items)) {
+      return {
+        items: payload.items,
+        total: payload.total ?? payload.totalItems ?? payload.count ?? payload.items.length,
+        size: payload.size ?? payload.pageSize ?? payload.limit ?? defaultSize,
+        pageNumber: (payload.page ?? payload.currentPage ?? fallbackParams?.page ?? 1)
+      };
+    }
+
+    if (Array.isArray(payload.content)) {
+      const zeroBased = typeof payload.number === 'number';
+      return {
+        items: payload.content,
+        total: payload.totalElements ?? payload.total ?? payload.totalCount ?? payload.content.length,
+        size: payload.size ?? payload.pageSize ?? defaultSize,
+        pageNumber: zeroBased ? (payload.number + 1) : (payload.page ?? fallbackParams?.page ?? 1)
+      };
+    }
+
+    if (Array.isArray(payload.results)) {
+      return {
+        items: payload.results,
+        total: payload.total ?? payload.totalResults ?? payload.results.length,
+        size: payload.size ?? payload.limit ?? defaultSize,
+        pageNumber: payload.page ?? fallbackParams?.page ?? 1
+      };
+    }
+
+    const items = Array.isArray(payload.orphanedFiles) ? payload.orphanedFiles : [];
+    const total = payload.total ?? payload.totalOrphaned ?? items.length;
+
+    return {
+      items,
+      total,
+      size: defaultSize,
+      pageNumber: fallbackParams?.page ?? 1
+    };
+  }
+
+  renderGcsOrphanedTable(items = []) {
+    if (!this.gcsTableBody) {
+      return;
+    }
+
+    this.gcsTableBody.innerHTML = '';
+
+    if (!Array.isArray(items) || items.length === 0) {
+      if (this.gcsEmptyState) this.gcsEmptyState.classList.remove('d-none');
+      if (this.gcsTableBody) this.gcsTableBody.closest('table')?.classList.add('d-none');
+      this.clearGcsSelection();
+      this.syncGcsSelectAllState();
+      this.updateGcsSelectionInfo();
+      return;
+    }
+
+    this.gcsTableBody.closest('table')?.classList.remove('d-none');
+    if (this.gcsEmptyState) this.gcsEmptyState.classList.add('d-none');
+
+    const fragment = document.createDocumentFragment();
+
+    items.forEach((file) => {
+      const name = file?.name || file?.fileName || file?.objectName || file?.path || file?.blobName || file?.id || 'desconocido';
+      const size = file?.size ?? file?.sizeBytes ?? file?.contentLength ?? 0;
+      const rawUpdatedAt = file?.updatedAt || file?.lastModified || file?.timeCreated || file?.createdAt;
+      const contentType = file?.contentType || file?.mimeType || file?.type || 'application/octet-stream';
+
+      // Si el archivo desapareció de la lista, retirarlo de la selección
+      if (!this.gcsSelected.has(name)) {
+        // noop, solo aseguramos consistencia más adelante
+      }
+
+      const row = document.createElement('tr');
+      row.dataset.fileName = name;
+
+      const checkboxCell = document.createElement('td');
+      checkboxCell.style.width = '48px';
+      checkboxCell.innerHTML = `
+        <input type="checkbox" class="form-check-input" data-file-name="${name}">
+      `;
+
+      const nameCell = document.createElement('td');
+      nameCell.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-cloud" aria-hidden="true"></i>
+          <span class="text-break">${name}</span>
+        </div>
+      `;
+
+      const sizeCell = document.createElement('td');
+      sizeCell.textContent = this.formatFileSize(size);
+
+      const dateCell = document.createElement('td');
+      dateCell.textContent = this.formatGcsDate(rawUpdatedAt);
+
+      const typeCell = document.createElement('td');
+      typeCell.innerHTML = this.formatGcsTypeLabel(contentType);
+
+      const actionCell = document.createElement('td');
+      actionCell.classList.add('text-end');
+      actionCell.innerHTML = `
+        <button type="button" class="btn btn-link btn-sm" data-gcs-action="copy-name">
+          <i class="bi bi-clipboard"></i> Copiar nombre
+        </button>
+      `;
+
+      row.append(checkboxCell, nameCell, sizeCell, dateCell, typeCell, actionCell);
+      fragment.appendChild(row);
+
+      const checkbox = checkboxCell.querySelector('input[type="checkbox"]');
+      if (checkbox && this.gcsSelected.has(name)) {
+        checkbox.checked = true;
+      }
+    });
+
+    // Depurar selección con elementos que ya no existen
+    this.gcsSelected.forEach((value) => {
+      if (!items.some(file => {
+        const name = file?.name || file?.fileName || file?.objectName || file?.path || file?.blobName || file?.id;
+        return name === value;
+      })) {
+        this.gcsSelected.delete(value);
+      }
+    });
+
+    this.gcsTableBody.appendChild(fragment);
+    this.syncGcsSelectAllState();
+    this.updateGcsSelectionInfo();
+  }
+
+  toggleGcsLoading(show) {
+    if (!this.gcsLoadingOverlay) return;
+    if (show) {
+      this.gcsLoadingOverlay.classList.remove('d-none');
+    } else {
+      this.gcsLoadingOverlay.classList.add('d-none');
+    }
+  }
+
+  applyGcsSelectAll(checked) {
+    if (!this.gcsTableBody) return;
+
+    const checkboxes = Array.from(this.gcsTableBody.querySelectorAll('input[type="checkbox"][data-file-name]'));
+    if (checked) {
+      checkboxes.forEach(cb => {
+        cb.checked = true;
+        if (cb.dataset.fileName) {
+          this.gcsSelected.add(cb.dataset.fileName);
+        }
+      });
+    } else {
+      checkboxes.forEach(cb => {
+        cb.checked = false;
+      });
+      this.gcsSelected.clear();
+    }
+
+    if (this.gcsSelectAllCheckbox) {
+      this.gcsSelectAllCheckbox.indeterminate = false;
+      this.gcsSelectAllCheckbox.checked = checked && checkboxes.length > 0;
+    }
+
+    this.updateGcsSelectionInfo();
+  }
+
+  syncGcsSelectAllState() {
+    if (!this.gcsSelectAllCheckbox || !this.gcsTableBody) return;
+
+    const checkboxes = Array.from(this.gcsTableBody.querySelectorAll('input[type="checkbox"][data-file-name]'));
+    if (checkboxes.length === 0) {
+      this.gcsSelectAllCheckbox.checked = false;
+      this.gcsSelectAllCheckbox.indeterminate = false;
+      return;
+    }
+
+    const selectedCount = checkboxes.filter(cb => cb.checked).length;
+    if (selectedCount === 0) {
+      this.gcsSelectAllCheckbox.checked = false;
+      this.gcsSelectAllCheckbox.indeterminate = false;
+    } else if (selectedCount === checkboxes.length) {
+      this.gcsSelectAllCheckbox.checked = true;
+      this.gcsSelectAllCheckbox.indeterminate = false;
+    } else {
+      this.gcsSelectAllCheckbox.indeterminate = true;
+    }
+  }
+
+  updateGcsSelectionInfo() {
+    if (this.gcsSelectedCountEl) {
+      const count = this.gcsSelected.size;
+      this.gcsSelectedCountEl.textContent = `${count} seleccionado${count === 1 ? '' : 's'}`;
+    }
+
+    if (this.gcsDeleteSelectedButton) {
+      this.gcsDeleteSelectedButton.disabled = this.gcsSelected.size === 0;
+    }
+  }
+
+  clearGcsSelection() {
+    this.gcsSelected.clear();
+    if (this.gcsTableBody) {
+      this.gcsTableBody.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+      });
+    }
+    this.syncGcsSelectAllState();
+    this.updateGcsSelectionInfo();
+  }
+
+  async handleGcsReconcile() {
+    if (!this.isAdminUser()) {
+      showNotification('Solo los administradores pueden reconciliar datos.', 'warning');
+      return;
+    }
+
+    const confirmed = confirm('Esto ejecutará una reconciliación completa entre la base de datos y el bucket. ¿Deseas continuar?');
+    if (!confirmed) return;
+
+    this.toggleGcsLoading(true);
+    try {
+      await docuFlowAPI.gcs.reconcileFiles();
+      showNotification('Se inició la reconciliación con Google Cloud Storage.', 'success');
+      await this.loadGcsSyncData({ refreshStats: true, page: 1 });
+    } catch (error) {
+      console.error('Error al reconciliar archivos GCS:', error);
+      showNotification('No se pudo ejecutar la reconciliación.', 'error');
+    } finally {
+      this.toggleGcsLoading(false);
+    }
+  }
+
+  async handleGcsCleanup() {
+    if (!this.isAdminUser()) {
+      showNotification('Solo los administradores pueden eliminar objetos del bucket.', 'warning');
+      return;
+    }
+
+    if (this.gcsSelected.size === 0) {
+      showNotification('Selecciona al menos un objeto huérfano para eliminar.', 'info');
+      return;
+    }
+
+    const items = Array.from(this.gcsSelected);
+    const confirmed = confirm(`¿Eliminar ${items.length} objeto${items.length === 1 ? '' : 's'} de Google Cloud Storage?`);
+    if (!confirmed) return;
+
+    this.toggleGcsLoading(true);
+    try {
+      await docuFlowAPI.gcs.cleanupFiles(items);
+      showNotification('Objetos eliminados correctamente del bucket.', 'success');
+      this.clearGcsSelection();
+      await this.loadGcsSyncData({ refreshStats: true, page: 1 });
+    } catch (error) {
+      console.error('Error al limpiar objetos GCS:', error);
+      showNotification('No se pudieron eliminar los objetos seleccionados.', 'error');
+    } finally {
+      this.toggleGcsLoading(false);
+    }
+  }
+
+  handleGcsRowAction(action, row) {
+    if (!row) return;
+
+    const fileName = row.dataset.fileName || row.querySelector('[data-file-name]')?.dataset.fileName;
+    if (!fileName) return;
+
+    switch (action) {
+      case 'copy-name': {
+        navigator.clipboard?.writeText(fileName)
+          .then(() => showNotification('Nombre del objeto copiado al portapapeles.', 'success', 2000))
+          .catch(() => showNotification('No se pudo copiar el nombre. Copia manualmente.', 'warning'));
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  formatGcsDate(value) {
+    if (!value) return '—';
+    const formatted = this.formatDisplayDate?.(value) || this.formatRelativeDate?.(value) || null;
+    return formatted || this.formatRelativeDate(value);
+  }
+
+  formatGcsTypeLabel(contentType) {
+    if (!contentType) {
+      return '<span class="badge gcs-tag-muted">N/D</span>';
+    }
+
+    const lowered = contentType.toLowerCase();
+    if (lowered.includes('pdf')) {
+      return `<span class="badge gcs-tag-danger">${contentType}</span>`;
+    }
+    if (lowered.startsWith('image/')) {
+      return `<span class="badge gcs-tag-success">${contentType}</span>`;
+    }
+    if (lowered.startsWith('video/')) {
+      return `<span class="badge gcs-tag-warning">${contentType}</span>`;
+    }
+    if (lowered.includes('json') || lowered.includes('xml')) {
+      return `<span class="badge gcs-tag-info">${contentType}</span>`;
+    }
+    return `<span class="badge gcs-tag-muted">${contentType}</span>`;
   }
 
   // Obtener estadísticas de Google Cloud Storage
