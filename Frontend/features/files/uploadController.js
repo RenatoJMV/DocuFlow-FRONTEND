@@ -209,6 +209,42 @@ class UploadController {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
+  formatDisplayDate(dateValue) {
+    if (!dateValue) return '—';
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) {
+      return '—';
+    }
+    return date.toLocaleDateString();
+  }
+
+  formatRelativeDate(dateValue) {
+    if (!dateValue) return 'Fecha desconocida';
+
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) {
+      return 'Fecha desconocida';
+    }
+
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return 'Hoy';
+    }
+
+    if (diffDays === 1) {
+      return 'Hace 1 día';
+    }
+
+    if (diffDays < 7) {
+      return `Hace ${diffDays} días`;
+    }
+
+    return date.toLocaleDateString();
+  }
+
   setupEventListeners() {
     // Upload form
     const uploadForm = document.getElementById('uploadForm');
@@ -434,7 +470,7 @@ class UploadController {
       sizeCell.textContent = this.formatFileSize(file.size || 0);
 
       const dateCell = document.createElement('td');
-      dateCell.textContent = new Date(file.uploadDate || Date.now()).toLocaleDateString();
+        dateCell.textContent = this.formatDisplayDate(file.uploadDate);
 
       const uploaderCell = document.createElement('td');
       uploaderCell.textContent = file.uploader || 'Usuario';
@@ -506,64 +542,57 @@ class UploadController {
 
     files.forEach(file => {
       const cardColumn = document.createElement('div');
-      cardColumn.className = 'col-md-6 col-xl-4 mb-3';
+      cardColumn.className = 'col-sm-6 col-xl-3 mb-4';
 
       const card = document.createElement('div');
-      card.className = 'file-card card-modern h-100';
+      card.className = 'file-grid-card';
 
-      const header = document.createElement('div');
-      header.className = 'file-card-header d-flex align-items-center gap-2';
+      const iconWrapper = document.createElement('div');
+      iconWrapper.className = 'file-grid-icon';
       const icon = document.createElement('i');
       icon.className = this.getFileIconClass(file.filename);
-      const titleWrapper = document.createElement('div');
-      titleWrapper.className = 'file-card-title';
-      const title = document.createElement('h6');
-      title.className = 'mb-0';
-      title.textContent = file.filename;
-      const size = document.createElement('small');
-      size.className = 'text-muted';
-      size.textContent = this.formatFileSize(file.size || 0);
-      titleWrapper.append(title, size);
-      header.append(icon, titleWrapper);
+      iconWrapper.appendChild(icon);
 
-      const body = document.createElement('div');
-      body.className = 'file-card-body';
-      const uploader = document.createElement('p');
-      uploader.className = 'mb-1';
-      uploader.innerHTML = `<i class="bi bi-person me-2"></i>${file.uploader || 'Usuario'}`;
-      const date = document.createElement('p');
-      date.className = 'mb-1';
-      date.innerHTML = `<i class="bi bi-calendar me-2"></i>${new Date(file.uploadDate || Date.now()).toLocaleDateString()}`;
-      body.append(uploader, date);
+      const title = document.createElement('div');
+      title.className = 'file-grid-name';
+      title.title = file.filename;
+      title.textContent = file.filename;
+
+      const meta = document.createElement('div');
+      meta.className = 'file-grid-meta';
+      meta.innerHTML = `
+        <span>${this.formatFileSize(file.size || 0)}</span>
+        <span>${this.formatRelativeDate(file.uploadDate)}</span>
+      `;
 
       const actions = document.createElement('div');
-      actions.className = 'file-card-actions d-flex gap-2';
+      actions.className = 'file-grid-actions';
 
       const downloadBtn = document.createElement('button');
       downloadBtn.type = 'button';
-      downloadBtn.className = 'btn btn-sm btn-outline-modern flex-fill';
+      downloadBtn.className = 'file-grid-btn';
       downloadBtn.dataset.uploadAction = 'download';
       downloadBtn.dataset.fileId = file.id;
       downloadBtn.dataset.fileName = file.filename;
-      downloadBtn.innerHTML = '<i class="bi bi-download"></i> Descargar';
+      downloadBtn.innerHTML = '<i class="bi bi-download"></i>';
 
       const previewBtn = document.createElement('button');
       previewBtn.type = 'button';
-      previewBtn.className = 'btn btn-sm btn-outline-modern flex-fill';
+      previewBtn.className = 'file-grid-btn';
       previewBtn.dataset.uploadAction = 'preview';
       previewBtn.dataset.fileId = file.id;
-      previewBtn.innerHTML = '<i class="bi bi-eye"></i> Vista previa';
+      previewBtn.innerHTML = '<i class="bi bi-eye"></i>';
 
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
-      deleteBtn.className = 'btn btn-sm btn-outline-danger flex-fill';
+      deleteBtn.className = 'file-grid-btn danger';
       deleteBtn.dataset.uploadAction = 'delete';
       deleteBtn.dataset.fileId = file.id;
-      deleteBtn.innerHTML = '<i class="bi bi-trash"></i> Eliminar';
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
 
       actions.append(downloadBtn, previewBtn, deleteBtn);
 
-      card.append(header, body, actions);
+      card.append(iconWrapper, title, meta, actions);
       cardColumn.appendChild(card);
       grid.appendChild(cardColumn);
     });
@@ -606,6 +635,23 @@ class UploadController {
       case 'update-stats':
         this.updateStats();
         break;
+      case 'refresh-files':
+        this.refreshFileList();
+        break;
+      case 'download-selected':
+        this.downloadAllSelected();
+        break;
+      case 'show-advanced-stats':
+        this.showAdvancedStatsModal();
+        break;
+      case 'detect-orphans':
+        this.detectOrphanedFiles();
+        break;
+      case 'trigger-file-input': {
+        const fileInput = document.getElementById('fileInput');
+        fileInput?.click();
+        break;
+      }
       default:
         break;
     }
@@ -635,8 +681,23 @@ class UploadController {
     if (!file) return null;
 
     const filename = file.filename || file.name || file.originalFilename || 'archivo_sin_nombre';
-    const uploadDate = file.uploadDate || file.createdAt || file.updatedAt || file.timestamp;
-    const uploader = file.uploader || file.uploadedBy || file.owner || file.user || 'Usuario';
+    const uploadDate = file.uploadDate
+      || file.createdAt
+      || file.created_at
+      || file.uploadedAt
+      || file.uploaded_at
+      || file.updatedAt
+      || file.timestamp
+      || null;
+    const uploader = file.uploader
+      || file.uploadedBy
+      || file.uploaded_by
+      || file.owner
+      || file.ownerName
+      || file.createdBy
+      || file.created_by
+      || file.user
+      || 'Usuario';
 
     return {
       ...file,
@@ -1327,23 +1388,11 @@ class UploadController {
     try {
       showNotification('Iniciando descarga...', 'info', 1000);
       
-      // Usar endpoint real del backend Spring Boot para descarga
-      const response = await docuFlowAPI.get(`/files/${fileId}/download`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      // Si el response es un blob, usarlo directamente
-      let blob;
-      if (response instanceof Blob) {
-        blob = response;
-      } else {
-        // Si es otro tipo de respuesta, intentar convertir
-        const arrayBuffer = response.arrayBuffer ? await response.arrayBuffer() : response;
-        blob = new Blob([arrayBuffer]);
-      }
+      const response = await docuFlowAPI.files.download(fileId);
+
+      const blob = response instanceof Blob
+        ? response
+        : await response.blob?.() ?? new Blob([response]);
       
       // Crear enlace de descarga
       const url = window.URL.createObjectURL(blob);
@@ -1385,7 +1434,15 @@ class UploadController {
       this.updateStats();
     } catch (error) {
       console.error('Delete error:', error);
-      showNotification('Error al eliminar archivo', 'error');
+      if (error?.status === 403) {
+        showNotification('No tienes permisos para eliminar este archivo.', 'error');
+      } else if (error?.status === 404) {
+        showNotification('El archivo ya no se encuentra en el servidor.', 'warning');
+      } else if (error?.status === 500) {
+        showNotification('El servidor devolvió un error al eliminar el archivo (500). Reintenta más tarde.', 'error');
+      } else {
+        showNotification('Error al eliminar archivo', 'error');
+      }
     }
   }
 
@@ -1399,18 +1456,9 @@ class UploadController {
 let uploadController;
 document.addEventListener('DOMContentLoaded', () => {
   uploadController = new UploadController();
-  
-  // Exponer métodos específicos globalmente para onclick handlers
-  window.uploadController = {
-    downloadFile: (fileId) => uploadController.downloadFile(fileId),
-    deleteFile: (fileId) => uploadController.deleteFile(fileId),
-    openPreviewModal: (fileId) => uploadController.previewFile(fileId),
-    removeFile: (index) => uploadController.removeFile(index),
-    refreshFileList: () => uploadController.refreshFileList(),
-    downloadAllSelected: () => uploadController.downloadAllSelected(),
-    showFileStatsModal: () => uploadController.showFileStatsModal()
-  };
   window.addEventListener('beforeunload', () => {
-    document.removeEventListener('click', uploadController.boundDocumentClick, true);
+    if (uploadController?.boundDocumentClick) {
+      document.removeEventListener('click', uploadController.boundDocumentClick, true);
+    }
   });
 });

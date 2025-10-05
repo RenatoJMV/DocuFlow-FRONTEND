@@ -65,7 +65,7 @@
             <div class="drop-zone-content">
               <i class="bi bi-cloud-upload display-4 text-primary mb-3"></i>
               <p class="mb-2">Arrastra archivos aquí o</p>
-              <button type="button" class="btn btn-modern btn-outline-modern" onclick="document.getElementById('fileInput').click()">
+              <button type="button" class="btn btn-modern btn-outline-modern" data-upload-action="trigger-file-input">
                 Seleccionar Archivos
               </button>
             </div>
@@ -107,16 +107,16 @@
           <div class="quick-actions mt-4">
             <h6>Acciones Rápidas</h6>
             <div class="d-grid gap-2">
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.refreshFileList?.()">
+              <button class="btn btn-modern btn-outline-modern btn-sm" data-upload-action="refresh-files">
                 <i class="bi bi-arrow-clockwise me-2"></i>Actualizar Lista
               </button>
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.downloadAllSelected?.()">
+              <button class="btn btn-modern btn-outline-modern btn-sm" data-upload-action="download-selected">
                 <i class="bi bi-download me-2"></i>Descargar Todo
               </button>
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.showAdvancedStatsModal?.()">
+              <button class="btn btn-modern btn-outline-modern btn-sm" data-upload-action="show-advanced-stats">
                 <i class="bi bi-bar-chart me-2"></i>Estadísticas GCS
               </button>
-              <button class="btn btn-modern btn-outline-modern btn-sm" onclick="window.uploadController?.detectOrphanedFiles?.()">
+              <button class="btn btn-modern btn-outline-modern btn-sm" data-upload-action="detect-orphans">
                 <i class="bi bi-search me-2"></i>Detectar Huérfanos
               </button>
             </div>
