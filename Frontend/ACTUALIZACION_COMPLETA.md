@@ -70,7 +70,13 @@
   - Polling automático cada 30 segundos
   - Eliminación individual y masiva
 
-#### 🔒 `permissionsControllerUpdated.js` - NUEVO
+#### � `portalLoginController.js` + `access-portal.html` - NUEVO
+- **Acceso unificado y seguro:**
+  - Combina el diseño moderno del login clásico con el panel informativo del modo seguro
+  - Validaciones reforzadas (email/usuario), sanitización y reportes en tiempo real mediante `securityService`
+  - Indicador de contexto seguro, reporte de estado y compatibilidad con recordatorio de usuario
+
+#### �🔒 `permissionsControllerUpdated.js` - NUEVO
 - **Gestión avanzada de permisos:**
   - Visualización de permisos por archivo y usuario
   - Asignación de permisos con tipos: READ, WRITE, DELETE, ADMIN, SHARE

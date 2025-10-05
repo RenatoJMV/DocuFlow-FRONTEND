@@ -1,5 +1,6 @@
 import { docuFlowAPI, ApiError } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
+import { featureFlags } from '../../shared/services/featureFlags.js';
 import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import { initializeNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
 
@@ -19,6 +20,9 @@ class UploadController {
     this.filteredFiles = [];
   this.lastGcsStatsErrorAt = null;
   this.gcsWarningShown = false;
+  this.gcsFeatureDisabledNoticeShown = false;
+  this.lastStorageUsageBand = null;
+  this.demoFilesFilteredNoticeShown = false;
     this.boundDocumentClick = this.handleDocumentClick.bind(this);
     this.pagination = new Pagination('paginationContainer', {
       itemsPerPage: this.itemsPerPage,
@@ -321,9 +325,12 @@ class UploadController {
               ? response.content
               : [];
 
-      this.allFiles = files
+      const normalizedFiles = files
         .map(file => this.normalizeFile(file))
         .filter(Boolean);
+
+      this.allFiles = this.stripDemoFiles(normalizedFiles);
+      store.setFiles(this.allFiles);
       console.log('📁 Archivos cargados:', this.allFiles.length);
       
       this.filterFiles();
@@ -331,6 +338,7 @@ class UploadController {
       console.error('Error loading files:', error);
       showNotification('Error al cargar archivos', 'error');
       this.allFiles = [];
+      store.setFiles([]);
       this.renderFiles();
     }
   }
@@ -640,6 +648,49 @@ class UploadController {
     };
   }
 
+  stripDemoFiles(files = []) {
+    const KNOWN_DEMO_NAMES = new Set([
+      'documento_importante.pdf',
+      'presentacion_q4.pptx',
+      'presentación_q4.pptx',
+      'reporte_financiero.xlsx',
+      'demo_contrato.pdf',
+      'archivo_demo.txt'
+    ]);
+
+    let removed = 0;
+
+    const sanitizedFiles = files.filter((file) => {
+      if (!file) return false;
+
+      if (file.isDemo === true || file.demo === true || file.sample === true || file.placeholder === true) {
+        removed++;
+        return false;
+      }
+
+      const id = (file.id ?? '').toString().toLowerCase();
+      if (id.startsWith('demo-') || id.startsWith('sample-')) {
+        removed++;
+        return false;
+      }
+
+      const filename = (file.filename || '').toLowerCase();
+      if (KNOWN_DEMO_NAMES.has(filename)) {
+        removed++;
+        return false;
+      }
+
+      return true;
+    });
+
+    if (removed > 0 && !this.demoFilesFilteredNoticeShown) {
+      showNotification(`Se ocultaron ${removed} archivos de demostración heredados.`, 'info', 4000);
+      this.demoFilesFilteredNoticeShown = true;
+    }
+
+    return sanitizedFiles;
+  }
+
   updateViewToggle() {
     document.querySelectorAll('.view-toggle .btn').forEach(btn => {
       btn.classList.remove('active');
@@ -677,76 +728,128 @@ class UploadController {
   }
 
   async updateStats() {
-    try {
-      // Usar los nuevos endpoints del backend incluyendo GCS
-      const [statsResponse, gcsResponse] = await Promise.allSettled([
-        docuFlowAPI.files.getStats(),
-        this.getGcsStats()
-      ]);
-      
-      console.log('📊 Estadísticas del servidor:', statsResponse);
-      console.log('☁️ Estadísticas de GCS:', gcsResponse);
-      
-      const totalFilesEl = document.getElementById('total-files');
-      const totalSizeEl = document.getElementById('total-size');
-      const gcsUsageEl = document.getElementById('gcs-usage');
-      const orphanFilesEl = document.getElementById('orphan-files');
+    const totalFilesEl = document.getElementById('total-files');
+    const totalSizeEl = document.getElementById('total-size');
 
-      // Procesar estadísticas básicas
-      if (statsResponse.status === 'fulfilled' && statsResponse.value && 
-          (statsResponse.value.totalFiles !== undefined || statsResponse.value.totalSizeBytes !== undefined)) {
-        const stats = statsResponse.value;
+    try {
+      const stats = await docuFlowAPI.files.getStats();
+
+      if (stats && (stats.totalFiles !== undefined || stats.totalSizeBytes !== undefined || stats.totalSize !== undefined)) {
         const totalFiles = stats.totalFiles ?? stats.count ?? this.allFiles.length;
         const totalSizeBytes = stats.totalSizeBytes ?? stats.totalSize ?? 0;
         const formattedTotalSize = stats.formattedTotalSize || this.formatFileSize(totalSizeBytes);
 
         if (totalFilesEl) totalFilesEl.textContent = totalFiles;
         if (totalSizeEl) totalSizeEl.textContent = formattedTotalSize;
-        
+
         console.log(`📊 Estadísticas actualizadas: ${totalFiles} archivos, ${formattedTotalSize}`);
       } else {
-        // Fallback: calcular desde los archivos cargados
-        const totalFiles = this.allFiles.length;
-        const totalSize = this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
-        
-        if (totalFilesEl) totalFilesEl.textContent = totalFiles;
-        if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);
-        
-        console.log(`📊 Estadísticas fallback: ${totalFiles} archivos, ${this.formatFileSize(totalSize)}`);
+        this.applyLocalStatsFallback(totalFilesEl, totalSizeEl);
       }
-
-      // Procesar estadísticas de GCS
-      if (gcsResponse.status === 'fulfilled' && gcsResponse.value) {
-        const gcsStats = gcsResponse.value;
-        
-        if (gcsUsageEl) {
-          gcsUsageEl.textContent = `${this.formatFileSize(gcsStats.usedStorage)} / ${this.formatFileSize(gcsStats.totalStorage)}`;
-        }
-        
-        if (orphanFilesEl) {
-          orphanFilesEl.textContent = gcsStats.orphanedFiles || 0;
-        }
-
-        // Actualizar indicadores visuales
-        this.updateStorageIndicator(gcsStats);
-      }
-      
     } catch (error) {
-      console.error('Error updating stats:', error);
-      // Fallback en caso de error
-      const totalFiles = this.allFiles.length;
-      const totalSize = this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
-      
-      const totalFilesEl = document.getElementById('total-files');
-      const totalSizeEl = document.getElementById('total-size');
-      
-      if (totalFilesEl) totalFilesEl.textContent = totalFiles;
-      if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);
+      console.warn('No se pudieron obtener estadísticas del backend, usando fallback local.', error);
+      this.applyLocalStatsFallback(totalFilesEl, totalSizeEl);
     }
+
+    if (featureFlags.isEnabled('gcsStats')) {
+      const gcsStats = await this.getGcsStats();
+      this.applyGcsStats(gcsStats);
+    } else {
+      this.applyGcsStats(this.getGcsFallbackStats(), { disabled: true });
+      this.notifyGcsFeatureDisabled();
+    }
+  }
+
+  applyLocalStatsFallback(totalFilesEl, totalSizeEl) {
+    const totalFiles = this.allFiles.length;
+    const totalSize = this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+
+    if (totalFilesEl) totalFilesEl.textContent = totalFiles;
+    if (totalSizeEl) totalSizeEl.textContent = this.formatFileSize(totalSize);
+
+    console.log(`📊 Estadísticas fallback: ${totalFiles} archivos, ${this.formatFileSize(totalSize)}`);
+  }
+
+  applyGcsStats(gcsStats, options = {}) {
+    const { disabled = false } = options;
+    const gcsUsageEl = document.getElementById('gcs-usage');
+    const orphanFilesEl = document.getElementById('orphan-files');
+    const storageUsedEl = document.getElementById('storage-used');
+    const storageAvailableEl = document.getElementById('storage-available');
+
+    const usedStorage = gcsStats?.usedStorage ?? 0;
+    const totalStorage = Math.max(gcsStats?.totalStorage ?? 0, usedStorage);
+    const orphanedFiles = gcsStats?.orphanedFiles ?? 0;
+
+    const usedLabel = this.formatFileSize(usedStorage);
+    const totalLabel = this.formatFileSize(totalStorage || 10737418240);
+
+    if (gcsUsageEl) {
+      if (disabled) {
+        gcsUsageEl.textContent = 'Desactivado temporalmente';
+      } else if (gcsStats?.isFallback) {
+        gcsUsageEl.textContent = `${usedLabel} / ${totalLabel} (estimado)`;
+      } else {
+        gcsUsageEl.textContent = `${usedLabel} / ${totalLabel}`;
+      }
+    }
+
+    if (orphanFilesEl) {
+      orphanFilesEl.textContent = disabled ? '—' : orphanedFiles;
+    }
+
+    if (storageUsedEl) {
+      storageUsedEl.textContent = disabled ? '--' : usedLabel;
+    }
+
+    if (storageAvailableEl) {
+      const available = Math.max(totalStorage - usedStorage, 0);
+      storageAvailableEl.textContent = disabled ? '--' : this.formatFileSize(available);
+    }
+
+    if (disabled || !gcsStats) {
+      this.resetStorageIndicator();
+      return;
+    }
+
+    this.updateStorageIndicator(gcsStats);
+  }
+
+  resetStorageIndicator() {
+    const storageBar = document.getElementById('storage-usage-bar');
+    const storagePercent = document.getElementById('storage-usage-percent');
+
+    if (storageBar) {
+      storageBar.style.width = '0%';
+      storageBar.className = 'progress-bar bg-secondary';
+    }
+
+    if (storagePercent) {
+      storagePercent.textContent = '--';
+    }
+
+    this.lastStorageUsageBand = null;
+  }
+
+  notifyGcsFeatureDisabled() {
+    if (this.gcsFeatureDisabledNoticeShown) {
+      return;
+    }
+
+    showNotification(
+      'Las métricas de Google Cloud Storage están desactivadas hasta que el backend exponga el endpoint `/api/gcs/stats`.',
+      'info',
+      6000
+    );
+    this.gcsFeatureDisabledNoticeShown = true;
   }
 
   // Obtener estadísticas de Google Cloud Storage
   async getGcsStats() {
+    if (!featureFlags.isEnabled('gcsStats')) {
+      return this.getGcsFallbackStats();
+    }
+
     const cooldownMs = 5 * 60 * 1000; // 5 minutos
 
     if (this.lastGcsStatsErrorAt && (Date.now() - this.lastGcsStatsErrorAt) < cooldownMs) {
@@ -779,12 +882,18 @@ class UploadController {
       usedStorage: this.allFiles.reduce((sum, file) => sum + (file.size || 0), 0),
       totalStorage: 10737418240, // 10GB por defecto
       orphanedFiles: 0,
-      storageUsagePercent: 0
+      storageUsagePercent: 0,
+      isFallback: true
     };
   }
 
   // Detectar archivos huérfanos
   async detectOrphanedFiles() {
+    if (!featureFlags.isEnabled('gcsStats')) {
+      this.notifyGcsFeatureDisabled();
+      return [];
+    }
+
     try {
       showNotification('🔍 Detectando archivos huérfanos...', 'info');
       
@@ -808,6 +917,11 @@ class UploadController {
 
   // Limpiar archivos huérfanos
   async cleanupOrphanedFiles(fileIds = []) {
+    if (!featureFlags.isEnabled('gcsStats')) {
+      this.notifyGcsFeatureDisabled();
+      return;
+    }
+
     try {
       if (fileIds.length === 0) {
         // Detectar primero si no se especifican IDs
@@ -850,17 +964,23 @@ class UploadController {
 
   // Actualizar indicador visual de almacenamiento
   updateStorageIndicator(gcsStats) {
-    const usagePercent = gcsStats.storageUsagePercent || 
-      (gcsStats.usedStorage / gcsStats.totalStorage) * 100;
-    
     const storageBar = document.getElementById('storage-usage-bar');
     const storagePercent = document.getElementById('storage-usage-percent');
     
+    if (!gcsStats || !gcsStats.totalStorage) {
+      this.resetStorageIndicator();
+      return;
+    }
+
+    const rawPercent = gcsStats.storageUsagePercent ?? ((gcsStats.usedStorage / gcsStats.totalStorage) * 100);
+    const usagePercent = Number.isFinite(rawPercent) ? rawPercent : 0;
+
     if (storageBar) {
       storageBar.style.width = `${Math.min(usagePercent, 100)}%`;
-      
-      // Cambiar color según el uso
-      if (usagePercent > 90) {
+
+      if (gcsStats.isFallback) {
+        storageBar.className = 'progress-bar bg-secondary';
+      } else if (usagePercent > 90) {
         storageBar.className = 'progress-bar bg-danger';
       } else if (usagePercent > 75) {
         storageBar.className = 'progress-bar bg-warning';
@@ -868,19 +988,33 @@ class UploadController {
         storageBar.className = 'progress-bar bg-success';
       }
     }
-    
+
     if (storagePercent) {
-      storagePercent.textContent = `${usagePercent.toFixed(1)}%`;
+      const prefix = gcsStats.isFallback ? '≈ ' : '';
+      storagePercent.textContent = `${prefix}${usagePercent.toFixed(1)}%`;
     }
 
-    // Mostrar advertencia si el almacenamiento está casi lleno
-    if (usagePercent > 85) {
-      const warningMessage = usagePercent > 95 ? 
-        '⚠️ Almacenamiento casi lleno' : 
-        '📊 Almacenamiento con uso alto';
-      
+    if (gcsStats.isFallback) {
+      this.lastStorageUsageBand = null;
+      return;
+    }
+
+    let usageBand = 'normal';
+    if (usagePercent > 90) {
+      usageBand = 'danger';
+    } else if (usagePercent > 75) {
+      usageBand = 'warning';
+    }
+
+    if (usageBand !== 'normal' && usageBand !== this.lastStorageUsageBand) {
+      const warningMessage = usageBand === 'danger'
+        ? '⚠️ Almacenamiento casi lleno'
+        : '📊 Almacenamiento con uso alto';
+
       showNotification(warningMessage, 'warning', 5000);
     }
+
+    this.lastStorageUsageBand = usageBand;
   }
 
   refreshFileList() {
@@ -1015,6 +1149,11 @@ class UploadController {
 
   // Modal avanzado de estadísticas GCS
   async showAdvancedStatsModal() {
+    if (!featureFlags.isEnabled('gcsStats')) {
+      this.notifyGcsFeatureDisabled();
+      return;
+    }
+
     try {
       showNotification('📊 Cargando estadísticas avanzadas...', 'info');
       

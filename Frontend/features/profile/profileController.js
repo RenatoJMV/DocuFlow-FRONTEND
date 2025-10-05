@@ -202,7 +202,7 @@ class ProfileController {
       });
 
       setTimeout(() => {
-        window.location.href = '../auth/login.html';
+        window.location.href = '../auth/access-portal.html';
       }, 600);
     } catch (error) {
       console.error('Error al cerrar sesión desde el perfil:', error);

@@ -234,7 +234,7 @@ async function handleLogout() {
     console.warn('❌ Error al cerrar sesión:', error);
   } finally {
     setTimeout(() => {
-      window.location.href = '../auth/login.html';
+  window.location.href = '../auth/access-portal.html';
     }, 600);
   }
 

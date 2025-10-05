@@ -232,10 +232,10 @@ apiClient.addErrorInterceptor((error, config, endpoint) => {
     localStorage.removeItem('user');
     localStorage.removeItem('refreshToken');
     
-    if (window.location.pathname !== '/auth/login.html') {
+    if (!window.location.pathname.includes('/auth/access-portal.html')) {
       showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
       setTimeout(() => {
-        window.location.href = '../auth/login.html';
+        window.location.href = '../auth/access-portal.html';
       }, 1500);
     }
   }

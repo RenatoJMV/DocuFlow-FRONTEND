@@ -33,7 +33,7 @@ function ensureUserLoaded() {
 
 export function enforcePageAuth(options = {}) {
   const {
-    loginPath = '../auth/login.html',
+  loginPath = '../auth/access-portal.html',
     message = 'Tu sesión ha expirado. Inicia sesión para continuar.',
     reason = 'auth_required',
     restoreUser = true
