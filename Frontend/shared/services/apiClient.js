@@ -378,7 +378,8 @@ const docuFlowAPI = {
       return apiClient.get(`${GCS_PREFIX}/files/orphaned${query ? `?${query}` : ''}`);
     },
     reconcileFiles: () => apiClient.post(`${GCS_PREFIX}/files/reconcile`, {}, {
-      successMessage: 'Proceso de reconciliación iniciado'
+      successMessage: 'Proceso de reconciliación iniciado',
+      showErrorNotification: false
     }),
     cleanupFiles: (fileNames = []) => apiClient.post(`${GCS_PREFIX}/files/cleanup`, { fileNames })
   },

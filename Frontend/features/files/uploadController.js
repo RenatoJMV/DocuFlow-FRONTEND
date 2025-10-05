@@ -58,7 +58,7 @@ class UploadController {
 
   async init() {
     await this.loadFiles();
-    this.updateStats();
+    await this.updateStats();
   }
 
   initializeComponents() {
@@ -649,7 +649,6 @@ class UploadController {
     this.currentPage = 1;
     this.renderFiles();
     this.updatePagination();
-    this.updateStats(); // Actualizar estadísticas después de filtrar
   }
 
   renderFiles() {
@@ -1606,7 +1605,8 @@ class UploadController {
       await this.loadGcsSyncData({ refreshStats: true, page: 1 });
     } catch (error) {
       console.error('Error al reconciliar archivos GCS:', error);
-      showNotification('No se pudo ejecutar la reconciliación.', 'error');
+      const message = await this.resolveApiErrorMessage(error, 'No se pudo ejecutar la reconciliación. Revisa los logs del backend.');
+      showNotification(message, 'error');
     } finally {
       this.toggleGcsLoading(false);
     }
@@ -1907,8 +1907,9 @@ class UploadController {
     this.lastStorageUsageBand = usageBand;
   }
 
-  refreshFileList() {
-    this.loadFiles();
+  async refreshFileList() {
+    await this.loadFiles();
+    await this.updateStats();
   }
 
   async downloadAllSelected() {
@@ -2275,6 +2276,48 @@ class UploadController {
         showNotification('Error al eliminar archivo', 'error');
       }
     }
+  }
+
+  async resolveApiErrorMessage(error, fallbackMessage = 'Ocurrió un error inesperado.') {
+    const defaultMessage = fallbackMessage;
+
+    if (error instanceof ApiError) {
+      if (error.response) {
+        try {
+          const cloned = error.response.clone();
+          const contentType = cloned.headers?.get('content-type') || '';
+
+          if (contentType.includes('application/json')) {
+            const payload = await cloned.json();
+            const detailedMessage = payload?.message || payload?.error || payload?.details;
+            if (detailedMessage) {
+              return detailedMessage;
+            }
+          } else {
+            const text = (await cloned.text())?.trim();
+            if (text) {
+              return text;
+            }
+          }
+        } catch (_) {
+          // Ignorar problemas al leer el body del error
+        }
+      }
+
+      if (error.status === 500) {
+        return 'El backend devolvió un error interno (500). Revisa los logs del servidor para más detalles.';
+      }
+
+      if (typeof error.message === 'string' && error.message.trim()) {
+        return error.message;
+      }
+    }
+
+    if (error && typeof error.message === 'string' && error.message.trim()) {
+      return error.message;
+    }
+
+    return defaultMessage;
   }
 
   async previewFile(fileId) {
