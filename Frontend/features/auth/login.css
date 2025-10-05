@@ -58,20 +58,24 @@
   position: relative;
 }
 
+.password-input-container .form-control {
+  padding-right: 3rem;
+}
+
 .password-toggle {
   position: absolute;
-  right: 10px;
+  right: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   color: var(--gray-500);
   cursor: pointer;
-  padding: var(--spacing-2xs);
+  padding: 0.35rem;
   border-radius: var(--border-radius-sm);
   transition: var(--transition-fast);
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   line-height: 1;
