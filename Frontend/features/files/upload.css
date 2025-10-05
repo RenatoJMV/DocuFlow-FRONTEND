@@ -313,6 +313,27 @@
 .gcs-sync-body {
   position: relative;
   overflow: hidden;
+  padding: var(--spacing-lg);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--border-radius-lg);
+  background: var(--white);
+}
+
+.gcs-sync-body > *:not(:last-child) {
+  margin-bottom: var(--spacing-lg);
+}
+
+.gcs-sync-body .table-responsive {
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--gray-200);
+  background: var(--gray-50);
+}
+
+.gcs-sync-body .table-responsive table {
+  background: var(--white);
+  border-radius: var(--border-radius);
+  overflow: hidden;
 }
 
 .gcs-selection-info {
