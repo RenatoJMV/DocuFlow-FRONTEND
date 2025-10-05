@@ -295,6 +295,21 @@
   color: var(--gray-900);
 }
 
+.gcs-status-banner {
+  border-radius: var(--border-radius-lg);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.gcs-status-banner.alert-danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.gcs-status-banner .btn-sm {
+  font-weight: 600;
+}
+
 .gcs-sync-body {
   position: relative;
   overflow: hidden;

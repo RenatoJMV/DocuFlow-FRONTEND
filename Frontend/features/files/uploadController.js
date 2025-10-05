@@ -34,6 +34,11 @@ class UploadController {
     this.gcsOrphanedFiles = [];
     this.gcsSelected = new Set();
     this.gcsPagination = null;
+    this.gcsStatsReady = null;
+    this.latestGcsStats = null;
+    this.lastGcsStatsFetchedAt = 0;
+    this.lastGcsError = null;
+    this.gcsActionsEnabled = false;
     this.boundDocumentClick = this.handleDocumentClick.bind(this);
     this.pagination = new Pagination('paginationContainer', {
       itemsPerPage: this.itemsPerPage,
@@ -222,11 +227,20 @@ class UploadController {
     this.gcsLoadingOverlay = document.getElementById('gcsSyncLoading');
     this.gcsDeleteSelectedButton = document.getElementById('gcsDeleteSelectedButton');
     this.gcsReconcileButton = document.getElementById('gcsReconcileButton');
+    this.gcsStatusBanner = document.getElementById('gcsStatusBanner');
+    this.gcsStatusMessage = document.getElementById('gcsStatusMessage');
+    this.gcsRetryButton = document.getElementById('gcsRetryButton');
 
     this.gcsPagination = new Pagination('gcsPaginationContainer', {
       itemsPerPage: this.gcsPageSize,
       onPageChange: (page) => this.handleGcsPageChange(page)
     });
+
+    this.gcsRetryButton?.addEventListener('click', () => {
+      this.loadGcsSyncData({ refreshStats: true, page: 1, forceRefresh: true });
+    });
+
+    this.setGcsActionsEnabled(false);
 
     this.gcsReconcileButton?.addEventListener('click', () => this.handleGcsReconcile());
     this.gcsDeleteSelectedButton?.addEventListener('click', () => this.handleGcsCleanup());
@@ -1095,15 +1109,9 @@ class UploadController {
       this.applyLocalStatsFallback(totalFilesEl, totalSizeEl);
     }
 
-    if (featureFlags.isEnabled('gcsStats')) {
-      const gcsStats = await this.getGcsStats();
-      this.applyGcsStats(gcsStats);
-      this.updateGcsStatsCards(gcsStats);
-    } else {
-      this.applyGcsStats(this.getGcsFallbackStats(), { disabled: true });
-      this.notifyGcsFeatureDisabled();
-      this.updateGcsStatsCards(this.getGcsFallbackStats());
-    }
+    const gcsStats = await this.getGcsStats();
+    this.applyGcsStats(gcsStats);
+    this.updateGcsStatsCards(gcsStats);
   }
 
   applyLocalStatsFallback(totalFilesEl, totalSizeEl) {
@@ -1122,6 +1130,28 @@ class UploadController {
     const orphanFilesEl = document.getElementById('orphan-files');
     const storageUsedEl = document.getElementById('storage-used');
     const storageAvailableEl = document.getElementById('storage-available');
+    const ready = !disabled && gcsStats && gcsStats.ready !== false;
+    this.gcsStatsReady = ready;
+
+    if (!ready) {
+      const message = gcsStats?.message
+        || (gcsStats?.status === 503 ? 'Servicio temporalmente no disponible.' : null)
+        || 'El bucket está inicializándose. Intenta nuevamente en unos minutos.';
+      const tone = gcsStats?.status === 503 ? 'danger' : 'warning';
+      this.showGcsStatusBanner(message, { tone });
+      this.setGcsActionsEnabled(false);
+
+      if (gcsUsageEl) gcsUsageEl.textContent = disabled ? 'Desactivado temporalmente' : '—';
+      if (orphanFilesEl) orphanFilesEl.textContent = '—';
+      if (storageUsedEl) storageUsedEl.textContent = '--';
+      if (storageAvailableEl) storageAvailableEl.textContent = '--';
+
+      this.resetStorageIndicator();
+      return;
+    }
+
+    this.hideGcsStatusBanner();
+    this.setGcsActionsEnabled(true);
 
     const usedStorage = gcsStats?.usedStorage ?? 0;
     const totalStorage = Math.max(gcsStats?.totalStorage ?? 0, usedStorage);
@@ -1131,9 +1161,7 @@ class UploadController {
     const totalLabel = this.formatFileSize(totalStorage || 10737418240);
 
     if (gcsUsageEl) {
-      if (disabled) {
-        gcsUsageEl.textContent = 'Desactivado temporalmente';
-      } else if (gcsStats?.isFallback) {
+      if (gcsStats?.isFallback) {
         gcsUsageEl.textContent = `${usedLabel} / ${totalLabel} (estimado)`;
       } else {
         gcsUsageEl.textContent = `${usedLabel} / ${totalLabel}`;
@@ -1141,21 +1169,16 @@ class UploadController {
     }
 
     if (orphanFilesEl) {
-      orphanFilesEl.textContent = disabled ? '—' : orphanedFiles;
+      orphanFilesEl.textContent = orphanedFiles;
     }
 
     if (storageUsedEl) {
-      storageUsedEl.textContent = disabled ? '--' : usedLabel;
+      storageUsedEl.textContent = usedLabel;
     }
 
     if (storageAvailableEl) {
       const available = Math.max(totalStorage - usedStorage, 0);
-      storageAvailableEl.textContent = disabled ? '--' : this.formatFileSize(available);
-    }
-
-    if (disabled || !gcsStats) {
-      this.resetStorageIndicator();
-      return;
+      storageAvailableEl.textContent = this.formatFileSize(available);
     }
 
     this.updateStorageIndicator(gcsStats);
@@ -1193,12 +1216,24 @@ class UploadController {
   async loadGcsSyncData(options = {}) {
     if (!this.isAdminUser()) return;
 
-    const { page = this.gcsCurrentPage || 1, refreshStats = true } = options;
+    const { page = this.gcsCurrentPage || 1, refreshStats = true, forceRefresh = false } = options;
 
     try {
-      if (refreshStats) {
-        await this.loadGcsStatsCards();
+      let stats = this.latestGcsStats;
+      if (refreshStats || !stats) {
+        stats = await this.loadGcsStatsCards(forceRefresh);
       }
+
+      if (stats?.ready === false) {
+        this.gcsStatsReady = false;
+        this.renderGcsOrphanedTable([]);
+        this.setGcsActionsEnabled(false);
+        if (this.gcsTotalOrphansEl) {
+          this.gcsTotalOrphansEl.textContent = '—';
+        }
+        return;
+      }
+
       await this.loadGcsOrphanedFiles(page);
       this.gcsDataLoaded = true;
     } catch (error) {
@@ -1208,15 +1243,18 @@ class UploadController {
   }
 
   async loadGcsStatsCards() {
-    if (!this.isAdminUser()) return;
+    if (!this.isAdminUser()) return this.latestGcsStats;
 
     try {
-      const response = await docuFlowAPI.gcs.getStats();
-      const stats = response?.data || response || {};
+      const stats = await this.getGcsStats({ forceRefresh: true });
+      this.applyGcsStats(stats);
       this.updateGcsStatsCards(stats);
+      return stats;
     } catch (error) {
       console.warn('No fue posible obtener estadísticas detalladas de GCS.', error);
-      this.updateGcsStatsCards({});
+      const fallback = await this.getGcsStats().catch(() => ({ ready: false }));
+      this.updateGcsStatsCards(fallback || {});
+      return fallback;
     }
   }
 
@@ -1227,6 +1265,14 @@ class UploadController {
     const totalDbEl = document.getElementById('gcsStatTotalDb');
     const missingDbEl = document.getElementById('gcsStatMissingInDb');
     const missingGcsEl = document.getElementById('gcsStatMissingInGcs');
+
+    if (stats?.ready === false) {
+      if (totalGcsEl) totalGcsEl.textContent = '—';
+      if (totalDbEl) totalDbEl.textContent = '—';
+      if (missingDbEl) missingDbEl.textContent = '—';
+      if (missingGcsEl) missingGcsEl.textContent = '—';
+      return;
+    }
 
     const totalGcs = stats.totalGcsObjects ?? stats.totalObjects ?? stats.gcsCount ?? stats.bucketCount ?? 0;
     const totalDb = stats.totalDatabaseRecords ?? stats.totalDbEntries ?? stats.dbCount ?? stats.databaseCount ?? 0;
@@ -1246,6 +1292,11 @@ class UploadController {
 
   async loadGcsOrphanedFiles(page = 1) {
     if (!this.isAdminUser()) return;
+
+    if (this.gcsStatsReady === false) {
+      this.renderGcsOrphanedTable([]);
+      return;
+    }
 
     this.gcsCurrentPage = page;
     this.toggleGcsLoading(true);
@@ -1495,8 +1546,33 @@ class UploadController {
     }
 
     if (this.gcsDeleteSelectedButton) {
-      this.gcsDeleteSelectedButton.disabled = this.gcsSelected.size === 0;
+      const canAct = this.gcsStatsReady !== false && this.gcsActionsEnabled;
+      this.gcsDeleteSelectedButton.disabled = !canAct || this.gcsSelected.size === 0;
     }
+  }
+
+  setGcsActionsEnabled(enabled) {
+    this.gcsActionsEnabled = Boolean(enabled);
+    const buttons = [this.gcsReconcileButton, this.gcsDeleteSelectedButton];
+    buttons.forEach((btn) => {
+      if (btn) {
+        btn.disabled = !this.gcsActionsEnabled;
+      }
+    });
+    this.updateGcsSelectionInfo();
+  }
+
+  showGcsStatusBanner(message, { tone = 'warning' } = {}) {
+    if (!this.gcsStatusBanner || !this.gcsStatusMessage) return;
+
+    this.gcsStatusBanner.classList.remove('d-none', 'alert-warning', 'alert-danger');
+    this.gcsStatusBanner.classList.add(tone === 'danger' ? 'alert-danger' : 'alert-warning');
+    this.gcsStatusMessage.textContent = message || 'El servicio de Google Cloud Storage no está listo todavía.';
+  }
+
+  hideGcsStatusBanner() {
+    if (!this.gcsStatusBanner) return;
+    this.gcsStatusBanner.classList.add('d-none');
   }
 
   clearGcsSelection() {
@@ -1516,13 +1592,17 @@ class UploadController {
       return;
     }
 
+    if (this.gcsStatsReady === false) {
+      showNotification('El servicio de Google Cloud Storage no está listo. Intenta más tarde.', 'warning');
+      return;
+    }
+
     const confirmed = confirm('Esto ejecutará una reconciliación completa entre la base de datos y el bucket. ¿Deseas continuar?');
     if (!confirmed) return;
 
     this.toggleGcsLoading(true);
     try {
       await docuFlowAPI.gcs.reconcileFiles();
-      showNotification('Se inició la reconciliación con Google Cloud Storage.', 'success');
       await this.loadGcsSyncData({ refreshStats: true, page: 1 });
     } catch (error) {
       console.error('Error al reconciliar archivos GCS:', error);
@@ -1535,6 +1615,11 @@ class UploadController {
   async handleGcsCleanup() {
     if (!this.isAdminUser()) {
       showNotification('Solo los administradores pueden eliminar objetos del bucket.', 'warning');
+      return;
+    }
+
+    if (this.gcsStatsReady === false) {
+      showNotification('El servicio de Google Cloud Storage no está listo. Intenta más tarde.', 'warning');
       return;
     }
 
@@ -1607,36 +1692,84 @@ class UploadController {
   }
 
   // Obtener estadísticas de Google Cloud Storage
-  async getGcsStats() {
-    if (!featureFlags.isEnabled('gcsStats')) {
-      return this.getGcsFallbackStats();
-    }
+  async getGcsStats(options = {}) {
+    const { forceRefresh = false } = options;
 
-    const cooldownMs = 5 * 60 * 1000; // 5 minutos
+    const cacheValid = !forceRefresh
+      && this.latestGcsStats
+      && (Date.now() - this.lastGcsStatsFetchedAt) < (60 * 1000);
 
-    if (this.lastGcsStatsErrorAt && (Date.now() - this.lastGcsStatsErrorAt) < cooldownMs) {
-      return this.getGcsFallbackStats();
+    if (cacheValid) {
+      return this.latestGcsStats;
     }
 
     try {
       const response = await docuFlowAPI.gcs.getStats();
+      const stats = response?.data || response || {};
+      const normalized = {
+        ...stats,
+        ready: stats.ready === false ? false : true
+      };
 
-      if (response instanceof ApiError || response?.status >= 500) {
-        throw response;
-      }
-
+      this.latestGcsStats = normalized;
+      this.lastGcsStatsFetchedAt = Date.now();
       this.lastGcsStatsErrorAt = null;
+      this.lastGcsError = null;
       this.gcsWarningShown = false;
-      return response.data || response;
+      return normalized;
     } catch (error) {
-      this.lastGcsStatsErrorAt = Date.now();
-      if (!this.gcsWarningShown) {
-        console.warn('⚠️ No se pudieron obtener estadísticas de GCS:', error);
-        showNotification('No pudimos consultar el uso de almacenamiento en la nube (se mostrará un estimado).', 'warning');
-        this.gcsWarningShown = true;
+      if (error instanceof ApiError && error.status === 401) {
+        throw error;
       }
-      return this.getGcsFallbackStats();
+
+      this.lastGcsStatsErrorAt = Date.now();
+      this.lastGcsError = error;
+
+      const normalized = await this.normalizeGcsStatsError(error);
+      this.latestGcsStats = normalized;
+      return normalized;
     }
+  }
+
+  async normalizeGcsStatsError(error) {
+    let status = null;
+    let message = 'No pudimos consultar el estado de Google Cloud Storage.';
+
+    if (error instanceof ApiError) {
+      status = error.status;
+
+      if (error.response && typeof error.response.clone === 'function') {
+        try {
+          const cloned = error.response.clone();
+          const payload = await cloned.json();
+          if (payload?.error || payload?.message) {
+            message = payload.error || payload.message;
+          }
+        } catch (_) {
+          // Ignorar errores al parsear el body
+        }
+      }
+
+      if (status === 503 && (!message || message === 'No pudimos consultar el estado de Google Cloud Storage.')) {
+        message = 'Servicio temporalmente no disponible.';
+      }
+    } else if (error && typeof error.message === 'string') {
+      message = error.message;
+    }
+
+    if (!this.gcsWarningShown) {
+      console.warn('⚠️ No se pudieron obtener estadísticas de GCS:', error);
+      const severity = status === 503 ? 'error' : 'warning';
+      showNotification(message, severity);
+      this.gcsWarningShown = true;
+    }
+
+    return {
+      ready: false,
+      message,
+      status,
+      error: true
+    };
   }
 
   getGcsFallbackStats() {
@@ -1651,17 +1784,16 @@ class UploadController {
 
   // Detectar archivos huérfanos
   async detectOrphanedFiles() {
-    if (!featureFlags.isEnabled('gcsStats')) {
-      this.notifyGcsFeatureDisabled();
+    if (this.gcsStatsReady === false) {
+      showNotification('El servicio de Google Cloud Storage no está listo. Intenta más tarde.', 'warning');
       return [];
     }
 
     try {
       showNotification('🔍 Detectando archivos huérfanos...', 'info');
-      
-      const response = await docuFlowAPI.gcs.getOrphanedFiles();
-      const orphanedFiles = response.data || response || [];
-      
+      const response = await docuFlowAPI.gcs.getOrphanedFiles({ page: 1, size: 500 });
+      const { items: orphanedFiles = [] } = this.normalizeGcsOrphanedResponse(response, { page: 1, size: 500 });
+
       if (orphanedFiles.length > 0) {
         this.showOrphanedFilesModal(orphanedFiles);
         showNotification(`⚠️ Se encontraron ${orphanedFiles.length} archivos huérfanos`, 'warning');
@@ -1678,46 +1810,42 @@ class UploadController {
   }
 
   // Limpiar archivos huérfanos
-  async cleanupOrphanedFiles(fileIds = []) {
-    if (!featureFlags.isEnabled('gcsStats')) {
-      this.notifyGcsFeatureDisabled();
+  async cleanupOrphanedFiles(fileNames = []) {
+    if (this.gcsStatsReady === false) {
+      showNotification('El servicio de Google Cloud Storage no está listo. Intenta más tarde.', 'warning');
       return;
     }
 
     try {
-      if (fileIds.length === 0) {
-        // Detectar primero si no se especifican IDs
-        const orphanedFiles = await this.detectOrphanedFiles();
-        fileIds = orphanedFiles.map(file => file.id);
+      let targets = Array.isArray(fileNames) ? [...fileNames] : [];
+
+      if (targets.length === 0) {
+        const response = await docuFlowAPI.gcs.getOrphanedFiles({ page: 1, size: 500 });
+        const { items = [] } = this.normalizeGcsOrphanedResponse(response, { page: 1, size: 500 });
+        targets = items.map(file => file.name || file.fileName || file.objectName).filter(Boolean);
       }
 
-      if (fileIds.length === 0) {
+      if (targets.length === 0) {
         showNotification('✅ No hay archivos huérfanos para limpiar', 'info');
         return;
       }
 
-      const confirmed = confirm(`¿Estás seguro de que quieres eliminar ${fileIds.length} archivos huérfanos? Esta acción no se puede deshacer.`);
+      const confirmed = confirm(`¿Estás seguro de que quieres eliminar ${targets.length} archivos huérfanos? Esta acción no se puede deshacer.`);
       
       if (!confirmed) return;
 
       showNotification('🧹 Limpiando archivos huérfanos...', 'info');
 
-      const response = await docuFlowAPI.gcs.cleanupOrphaned(fileIds);
-      
-      if (response.success) {
-        showNotification(`✅ Se limpiaron ${fileIds.length} archivos huérfanos exitosamente`, 'success');
-        
-        // Actualizar estadísticas
-        this.updateStats();
-        
-        // Crear notificación del sistema
-        if (window.createNotification) {
-          window.createNotification('SYSTEM', 'Limpieza completada', 
-            `Se eliminaron ${fileIds.length} archivos huérfanos`, 2);
-        }
-      }
+      await docuFlowAPI.gcs.cleanupFiles(targets);
 
-      return response;
+      showNotification(`✅ Se limpiaron ${targets.length} archivos huérfanos exitosamente`, 'success');
+
+      await this.loadGcsSyncData({ refreshStats: true, page: 1, forceRefresh: true });
+
+      if (window.createNotification) {
+        window.createNotification('SYSTEM', 'Limpieza completada',
+          `Se eliminaron ${targets.length} objetos huérfanos`, 2);
+      }
     } catch (error) {
       console.error('Error cleaning up orphaned files:', error);
       showNotification('❌ Error durante la limpieza de archivos', 'error');

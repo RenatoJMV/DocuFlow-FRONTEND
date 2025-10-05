@@ -380,9 +380,7 @@ const docuFlowAPI = {
     reconcileFiles: () => apiClient.post(`${GCS_PREFIX}/files/reconcile`, {}, {
       successMessage: 'Proceso de reconciliación iniciado'
     }),
-    cleanupFiles: (fileNames = []) => apiClient.post(`${GCS_PREFIX}/files/cleanup`, { fileNames }, {
-      successMessage: fileNames.length ? 'Archivos seleccionados eliminados de GCS' : 'Limpieza de huérfanos completada'
-    })
+    cleanupFiles: (fileNames = []) => apiClient.post(`${GCS_PREFIX}/files/cleanup`, { fileNames })
   },
 
   // 👤 PERFIL DE USUARIO
