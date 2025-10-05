@@ -301,7 +301,7 @@ const docuFlowAPI = {
     // Operaciones básicas
     getAll: () => apiClient.get(FILES_PREFIX),
     getById: (id) => apiClient.get(`${FILES_PREFIX}/${id}`),
-    upload: (formData) => apiClient.request(`${FILES_PREFIX}/upload`, {
+    upload: (formData) => apiClient.request(`${FILES_PREFIX}`, {
       method: 'POST',
       body: formData,
       headers: {} // No Content-Type para FormData

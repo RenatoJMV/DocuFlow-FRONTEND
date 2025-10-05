@@ -209,22 +209,71 @@ class UploadController {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
-  formatDisplayDate(dateValue) {
-    if (!dateValue) return '—';
-    const date = new Date(dateValue);
-    if (Number.isNaN(date.getTime())) {
-      return '—';
+  parseDateValue(dateValue) {
+    if (!dateValue && dateValue !== 0) return null;
+
+    if (dateValue instanceof Date) {
+      return Number.isNaN(dateValue.getTime()) ? null : dateValue;
     }
-    return date.toLocaleDateString();
+
+    if (typeof dateValue === 'number') {
+      const normalizedNumber = dateValue < 1e12 ? dateValue * 1000 : dateValue;
+      const dateFromNumber = new Date(normalizedNumber);
+      return Number.isNaN(dateFromNumber.getTime()) ? null : dateFromNumber;
+    }
+
+    if (typeof dateValue === 'string') {
+      let normalized = dateValue.trim();
+      if (!normalized || normalized.toLowerCase() === 'null') {
+        return null;
+      }
+
+      if (/^\d+$/.test(normalized)) {
+        const epoch = Number(normalized);
+        const dateFromEpoch = new Date(epoch < 1e12 ? epoch * 1000 : epoch);
+        if (!Number.isNaN(dateFromEpoch.getTime())) {
+          return dateFromEpoch;
+        }
+      }
+
+      const candidates = new Set([normalized]);
+
+      if (normalized.includes(' ')) {
+        candidates.add(normalized.replace(' ', 'T'));
+      }
+
+      const hasTimezone = /[zZ]$/.test(normalized) || /[\+\-]\d{2}:?\d{2}$/.test(normalized);
+      if (!hasTimezone) {
+        candidates.add(`${normalized}Z`);
+        if (normalized.includes(' ')) {
+          candidates.add(`${normalized.replace(' ', 'T')}Z`);
+        }
+      }
+
+      for (const candidate of candidates) {
+        const dateFromCandidate = new Date(candidate);
+        if (!Number.isNaN(dateFromCandidate.getTime())) {
+          return dateFromCandidate;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  formatDisplayDate(dateValue) {
+    const date = this.parseDateValue(dateValue);
+    if (!date) return '—';
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   }
 
   formatRelativeDate(dateValue) {
-    if (!dateValue) return 'Fecha desconocida';
-
-    const date = new Date(dateValue);
-    if (Number.isNaN(date.getTime())) {
-      return 'Fecha desconocida';
-    }
+    const date = this.parseDateValue(dateValue);
+    if (!date) return 'Fecha desconocida';
 
     const now = new Date();
     const diffMs = now - date;
@@ -339,7 +388,25 @@ class UploadController {
 
     } catch (error) {
       console.error('Upload error:', error);
-      showNotification('Error al subir archivos', 'error');
+      if (error instanceof ApiError) {
+        if (error.status === 400) {
+          showNotification('El archivo no cumple con los requisitos de validación.', 'warning');
+        } else if (error.status === 401) {
+          showNotification('Tu sesión expiró. Inicia sesión nuevamente para subir archivos.', 'error');
+        } else if (error.status === 403) {
+          showNotification('No tienes permisos suficientes para subir archivos.', 'error');
+        } else if (error.status === 413) {
+          showNotification('El archivo supera el límite permitido por el backend.', 'warning');
+        } else if (error.status === 415) {
+          showNotification('Formato de archivo no permitido. Permitidos: PDF, DOCX, XLSX.', 'warning');
+        } else if (error.status === 500) {
+          showNotification('El backend devolvió un error (500) al subir el archivo. Reintenta o revisa la configuración de GCS.', 'error');
+        } else {
+          showNotification(`Error al subir archivos (HTTP ${error.status}).`, 'error');
+        }
+      } else {
+        showNotification('Error al subir archivos', 'error');
+      }
     } finally {
       uploadBtn.disabled = false;
       uploadBtn.innerHTML = originalText;
@@ -681,14 +748,43 @@ class UploadController {
     if (!file) return null;
 
     const filename = file.filename || file.name || file.originalFilename || 'archivo_sin_nombre';
-    const uploadDate = file.uploadDate
-      || file.createdAt
-      || file.created_at
+
+    const metadata = file.metadata
+      || file.meta
+      || file.fileMetadata
+      || file._metadata
+      || {};
+
+    const audit = file.audit
+      || file.auditInfo
+      || file.auditTrail
+      || {};
+
+    const rawUploadDate = file.uploadDate
       || file.uploadedAt
       || file.uploaded_at
+      || file.createdAt
+      || file.created_at
+      || file.created
+      || file.createdDate
+      || file.creationDate
+      || file.dateCreated
       || file.updatedAt
+      || file.lastModified
+      || file.lastModifiedAt
       || file.timestamp
+      || metadata.uploadDate
+      || metadata.uploadedAt
+      || metadata.createdAt
+      || metadata.created_at
+      || metadata.creationDate
+      || metadata.date
+      || audit.createdAt
+      || audit.timestamp
       || null;
+
+    const parsedUploadDate = this.parseDateValue(rawUploadDate);
+
     const uploader = file.uploader
       || file.uploadedBy
       || file.uploaded_by
@@ -697,6 +793,10 @@ class UploadController {
       || file.createdBy
       || file.created_by
       || file.user
+      || metadata.uploader
+      || metadata.uploadedBy
+      || metadata.createdBy
+      || audit.createdBy
       || 'Usuario';
 
     return {
@@ -704,7 +804,8 @@ class UploadController {
       id: file.id ?? file.fileId ?? file.uuid ?? filename,
       filename,
       size: file.size ?? file.fileSize ?? file.bytes ?? 0,
-      uploadDate,
+      uploadDate: parsedUploadDate ? parsedUploadDate.toISOString() : rawUploadDate,
+      uploadDateRaw: rawUploadDate ?? null,
       uploader
     };
   }
@@ -716,7 +817,10 @@ class UploadController {
       'presentación_q4.pptx',
       'reporte_financiero.xlsx',
       'demo_contrato.pdf',
-      'archivo_demo.txt'
+      'archivo_demo.txt',
+      'documento-prueba.pdf',
+      'reporte-mensual.xlsx',
+      'imagen-ejemplo.jpg'
     ]);
 
     let removed = 0;
@@ -1105,15 +1209,14 @@ class UploadController {
       let errorCount = 0;
 
       for (const file of selectedFiles) {
-        try {
-          await this.downloadFile(file.fileId, file.filename);
+        const success = await this.downloadFile(file.fileId, file.filename);
+        if (success) {
           successCount++;
-          // Pequeña pausa entre descargas
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } catch (error) {
-          console.error(`Error descargando ${file.filename}:`, error);
+        } else {
           errorCount++;
         }
+        // Pequeña pausa entre descargas para no saturar el backend
+        await new Promise(resolve => setTimeout(resolve, 400));
       }
 
       // Mostrar resumen
@@ -1410,17 +1513,20 @@ class UploadController {
       
       // Registrar descarga en logs si es necesario
       console.log(`✅ Archivo descargado: ${filename} (ID: ${fileId})`);
-      
+      return true;
     } catch (error) {
       console.error('Error descargando archivo:', error);
       
-      if (error.status === 404) {
+      if (error?.status === 404) {
         showNotification('Archivo no encontrado en el servidor', 'error');
-      } else if (error.status === 403) {
+      } else if (error?.status === 403) {
         showNotification('Sin permisos para descargar este archivo', 'error');
+      } else if (error?.status === 500) {
+        showNotification('El servidor tuvo un problema al preparar la descarga (500). Verifica si el archivo existe en GCS o reintenta más tarde.', 'error');
       } else {
         showNotification('Error al descargar archivo. Intente nuevamente.', 'error');
       }
+      return false;
     }
   }
 
