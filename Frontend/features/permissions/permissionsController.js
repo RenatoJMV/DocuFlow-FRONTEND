@@ -1,5 +1,5 @@
 import {
-  initializeNavbar,
+  initializeNavbar as initNavbar,
   showNotification,
   FormValidator,
   validators,
@@ -55,7 +55,7 @@ class PermissionsController {
   }
 
   initializeComponents() {
-    initializeNavbar('permissions');
+    initNavbar('permissions');
 
     this.forms.permission = document.getElementById('permissionForm');
     this.forms.addUser = document.getElementById('addUserForm');
