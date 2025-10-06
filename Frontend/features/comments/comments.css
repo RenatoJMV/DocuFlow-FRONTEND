@@ -164,6 +164,90 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.priority-badge i {
+  font-size: 0.8rem;
+}
+
+.priority-badge.priority-low {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--info);
+}
+
+.priority-badge.priority-medium {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--warning);
+}
+
+.priority-badge.priority-high {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+}
+
+.priority-badge.priority-urgent {
+  background: rgba(147, 51, 234, 0.12);
+  color: #9333ea;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.pending {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--warning);
+}
+
+.status-badge.completed {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+}
+
+.comment-document {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--gray-100);
+  border-radius: var(--border-radius-pill);
+  color: var(--gray-700);
+}
+
+.comment-document .document-id {
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+.comment-document .document-link {
+  color: var(--primary-blue);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.comment-document .document-link:hover {
+  text-decoration: underline;
 }
 
 .comment-content {
@@ -172,10 +256,24 @@
   color: var(--gray-700);
 }
 
+.comment-assignees {
+  margin-top: var(--spacing-sm);
+  background: var(--gray-50);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.comment-assignees small {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
 .comment-actions {
   display: flex;
   gap: var(--spacing-sm);
   margin-top: var(--spacing-md);
+  flex-wrap: wrap;
 }
 
 .action-btn {

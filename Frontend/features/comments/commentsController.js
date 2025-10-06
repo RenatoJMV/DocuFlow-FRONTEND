@@ -27,6 +27,7 @@ class CommentsController {
     this.activeSuggestionIndex = -1;
     this.debouncedDocumentSearch = debounce((query) => this.performDocumentSearch(query), 150);
     this.demoCommentsDetected = [];
+  this.cachedDocumentsKey = 'docuflow.documents.cache';
 
     this.initializeComponents();
     this.setupEventListeners();
@@ -317,6 +318,7 @@ class CommentsController {
   }
 
   async loadDocuments() {
+    const cachedDocuments = this.getCachedDocuments();
     try {
       let documents = [];
       let recent = [];
@@ -348,6 +350,11 @@ class CommentsController {
         documents = Array.isArray(stored) ? stored : [];
       }
 
+      if ((!documents || documents.length === 0) && cachedDocuments.length > 0) {
+        documents = cachedDocuments;
+        showNotification('Mostrando documentos almacenados recientemente debido a un problema con el servidor.', 'info');
+      }
+
       const normalized = (documents || [])
         .map((doc) => this.normalizeDocument(doc))
         .filter(Boolean)
@@ -355,6 +362,10 @@ class CommentsController {
 
       this.documents = normalized;
       this.documentsById = new Map(normalized.map((doc) => [String(doc.id), doc]));
+
+      if (normalized.length > 0) {
+        this.cacheDocuments(normalized);
+      }
 
       if (this.documentSearchInput && document.activeElement === this.documentSearchInput) {
         this.renderDocumentSuggestions(normalized.slice(0, 8));
@@ -368,6 +379,42 @@ class CommentsController {
     } catch (error) {
       console.error('Error al cargar documentos para el selector:', error);
       showNotification('No se pudieron cargar los documentos recientes. Intenta actualizar más tarde.', 'warning');
+    }
+  }
+
+  cacheDocuments(documents = []) {
+    try {
+      const serialized = JSON.stringify(documents.map((doc) => ({
+        id: doc.id,
+        displayName: doc.displayName,
+        filename: doc.filename,
+        uploader: doc.uploader,
+        uploadedAt: doc.uploadedAt,
+        uploadedAtValue: doc.uploadedAtValue,
+        size: doc.size,
+        sizeLabel: doc.sizeLabel,
+        uploadedLabel: doc.uploadedLabel,
+        searchText: doc.searchText
+      })));
+      localStorage.setItem(this.cachedDocumentsKey, serialized);
+    } catch (error) {
+      console.warn('No se pudo cachear la lista de documentos.', error);
+    }
+  }
+
+  getCachedDocuments() {
+    try {
+      const serialized = localStorage.getItem(this.cachedDocumentsKey);
+      if (!serialized) return [];
+      const parsed = JSON.parse(serialized);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((doc) => ({
+        ...doc,
+        uploadedAtValue: doc.uploadedAtValue ?? (doc.uploadedAt ? new Date(doc.uploadedAt).getTime() : 0)
+      }));
+    } catch (error) {
+      console.warn('No se pudo recuperar la caché de documentos.', error);
+      return [];
     }
   }
 
@@ -601,22 +648,176 @@ class CommentsController {
 
   normalizeComment(raw = {}) {
     const generatedId = `${Date.now()}-${Math.random()}`;
-    const status = raw.status || (raw.resolved ? 'completed' : raw.state) || 'pending';
-    const content = (raw.content || raw.text || 'Sin contenido').toString();
-    const author = (raw.author || raw.user || raw.createdBy || 'Usuario desconocido').toString();
+    const content = (raw.content || raw.text || raw.body || 'Sin contenido').toString();
+    const author = (raw.author || raw.user || raw.createdBy || raw.owner || 'Usuario desconocido').toString();
+    const type = this.normalizeCommentType(raw);
+    const status = this.normalizeStatus(raw, type);
+    const priority = this.normalizePriority(raw, type, status);
+    const assignees = this.normalizeAssignees(raw);
+    const dueDate = this.normalizeDueDate(raw);
+    const documentInfo = this.normalizeCommentDocument(raw);
     const isDemo = this.isDemoComment(raw, content, author);
+
     return {
-      id: raw.id ?? raw.commentId ?? generatedId,
+      id: raw.id ?? raw.commentId ?? raw.uuid ?? generatedId,
       content,
-      type: raw.type || (raw.isTask ? 'task' : 'comment'),
+      type,
       author,
-      createdAt: raw.createdAt || raw.timestamp || new Date().toISOString(),
+      createdAt: raw.createdAt || raw.timestamp || raw.created_on || new Date().toISOString(),
       status,
-      fileId: raw.fileId || null,
-      priority: raw.priority || (status === 'completed' ? 'medium' : 'normal'),
-      assignees: raw.assignees || raw.users || [],
-      dueDate: raw.dueDate || raw.deadline || null,
+      fileId: documentInfo?.id ?? null,
+      documentId: documentInfo?.id ?? null,
+      documentName: documentInfo?.name || documentInfo?.filename || documentInfo?.title || null,
+      documentInfo,
+      priority,
+      assignees,
+      dueDate,
       isDemo
+    };
+  }
+
+  normalizeCommentType(raw = {}) {
+    const typeCandidates = [
+      raw.type,
+      raw.commentType,
+      raw.kind,
+      raw.category,
+      raw.metadata?.type,
+      raw.details?.type,
+      raw.status?.type,
+      raw.taskType
+    ]
+      .filter(Boolean)
+      .map((value) => value.toString().toLowerCase());
+
+    if (raw.isTask === true || raw.task === true || raw.taskId || raw.taskMetadata || raw.priority || raw.assignees) {
+      typeCandidates.push('task');
+    }
+
+    if (typeCandidates.some((value) => value.includes('task'))) {
+      return 'task';
+    }
+
+    if (typeCandidates.some((value) => value.includes('comentario') || value.includes('comment'))) {
+      return 'comment';
+    }
+
+    return 'comment';
+  }
+
+  normalizeStatus(raw = {}, type = 'comment') {
+    const statusCandidates = [
+      raw.status,
+      raw.state,
+      raw.progress,
+      raw.taskStatus,
+      raw.metadata?.status,
+      raw.details?.status,
+      raw.resolved ? 'completed' : null
+    ].filter(Boolean);
+
+    if (statusCandidates.length === 0) {
+      return type === 'task' ? 'pending' : 'active';
+    }
+
+    const normalized = statusCandidates[0].toString().toLowerCase();
+    if (['completed', 'complete', 'done', 'resolved', 'terminada', 'finalizada'].includes(normalized)) {
+      return 'completed';
+    }
+    if (['pending', 'in_progress', 'en progreso', 'open', 'pendiente', 'active'].includes(normalized)) {
+      return 'pending';
+    }
+    return normalized || (type === 'task' ? 'pending' : 'active');
+  }
+
+  normalizePriority(raw = {}, type = 'comment', status = 'pending') {
+    const priorityCandidates = [
+      raw.priority,
+      raw.taskPriority,
+      raw.metadata?.priority,
+      raw.details?.priority
+    ].filter(Boolean);
+
+    if (priorityCandidates.length === 0) {
+      if (type === 'task') {
+        return status === 'completed' ? 'medium' : 'medium';
+      }
+      return null;
+    }
+
+    const normalized = priorityCandidates[0].toString().toLowerCase();
+    if (['low', 'baja', 'minor'].includes(normalized)) return 'low';
+    if (['medium', 'media', 'normal', 'default'].includes(normalized)) return 'medium';
+    if (['high', 'alta', 'important'].includes(normalized)) return 'high';
+    if (['urgent', 'urgente', 'critical', 'critica', 'crítica'].includes(normalized)) return 'urgent';
+    return normalized;
+  }
+
+  normalizeAssignees(raw = {}) {
+    const assignees = raw.assignees
+      || raw.users
+      || raw.assignedTo
+      || raw.assignedUsers
+      || raw.metadata?.assignees
+      || raw.details?.assignees
+      || [];
+
+    if (Array.isArray(assignees)) {
+      return assignees.map((assignee) => assignee?.name || assignee?.email || assignee).filter(Boolean);
+    }
+
+    if (typeof assignees === 'string') {
+      return assignees.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+
+    return [];
+  }
+
+  normalizeDueDate(raw = {}) {
+    const dueCandidates = [
+      raw.dueDate,
+      raw.deadline,
+      raw.expiration,
+      raw.metadata?.dueDate,
+      raw.details?.dueDate
+    ].filter(Boolean);
+
+    if (dueCandidates.length === 0) return null;
+
+    const rawValue = dueCandidates[0];
+    const parsed = this.parseDateValue(rawValue);
+    return parsed ? parsed.toISOString() : null;
+  }
+
+  normalizeCommentDocument(raw = {}) {
+    const documentId = raw.documentId
+      || raw.fileId
+      || raw.document?.id
+      || raw.file?.id
+      || raw.attachment?.id
+      || raw.metadata?.documentId
+      || raw.details?.documentId
+      || null;
+
+    const name = raw.documentName
+      || raw.document?.name
+      || raw.file?.name
+      || raw.fileName
+      || raw.file?.filename
+      || raw.document?.title
+      || null;
+
+    const filename = raw.filename || raw.file?.filename || raw.document?.filename || name;
+
+    if (!documentId && !name && !filename && !raw.document) {
+      return null;
+    }
+
+    return {
+      id: documentId,
+      name: name || filename || `Documento ${documentId ?? ''}`.trim(),
+      filename: filename || name,
+      url: raw.document?.url || raw.file?.url || null
     };
   }
 
@@ -728,8 +929,8 @@ class CommentsController {
       if (this.currentFilter !== 'all') {
         if (this.currentFilter === 'comments' && comment.type === 'task') return false;
         if (this.currentFilter === 'tasks' && comment.type === 'comment') return false;
-        if (this.currentFilter === 'pending' && comment.status === 'completed') return false;
-        if (this.currentFilter === 'completed' && comment.status !== 'completed') return false;
+        if (this.currentFilter === 'pending' && (comment.type !== 'task' || comment.status === 'completed')) return false;
+        if (this.currentFilter === 'completed' && (comment.type !== 'task' || comment.status !== 'completed')) return false;
       }
 
       if (searchTerm) {
@@ -773,6 +974,11 @@ class CommentsController {
     const isTask = comment.type === 'task';
     const typeClass = isTask ? 'task' : 'comment';
     const completedClass = comment.status === 'completed' ? 'completed' : '';
+    const priorityClass = comment.priority ? `priority-${comment.priority}` : '';
+  const documentLabel = comment.documentName || comment.documentInfo?.name || null;
+    const documentId = comment.documentId || comment.fileId || comment.documentInfo?.id || null;
+  const documentUrl = comment.documentInfo?.url || null;
+    const statusLabel = comment.status === 'completed' ? 'Completada' : 'Pendiente';
 
     return `
       <div class="comment-item ${typeClass} ${completedClass}" data-comment-id="${comment.id}">
@@ -782,12 +988,14 @@ class CommentsController {
               <i class="bi bi-${isTask ? 'list-task' : 'chat-text'}"></i>
               ${isTask ? 'Tarea' : 'Comentario'}
             </span>
-            ${comment.priority && isTask ? `<span class="priority-badge ${comment.priority}">${this.getPriorityText(comment.priority)}</span>` : ''}
+            ${comment.priority && isTask ? `<span class="priority-badge ${priorityClass}"><i class="bi bi-flag-fill"></i>${this.getPriorityText(comment.priority)}</span>` : ''}
+            ${isTask ? `<span class="status-badge ${comment.status}"><i class="bi bi-${comment.status === 'completed' ? 'check-circle-fill' : 'hourglass-split'}"></i>${statusLabel}</span>` : ''}
           </div>
           <div class="comment-meta">
             <span><i class="bi bi-person"></i> ${comment.author || 'Usuario'}</span>
             <span><i class="bi bi-clock"></i> ${this.formatDate(comment.createdAt)}</span>
             ${comment.dueDate && isTask ? `<span><i class="bi bi-calendar"></i> ${this.formatDate(comment.dueDate)}</span>` : ''}
+            ${documentLabel ? `<span class="comment-document"><i class="bi bi-file-earmark-text"></i> ${documentLabel}${documentId ? ` <span class="document-id">(ID: ${documentId})</span>` : ''}${documentUrl ? ` <a href="${documentUrl}" target="_blank" rel="noopener" class="document-link">Abrir</a>` : ''}</span>` : ''}
           </div>
         </div>
         <div class="comment-content">
@@ -895,13 +1103,33 @@ class CommentsController {
     try {
       const comment = this.comments.find((c) => String(c.id) === String(commentId));
       if (!comment) return;
+      const payload = this.buildCommentPayload(comment, { status: 'completed' });
+      const requestId = this.normalizeIdentifier(comment.id);
 
-  await docuFlowAPI.comments.update(comment.id, { status: 'completed' });
-  comment.status = 'completed';
-  showNotification('Tarea marcada como completada', 'success');
-  store.setComments(this.comments);
-  this.filterComments();
-  this.updateStats();
+      let updatedComment = null;
+      try {
+        updatedComment = await docuFlowAPI.comments.update(requestId, payload);
+      } catch (error) {
+        if (error?.status === 405 || error?.status === 404) {
+          updatedComment = await apiClient.patch(`/api/comments/${requestId}`, payload, { showErrorNotification: false });
+        } else {
+          throw error;
+        }
+      }
+
+      if (updatedComment) {
+        const normalized = this.normalizeComment(updatedComment);
+        const index = this.comments.findIndex((c) => String(c.id) === String(commentId));
+        if (index > -1) {
+          this.comments[index] = { ...this.comments[index], ...normalized, status: 'completed' };
+        }
+      } else {
+        comment.status = 'completed';
+      }
+
+      showNotification('Tarea marcada como completada', 'success');
+      store.setComments(this.comments);
+      await this.loadComments(true);
     } catch (error) {
       console.error('Error completing task:', error);
       showNotification('Error al completar la tarea', 'error');
@@ -912,16 +1140,66 @@ class CommentsController {
     if (!confirm('¿Estás seguro de eliminar este elemento?')) return;
 
     try {
-      await docuFlowAPI.comments.delete(commentId);
+      const requestId = this.normalizeIdentifier(commentId);
+      try {
+        await docuFlowAPI.comments.delete(requestId);
+      } catch (error) {
+        if (error?.status === 404) {
+          console.warn('El backend devolvió 404 al intentar eliminar; se eliminará localmente igualmente.');
+        } else {
+          throw error;
+        }
+      }
       this.comments = this.comments.filter((c) => String(c.id) !== String(commentId));
       store.setComments(this.comments);
       showNotification('Elemento eliminado', 'success');
-      this.filterComments();
-      this.updateStats();
+      await this.loadComments(true);
     } catch (error) {
       console.error('Error deleting comment:', error);
       showNotification('Error al eliminar el elemento', 'error');
     }
+  }
+
+  buildCommentPayload(comment, overrides = {}) {
+    const payload = {
+      content: comment.content,
+      type: comment.type === 'task' ? 'task' : 'comment',
+      documentId: comment.documentId ?? comment.fileId ?? null,
+      status: comment.status,
+      priority: comment.type === 'task' ? comment.priority : undefined,
+      assignees: Array.isArray(comment.assignees) ? comment.assignees : [],
+      dueDate: comment.dueDate || null
+    };
+
+    if (!payload.documentId && this.documentIdInput?.value) {
+      const fallbackId = Number(this.documentIdInput.value);
+      if (Number.isFinite(fallbackId)) {
+        payload.documentId = fallbackId;
+      }
+    }
+
+    const merged = { ...payload, ...overrides };
+    Object.keys(merged).forEach((key) => {
+      if (merged[key] === undefined) {
+        delete merged[key];
+      }
+    });
+
+    if (merged.documentId !== null && merged.documentId !== undefined) {
+      const numericDocId = Number(merged.documentId);
+      if (Number.isFinite(numericDocId)) {
+        merged.documentId = numericDocId;
+      }
+    }
+    return merged;
+  }
+
+  normalizeIdentifier(identifier) {
+    const numericId = Number(identifier);
+    if (Number.isFinite(numericId) && numericId >= 0) {
+      return numericId;
+    }
+    return identifier;
   }
 
   async markAllAsRead() {
