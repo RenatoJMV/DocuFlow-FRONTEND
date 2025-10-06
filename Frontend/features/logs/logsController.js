@@ -525,6 +525,8 @@ class LogsController {
       ? this.escapeHtml(String(log.documentId))
       : '';
     
+    // La estructura <TR> y <TD> es crucial para que la tabla funcione.
+    // Este bloque crea una fila (TR) con 8 celdas (TD) que coinciden con las 8 columnas del encabezado.
     return `
       <tr class="log-row${isSelected ? ' selected' : ''}" data-log-id="${log.id}">
         <td>
@@ -553,7 +555,7 @@ class LogsController {
           </div>
         </td>
         <td>
-          <span class="log-details" title="${detailsLabel}">
+          <span class="log-row-details" title="${detailsLabel}">
             ${detailsLabel}
           </span>
         </td>
