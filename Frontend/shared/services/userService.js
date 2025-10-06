@@ -1,5 +1,5 @@
 import { BACKEND_URL } from './config.js';
-import { apiClient } from './apiClient.js';
+import { apiClient, docuFlowAPI } from './apiClient.js';
 
 const getAuthToken = () => localStorage.getItem("authToken") || localStorage.getItem("token");
 
@@ -8,16 +8,17 @@ const getAuthToken = () => localStorage.getItem("authToken") || localStorage.get
 // Obtener roles disponibles
 export async function apiGetRoles() {
   try {
-  const response = await apiClient.get('/api/users/roles');
-    return { 
-      success: true, 
-      roles: response.roles || response.data || response || [] 
+    const response = await apiClient.get('/api/admin/users/roles');
+    const roles = response?.roles || response?.data || response;
+    return {
+      success: true,
+      roles: Array.isArray(roles) ? roles : []
     };
   } catch (error) {
     console.error('Error obteniendo roles:', error);
-    return { 
-      success: false, 
-      roles: [], 
+    return {
+      success: false,
+      roles: [],
       error: error.message || 'Error al obtener roles'
     };
   }
@@ -26,12 +27,12 @@ export async function apiGetRoles() {
 // Cambiar el rol de un usuario
 export async function apiSetUserRole(userId, role) {
   try {
-  await apiClient.put(`/api/users/${userId}/role`, { role });
+    await apiClient.put(`/api/admin/users/${userId}`, { role });
     return { success: true };
   } catch (error) {
     console.error('Error cambiando rol de usuario:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error.message || 'Error al cambiar el rol del usuario'
     };
   }
@@ -39,51 +40,30 @@ export async function apiSetUserRole(userId, role) {
 
 // Obtener permisos de un usuario
 export async function apiGetUserPermissions(userId) {
-  const token = getAuthToken();
-  if (!token) return { success: false, permissions: [] };
   try {
-  const response = await fetch(`${BACKEND_URL}/api/users/${userId}/permissions`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    const data = await response.json().catch(() => null);
-    if (response.ok && data) {
-      return { success: true, permissions: data };
-    } else {
-      return { success: false, permissions: [], error: data?.error };
-    }
-  } catch {
-    return { success: false, permissions: [] };
+    const response = await docuFlowAPI.permissions.getUserPermissions(userId);
+    const normalized = normalizePermissionsResponse(response);
+    return { success: true, permissions: normalized };
+  } catch (error) {
+    console.error('Error obteniendo permisos de usuario:', error);
+    return { success: false, permissions: [], error: error.message };
   }
 }
 
 // Actualizar permisos de un usuario
 export async function apiSetUserPermissions(userId, permissions) {
-  const token = getAuthToken();
-  if (!token) return { success: false };
   try {
-  const response = await fetch(`${BACKEND_URL}/api/users/${userId}/permissions`, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ permissions })
-    });
-    if (response.ok) {
-      return { success: true };
-    } else {
-      const data = await response.json().catch(() => null);
-      return { success: false, error: data?.error };
-    }
-  } catch {
-    return { success: false };
+    await apiClient.put(`/permissions/user/${userId}`, { permissions });
+    return { success: true };
+  } catch (error) {
+    console.error('Error actualizando permisos de usuario:', error);
+    return { success: false, error: error.message || 'Error al actualizar permisos' };
   }
 }
 // Obtener lista de usuarios
 export async function apiGetUsers() {
   try {
-  const response = await apiClient.get('/api/users');
+    const response = await apiClient.get('/api/admin/users');
     const users = response.users || response.data || response;
     
     return { 
@@ -103,7 +83,7 @@ export async function apiGetUsers() {
 // Crear nuevo usuario
 export async function apiCreateUser(userData) {
   try {
-    const response = await apiClient.post('/auth/register', userData);
+    const response = await apiClient.post('/api/admin/users', userData);
     return { 
       success: true, 
       user: response.user || response.data || response 
@@ -120,7 +100,7 @@ export async function apiCreateUser(userData) {
 // Actualizar usuario existente
 export async function apiUpdateUser(userId, userData) {
   try {
-  const response = await apiClient.put(`/api/users/${userId}`, userData);
+    const response = await apiClient.put(`/api/admin/users/${userId}`, userData);
     return { 
       success: true, 
       user: response.user || response.data || response 
@@ -137,7 +117,7 @@ export async function apiUpdateUser(userId, userData) {
 // Eliminar usuario
 export async function apiDeleteUser(userId) {
   try {
-  await apiClient.delete(`/api/users/${userId}`);
+    await apiClient.delete(`/api/admin/users/${userId}`);
     return { success: true };
   } catch (error) {
     console.error('Error eliminando usuario:', error);
@@ -146,6 +126,65 @@ export async function apiDeleteUser(userId) {
       error: error.message || 'Error al eliminar usuario'
     };
   }
+}
+
+export async function apiResetUserPassword(userId, newPassword) {
+  try {
+    await apiClient.patch(`/api/admin/users/${userId}/password`, { password: newPassword });
+    return { success: true };
+  } catch (error) {
+    console.error('Error actualizando contraseña:', error);
+    return { success: false, error: error.message || 'Error al actualizar contraseña' };
+  }
+}
+
+export async function apiGetPermissionCatalog() {
+  try {
+    const response = await apiClient.get('/permissions/modules');
+    return { success: true, catalog: response?.modules || response?.data || response };
+  } catch (error) {
+    console.error('Error obteniendo catálogo de permisos:', error);
+    return { success: false, catalog: [], error: error.message };
+  }
+}
+
+export async function apiGetRolePermissionTemplates() {
+  try {
+    const response = await apiClient.get('/permissions/roles/permissions');
+    return { success: true, templates: response?.templates || response?.data || response };
+  } catch (error) {
+    console.error('Error obteniendo permisos por rol:', error);
+    return { success: false, templates: {}, error: error.message };
+  }
+}
+
+function normalizePermissionsResponse(raw) {
+  if (!raw) return [];
+
+  if (Array.isArray(raw)) {
+    return raw.map(String);
+  }
+
+  if (typeof raw === 'object') {
+    const flattened = [];
+    Object.entries(raw).forEach(([moduleKey, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach((perm) => flattened.push(String(perm)));
+        return;
+      }
+
+      if (typeof value === 'object' && value !== null) {
+        Object.entries(value).forEach(([actionKey, flag]) => {
+          if (flag === true || flag === 'true' || flag === 1) {
+            flattened.push(`${moduleKey}.${actionKey}`);
+          }
+        });
+      }
+    });
+    return flattened;
+  }
+
+  return [];
 }
 
 export async function login(username, password) {

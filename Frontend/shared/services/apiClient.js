@@ -429,7 +429,10 @@ const docuFlowAPI = {
       method: 'DELETE',
       body: JSON.stringify(permissionData)
     }),
-    getUserPermissions: (userId) => apiClient.get(`${PERMISSIONS_PREFIX}/user/${userId}`)
+    getUserPermissions: (userId) => apiClient.get(`${PERMISSIONS_PREFIX}/user/${userId}`),
+    setUserPermissions: (userId, permissions) => apiClient.put(`${PERMISSIONS_PREFIX}/user/${userId}`, { permissions }),
+    getModules: () => apiClient.get(`${PERMISSIONS_PREFIX}/modules`),
+    getRoleTemplates: () => apiClient.get(`${PERMISSIONS_PREFIX}/roles/permissions`)
   },
 
   // 🔔 NOTIFICACIONES

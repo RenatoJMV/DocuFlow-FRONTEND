@@ -229,9 +229,25 @@
               <input type="email" class="form-control" id="userEmail" required>
             </div>
             <div class="mb-3">
+              <label for="userPassword" class="form-label">Contraseña</label>
+              <input type="password" class="form-control" id="userPassword" placeholder="Mínimo 8 caracteres">
+              <small class="text-muted">Requerida al crear usuarios. Déjala vacía para mantener la actual.</small>
+            </div>
+            <div class="mb-3">
+              <label for="userConfirmPassword" class="form-label">Confirmar Contraseña</label>
+              <input type="password" class="form-control" id="userConfirmPassword">
+            </div>
+            <div class="mb-3">
               <label for="userRole" class="form-label">Rol Inicial</label>
               <select id="userRole" class="form-select" required>
                 <option value="">Seleccionar rol...</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="userStatus" class="form-label">Estado</label>
+              <select id="userStatus" class="form-select">
+                <option value="active" selected>Activo</option>
+                <option value="inactive">Inactivo</option>
               </select>
             </div>
           </form>
@@ -273,6 +289,34 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="button" class="btn btn-primary" id="saveRoleBtn">Guardar Rol</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div class="modal fade" id="changePasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Actualizar Contraseña</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="changePasswordForm">
+            <div class="mb-3">
+              <label for="newPassword" class="form-label">Nueva Contraseña</label>
+              <input type="password" class="form-control" id="newPassword" required>
+            </div>
+            <div class="mb-3">
+              <label for="confirmNewPassword" class="form-label">Confirmar Contraseña</label>
+              <input type="password" class="form-control" id="confirmNewPassword" required>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="confirmPasswordChangeBtn">Actualizar</button>
         </div>
       </div>
     </div>
