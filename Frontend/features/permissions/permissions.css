@@ -343,10 +343,17 @@
 /* Permission Assignment */
 .permission-assignment {
   padding: var(--spacing-xl);
-  height: fit-content;
-  position: sticky;
-  top: var(--spacing-lg);
   align-self: flex-start;
+}
+
+@media (min-width: 992px) {
+  .permission-assignment.sticky-top {
+    position: sticky;
+    top: calc(var(--spacing-xl) + 64px);
+    max-height: calc(100vh - (var(--spacing-xl) + 80px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 
 .assignment-header {

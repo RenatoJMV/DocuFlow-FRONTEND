@@ -444,21 +444,53 @@ class LogsController {
 
   updateStats() {
     const stats = this.calculateStats();
-    
-    document.getElementById('totalLogsCount').textContent = this.allLogs.length;
-    document.getElementById('todayLogsCount').textContent = stats.today;
-    document.getElementById('errorsCount').textContent = stats.errors;
-    document.getElementById('warningsCount').textContent = stats.warnings;
+
+    const totalElement = document.getElementById('totalLogsCount');
+    if (totalElement) {
+      totalElement.textContent = this.allLogs.length;
+    }
+
+    const todayElement = document.getElementById('todayLogsCount');
+    if (todayElement) {
+      todayElement.textContent = stats.today;
+    }
+
+    const errorsElement = document.getElementById('errorsCount');
+    if (errorsElement) {
+      errorsElement.textContent = stats.errors;
+    }
+
+    const warningsElement = document.getElementById('warningsCount');
+    if (warningsElement) {
+      warningsElement.textContent = stats.warnings;
+    }
+
+    const successElement = document.getElementById('successCount');
+    if (successElement) {
+      successElement.textContent = stats.success;
+    }
   }
 
   calculateStats() {
     const today = new Date().toISOString().split('T')[0];
-    
-    return {
-      today: this.allLogs.filter(log => log.timestamp.startsWith(today)).length,
-      errors: this.allLogs.filter(log => log.level === 'error').length,
-      warnings: this.allLogs.filter(log => log.level === 'warning').length
-    };
+
+    const totals = this.allLogs.reduce((acc, log) => {
+      if (typeof log.timestamp === 'string' && log.timestamp.startsWith(today)) {
+        acc.today += 1;
+      }
+      if (log.level === 'error') {
+        acc.errors += 1;
+      }
+      if (log.level === 'warning') {
+        acc.warnings += 1;
+      }
+      if (log.level === 'success') {
+        acc.success += 1;
+      }
+      return acc;
+    }, { today: 0, errors: 0, warnings: 0, success: 0 });
+
+    return totals;
   }
 
   clearFilters() {
