@@ -21,6 +21,7 @@ class LogsController {
       action: '',
       level: ''
     };
+    this.selectedLogId = null;
     this.pagination = new Pagination('logsPaginationContainer', {
       itemsPerPage: this.itemsPerPage,
       currentPage: this.currentPage,
@@ -147,6 +148,11 @@ class LogsController {
         this.toggleRealtimeUpdates(e.target.checked);
       });
     }
+
+    const logsTableBody = document.querySelector('#logsTable tbody');
+    if (logsTableBody) {
+      logsTableBody.addEventListener('click', (event) => this.handleLogsTableClick(event));
+    }
   }
 
   debounceFilter() {
@@ -170,16 +176,24 @@ class LogsController {
 
       if (Array.isArray(logs) && logs.length > 0) {
         // Convertir los logs del backend al formato esperado por el frontend
-        this.allLogs = logs.map(log => ({
-          id: log.id || Date.now() + Math.random(),
-          timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
-          level: this.mapActionToLevel(log.action || 'INFO'),
-          action: log.action || 'UNKNOWN',
-          user: log.user || log.username || 'Sistema',
-          details: log.details || `${log.action} - ${log.message || 'Sin detalles'}`,
-          ip: log.ip || log.ipAddress || 'N/A',
-          userAgent: log.userAgent || 'N/A'
-        }));
+        const availableActions = this.getAvailableActions();
+        this.allLogs = logs.map((log) => {
+          const actionKey = log.action || 'UNKNOWN';
+          const actionInfo = availableActions.find((action) => action.id === actionKey);
+
+          return {
+            id: log.id || Date.now() + Math.random(),
+            timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
+            level: this.mapActionToLevel(actionKey),
+            action: actionKey,
+            actionLabel: actionInfo?.name || actionKey,
+            username: log.user || log.username || 'Sistema',
+            details: log.details || `${actionKey} - ${log.message || 'Sin detalles'}`,
+            ip: log.ip || log.ipAddress || 'N/A',
+            userAgent: log.userAgent || 'N/A',
+            documentId: log.documentId || log.document?.id || null
+          };
+        });
 
         console.log(`✅ ${this.allLogs.length} logs cargados desde el backend`);
         showNotification(`${this.allLogs.length} registros cargados del servidor`, 'success', 2000);
@@ -239,7 +253,7 @@ class LogsController {
     if (tbody) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" class="text-center py-4">
+          <td colspan="8" class="text-center py-4">
             <div class="spinner-border text-primary me-2" role="status">
               <span class="visually-hidden">Cargando...</span>
             </div>
@@ -290,6 +304,11 @@ class LogsController {
       return match;
     });
 
+    const selectedVisible = this.filteredLogs.some((log) => String(log.id) === String(this.selectedLogId));
+    if (!selectedVisible) {
+      this.clearLogDetailsPanel();
+    }
+
     this.currentPage = 1;
     this.renderLogs();
     this.updatePagination();
@@ -314,18 +333,24 @@ class LogsController {
     if (emptyState) emptyState.classList.add('d-none');
 
     if (tbody) {
-      tbody.innerHTML = logsToShow.map(log => this.renderLogRow(log)).join('');
+      tbody.innerHTML = logsToShow
+        .map((log) => this.renderLogRow(log, String(log.id) === String(this.selectedLogId)))
+        .join('');
     }
 
     this.updateShowingCount();
+    this.highlightSelectedRow();
   }
 
-  renderLogRow(log) {
+  renderLogRow(log, isSelected = false) {
     const actionInfo = this.getAvailableActions().find(a => a.id === log.action);
     const levelInfo = this.getAvailableLevels().find(l => l.id === log.level);
     
     return `
-      <tr class="log-row" data-log-id="${log.id}">
+      <tr class="log-row${isSelected ? ' selected' : ''}" data-log-id="${log.id}">
+        <td>
+          <input type="checkbox" class="form-check-input log-row-checkbox" data-log-id="${log.id}">
+        </td>
         <td>
           <div class="log-timestamp">
             <strong>${this.formatTime(log.timestamp)}</strong>
@@ -346,7 +371,6 @@ class LogsController {
         <td>
           <div class="user-info">
             <strong>${log.username}</strong>
-            <small class="text-muted d-block">${log.ip}</small>
           </div>
         </td>
         <td>
@@ -354,13 +378,14 @@ class LogsController {
             ${log.details}
           </span>
         </td>
+        <td>${log.ip}</td>
         <td>
           <div class="log-actions">
-            <button class="btn btn-sm btn-outline-primary" onclick="logsController.showLogDetails('${log.id}')">
+            <button class="btn btn-sm btn-outline-primary" data-action="view" data-log-id="${log.id}">
               <i class="bi bi-eye"></i>
             </button>
             ${log.documentId ? `
-              <button class="btn btn-sm btn-outline-info" onclick="logsController.goToDocument('${log.documentId}')">
+              <button class="btn btn-sm btn-outline-info" data-action="document" data-log-id="${log.id}" data-document-id="${log.documentId}">
                 <i class="bi bi-file-earmark"></i>
               </button>
             ` : ''}
@@ -368,6 +393,89 @@ class LogsController {
         </td>
       </tr>
     `;
+  }
+
+  handleLogsTableClick(event) {
+    const actionButton = event.target.closest('[data-action]');
+    if (actionButton) {
+      const logId = actionButton.dataset.logId;
+      const action = actionButton.dataset.action;
+
+      if (action === 'view') {
+        this.showLogDetails(logId);
+      } else if (action === 'document') {
+        this.showLogDetails(logId);
+        this.goToDocument(actionButton.dataset.documentId);
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    if (event.target.matches('.log-row-checkbox')) {
+      event.stopPropagation();
+      return;
+    }
+
+    const row = event.target.closest('tr[data-log-id]');
+    if (!row) return;
+
+    this.showLogDetails(row.dataset.logId);
+  }
+
+  highlightSelectedRow() {
+    const rows = document.querySelectorAll('#logsTable tbody tr');
+    rows.forEach((row) => {
+      row.classList.toggle('selected', row.dataset.logId === String(this.selectedLogId));
+    });
+  }
+
+  populateLogDetails(log) {
+    const placeholder = document.querySelector('#logDetailsContent .empty-details');
+    const detailsPanel = document.getElementById('logDetails');
+
+    if (placeholder) {
+      placeholder.classList.add('d-none');
+    }
+
+    if (detailsPanel) {
+      detailsPanel.classList.remove('d-none');
+    }
+
+    const setText = (id, value) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = value ?? '—';
+      }
+    };
+
+    setText('detailId', log.id);
+    setText('detailTimestamp', `${this.formatDate(log.timestamp)} ${this.formatTime(log.timestamp)}`);
+    setText('detailUser', log.username || 'Sistema');
+    setText('detailIp', log.ip || 'N/A');
+    setText('detailUserAgent', log.userAgent || 'N/A');
+
+    const detailMessage = document.getElementById('detailMessage');
+    if (detailMessage) {
+      detailMessage.textContent = log.details || '—';
+    }
+  }
+
+  clearLogDetailsPanel() {
+    const placeholder = document.querySelector('#logDetailsContent .empty-details');
+    const detailsPanel = document.getElementById('logDetails');
+
+    if (placeholder) {
+      placeholder.classList.remove('d-none');
+    }
+
+    if (detailsPanel) {
+      detailsPanel.classList.add('d-none');
+    }
+
+    this.selectedLogId = null;
+    this.highlightSelectedRow();
   }
 
   formatDate(timestamp) {
@@ -540,11 +648,12 @@ class LogsController {
       id: this.allLogs.length + 1,
       timestamp: new Date().toISOString(),
       action: randomAction.id,
-      actionName: randomAction.name,
+      actionLabel: randomAction.name,
       level: randomLevel.id,
       username: randomUser,
       details: this.generateLogDetails(randomAction.id),
       ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
+      userAgent: 'Simulado',
       documentId: Math.random() > 0.5 ? Math.floor(Math.random() * 100) + 1 : null
     };
     
@@ -584,10 +693,10 @@ class LogsController {
       this.formatDate(log.timestamp),
       this.formatTime(log.timestamp),
       log.level,
-      log.actionName,
-      log.username,
-      `"${log.details.replace(/"/g, '""')}"`,
-      log.ip,
+      log.actionLabel || log.action,
+      log.username || 'Sistema',
+      `"${(log.details || '').replace(/"/g, '""')}"`,
+      log.ip || 'N/A',
       log.documentId || ''
     ]);
     
@@ -628,10 +737,10 @@ class LogsController {
       this.formatDate(log.timestamp),
       this.formatTime(log.timestamp),
       log.level,
-      log.actionName,
-      log.username,
-      `"${log.details.replace(/"/g, '""')}"`,
-      log.ip,
+      log.actionLabel || log.action,
+      log.username || 'Sistema',
+      `"${(log.details || '').replace(/"/g, '""')}"`,
+      log.ip || 'N/A',
       log.documentId || ''
     ]);
     
@@ -639,22 +748,15 @@ class LogsController {
   }
 
   showLogDetails(logId) {
-    const log = this.allLogs.find(l => l.id == logId);
-    if (!log) return;
-    
-    // Simple alert for now - in a real app, use a modal
-    const details = `
-Registro ID: ${log.id}
-Fecha: ${this.formatDate(log.timestamp)} ${this.formatTime(log.timestamp)}
-Nivel: ${log.level}
-Acción: ${log.actionName}
-Usuario: ${log.username}
-IP: ${log.ip}
-Detalles: ${log.details}
-${log.documentId ? `Documento ID: ${log.documentId}` : ''}
-    `.trim();
-    
-    alert(details);
+    const log = this.allLogs.find((entry) => String(entry.id) === String(logId));
+    if (!log) {
+      showNotification('No encontramos la información de ese registro.', 'warning');
+      return;
+    }
+
+    this.selectedLogId = String(logId);
+    this.highlightSelectedRow();
+    this.populateLogDetails(log);
   }
 
   goToDocument(documentId) {
