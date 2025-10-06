@@ -28,6 +28,11 @@ class CommentsController {
     this.debouncedDocumentSearch = debounce((query) => this.performDocumentSearch(query), 150);
     this.demoCommentsDetected = [];
   this.cachedDocumentsKey = 'docuflow.documents.cache';
+    this.recentDocumentsBackoffKey = 'docuflow.documents.recent.backoff';
+
+    if (typeof window !== 'undefined') {
+      window.commentsController = this;
+    }
 
     this.initializeComponents();
     this.setupEventListeners();
@@ -323,14 +328,16 @@ class CommentsController {
       let documents = [];
       let recent = [];
 
-      if (typeof docuFlowAPI.files.getRecent === 'function') {
+      if (!this.shouldSkipRecentDocumentsRequest() && typeof docuFlowAPI.files.getRecent === 'function') {
         try {
           recent = await docuFlowAPI.files.getRecent(50);
           documents = this.extractArray(recent, ['files', 'data', 'content']);
+          this.clearRecentDocumentsBackoff();
         } catch (error) {
           console.warn('No se pudo obtener la lista de archivos recientes desde el backend. Se usará un fallback.', error);
           if (error?.status !== 404) {
             showNotification('No pudimos cargar la lista de documentos recientes. Intentaremos con todos los archivos.', 'info');
+            this.scheduleRecentDocumentsRetry();
           }
         }
       }
@@ -379,6 +386,39 @@ class CommentsController {
     } catch (error) {
       console.error('Error al cargar documentos para el selector:', error);
       showNotification('No se pudieron cargar los documentos recientes. Intenta actualizar más tarde.', 'warning');
+    }
+  }
+
+  shouldSkipRecentDocumentsRequest() {
+    try {
+      const serialized = localStorage.getItem(this.recentDocumentsBackoffKey);
+      if (!serialized) return false;
+      const retryTimestamp = Number(serialized);
+      if (!Number.isFinite(retryTimestamp)) {
+        return false;
+      }
+      return Date.now() < retryTimestamp;
+    } catch (error) {
+      console.warn('No se pudo leer el estado de reintento para documentos recientes.', error);
+      return false;
+    }
+  }
+
+  scheduleRecentDocumentsRetry() {
+    try {
+      const retryInMinutes = 5;
+      const nextAttempt = Date.now() + retryInMinutes * 60 * 1000;
+      localStorage.setItem(this.recentDocumentsBackoffKey, String(nextAttempt));
+    } catch (error) {
+      console.warn('No se pudo persistir el backoff para documentos recientes.', error);
+    }
+  }
+
+  clearRecentDocumentsBackoff() {
+    try {
+      localStorage.removeItem(this.recentDocumentsBackoffKey);
+    } catch (error) {
+      console.warn('No se pudo limpiar el estado de backoff de documentos recientes.', error);
     }
   }
 
@@ -690,16 +730,28 @@ class CommentsController {
       .filter(Boolean)
       .map((value) => value.toString().toLowerCase());
 
-    if (raw.isTask === true || raw.task === true || raw.taskId || raw.taskMetadata || raw.priority || raw.assignees) {
+    if (raw.isTask === true || raw.task === true || raw.taskId || raw.taskMetadata || raw.taskDetails) {
       typeCandidates.push('task');
     }
 
-    if (typeCandidates.some((value) => value.includes('task'))) {
+    if (typeCandidates.some((value) => value.includes('task') || value.includes('tarea'))) {
       return 'task';
     }
 
     if (typeCandidates.some((value) => value.includes('comentario') || value.includes('comment'))) {
       return 'comment';
+    }
+
+    if (raw.isTask === false || raw.task === false) {
+      return 'comment';
+    }
+
+    const hasExplicitTaskSignals = Boolean(
+      (raw.dueDate || raw.deadline) && (raw.assignees || raw.users)
+    );
+
+    if (hasExplicitTaskSignals) {
+      return 'task';
     }
 
     return 'comment';
@@ -1180,7 +1232,9 @@ class CommentsController {
 
     const merged = { ...payload, ...overrides };
     Object.keys(merged).forEach((key) => {
-      if (merged[key] === undefined) {
+      const value = merged[key];
+      const isEmptyArray = Array.isArray(value) && value.length === 0;
+      if (value === undefined || value === null || isEmptyArray) {
         delete merged[key];
       }
     });
