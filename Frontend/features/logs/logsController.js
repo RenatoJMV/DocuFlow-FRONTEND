@@ -31,6 +31,8 @@ class LogsController {
         this.updatePagination();
       }
     });
+    this.actionLookup = null;
+    this.levelLookup = null;
     
     this.initializeComponents();
     this.setupEventListeners();
@@ -96,6 +98,153 @@ class LogsController {
     ];
   }
 
+  ensureLookups() {
+    if (!this.actionLookup) {
+      this.actionLookup = new Map();
+      this.getAvailableActions().forEach((action) => {
+        this.actionLookup.set(action.id, action);
+      });
+    }
+
+    if (!this.levelLookup) {
+      this.levelLookup = new Map();
+      this.getAvailableLevels().forEach((level) => {
+        this.levelLookup.set(level.id, level);
+      });
+    }
+  }
+
+  getActionInfo(actionId) {
+    if (!actionId) return null;
+    this.ensureLookups();
+    return this.actionLookup.get(actionId) || null;
+  }
+
+  getLevelInfo(levelId) {
+    if (!levelId) return null;
+    this.ensureLookups();
+    return this.levelLookup.get(levelId) || null;
+  }
+
+  getLogsTableBody() {
+    return document.getElementById('logsTableBody') || document.querySelector('#logsTable tbody');
+  }
+
+  formatActionLabel(actionId) {
+    if (!actionId) return 'Acción';
+    return actionId
+      .toString()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  escapeHtml(value) {
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    return value
+      .toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  normalizeTimestamp(value) {
+    if (!value) {
+      return new Date().toISOString();
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return new Date().toISOString();
+    }
+
+    return date.toISOString();
+  }
+
+  normalizeLogEntry(raw) {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const actionCandidate = [
+      raw.action,
+      raw.actionType,
+      raw.eventType,
+      raw.event,
+      raw.type
+    ].find(Boolean) || 'unknown';
+    const actionKey = actionCandidate.toString().toLowerCase();
+    const actionInfo = this.getActionInfo(actionKey);
+
+    const levelCandidate = [
+      raw.level,
+      raw.severity,
+      raw.status,
+      raw.logLevel
+    ].find(Boolean);
+    const normalizedLevel = levelCandidate
+      ? levelCandidate.toString().toLowerCase()
+      : this.mapActionToLevel(actionKey);
+
+    const timestampCandidate = raw.timestamp || raw.createdAt || raw.date || raw.eventDate || raw.loggedAt;
+    const timestamp = this.normalizeTimestamp(timestampCandidate);
+
+    const username = [
+      raw.username,
+      raw.user,
+      raw.userName,
+      raw.performedBy,
+      raw.actor,
+      raw.email,
+      raw.owner
+    ].find(Boolean) || 'Sistema';
+
+    const details = [
+      raw.details,
+      raw.message,
+      raw.description,
+      raw.eventDescription,
+      raw.info,
+      raw.summary
+    ].find(Boolean) || `${this.formatActionLabel(actionKey)} - Sin detalles`;
+
+    const ip = [
+      raw.ip,
+      raw.ipAddress,
+      raw.remoteIp,
+      raw.sourceIp,
+      raw.clientIp
+    ].find(Boolean) || 'N/A';
+
+    const userAgent = [
+      raw.userAgent,
+      raw.agent,
+      raw.userAgentInfo,
+      raw.browser
+    ].find(Boolean) || 'N/A';
+
+    const documentId = raw.documentId || raw.document?.id || raw.documentReference || null;
+
+    const id = raw.id || raw.logId || raw._id || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    return {
+      id,
+      timestamp,
+      level: normalizedLevel,
+      action: actionKey,
+      actionLabel: actionInfo?.name || this.formatActionLabel(actionKey),
+      username: username.toString(),
+      details: details.toString(),
+      ip: ip.toString(),
+      userAgent: userAgent.toString(),
+      documentId
+    };
+  }
+
   setupEventListeners() {
     // Filter inputs
     const dateFilter = document.getElementById('filterDate');
@@ -120,13 +269,28 @@ class LogsController {
     }
 
     // Action buttons
-    const clearFiltersBtn = document.getElementById('clearFilters');
+    const clearFiltersBtn = document.getElementById('clearAllFilters');
+    const applyFiltersBtn = document.getElementById('applyFilters');
+    const clearDateBtn = document.getElementById('clearDate');
     const refreshBtn = document.getElementById('refreshLogs');
-    const exportBtn = document.getElementById('exportLogs');
-    const downloadLogBtn = document.getElementById('downloadDailyLog');
+    const exportBtn = document.getElementById('downloadLogs');
 
     if (clearFiltersBtn) {
       clearFiltersBtn.addEventListener('click', () => this.clearFilters());
+    }
+
+    if (applyFiltersBtn) {
+      applyFiltersBtn.addEventListener('click', () => this.applyFilters());
+    }
+
+    if (clearDateBtn) {
+      clearDateBtn.addEventListener('click', () => {
+        const dateInput = document.getElementById('filterDate');
+        if (dateInput) {
+          dateInput.value = '';
+        }
+        this.applyFilters();
+      });
     }
 
     if (refreshBtn) {
@@ -137,8 +301,19 @@ class LogsController {
       exportBtn.addEventListener('click', () => this.exportLogs());
     }
 
-    if (downloadLogBtn) {
-      downloadLogBtn.addEventListener('click', () => this.downloadDailyLog());
+    const clearOldLogsBtn = document.getElementById('clearOldLogs');
+    if (clearOldLogsBtn) {
+      clearOldLogsBtn.addEventListener('click', () => this.handleClearOldLogs());
+    }
+
+    const exportAnalyticsBtn = document.getElementById('exportAnalytics');
+    if (exportAnalyticsBtn) {
+      exportAnalyticsBtn.addEventListener('click', () => this.handleExportAnalytics());
+    }
+
+    const systemHealthBtn = document.getElementById('systemHealth');
+    if (systemHealthBtn) {
+      systemHealthBtn.addEventListener('click', () => this.handleSystemHealthCheck());
     }
 
     // Real-time toggle
@@ -149,7 +324,7 @@ class LogsController {
       });
     }
 
-    const logsTableBody = document.querySelector('#logsTable tbody');
+    const logsTableBody = this.getLogsTableBody();
     if (logsTableBody) {
       logsTableBody.addEventListener('click', (event) => this.handleLogsTableClick(event));
     }
@@ -175,25 +350,10 @@ class LogsController {
       const logs = response?.logs || response?.data || response || [];
 
       if (Array.isArray(logs) && logs.length > 0) {
-        // Convertir los logs del backend al formato esperado por el frontend
-        const availableActions = this.getAvailableActions();
-        this.allLogs = logs.map((log) => {
-          const actionKey = log.action || 'UNKNOWN';
-          const actionInfo = availableActions.find((action) => action.id === actionKey);
-
-          return {
-            id: log.id || Date.now() + Math.random(),
-            timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
-            level: this.mapActionToLevel(actionKey),
-            action: actionKey,
-            actionLabel: actionInfo?.name || actionKey,
-            username: log.user || log.username || 'Sistema',
-            details: log.details || `${actionKey} - ${log.message || 'Sin detalles'}`,
-            ip: log.ip || log.ipAddress || 'N/A',
-            userAgent: log.userAgent || 'N/A',
-            documentId: log.documentId || log.document?.id || null
-          };
-        });
+        this.ensureLookups();
+        this.allLogs = logs
+          .map((log) => this.normalizeLogEntry(log))
+          .filter(Boolean);
 
         console.log(`✅ ${this.allLogs.length} logs cargados desde el backend`);
         showNotification(`${this.allLogs.length} registros cargados del servidor`, 'success', 2000);
@@ -224,7 +384,10 @@ class LogsController {
       'comment': 'info',
       'login': 'success',
       'logout': 'info',
-      'error': 'error'
+      'error': 'error',
+      'system_error': 'error',
+      'permission_change': 'success',
+      'role_change': 'success'
     };
     
     return actionLevelMap[action] || 'info';
@@ -249,7 +412,7 @@ class LogsController {
   }
 
   showLoadingState() {
-    const tbody = document.querySelector('#logsTable tbody');
+    const tbody = this.getLogsTableBody();
     if (tbody) {
       tbody.innerHTML = `
         <tr>
@@ -266,7 +429,8 @@ class LogsController {
 
   applyFilters() {
     const dateFilter = document.getElementById('filterDate')?.value || '';
-    const userFilter = document.getElementById('filterUser')?.value.toLowerCase() || '';
+  const userFilterInput = document.getElementById('filterUser');
+  const userFilter = userFilterInput?.value ? userFilterInput.value.toLowerCase() : '';
     const actionFilter = document.getElementById('filterAction')?.value || '';
     const levelFilter = document.getElementById('filterLevel')?.value || '';
 
@@ -282,13 +446,16 @@ class LogsController {
 
       // Date filter
       if (dateFilter) {
-        const logDate = log.timestamp.split('T')[0];
+        const logDate = (typeof log.timestamp === 'string'
+          ? log.timestamp
+          : this.normalizeTimestamp(log.timestamp)
+        ).split('T')[0];
         match = match && logDate === dateFilter;
       }
 
       // User filter
       if (userFilter) {
-        match = match && log.username.toLowerCase().includes(userFilter);
+        match = match && log.username?.toLowerCase().includes(userFilter);
       }
 
       // Action filter
@@ -312,6 +479,7 @@ class LogsController {
     this.currentPage = 1;
     this.renderLogs();
     this.updatePagination();
+    this.updateAnalytics();
     this.updateFilterInfo();
   }
 
@@ -320,7 +488,7 @@ class LogsController {
     const endIndex = startIndex + this.itemsPerPage;
     const logsToShow = this.filteredLogs.slice(startIndex, endIndex);
 
-    const tbody = document.querySelector('#logsTable tbody');
+    const tbody = this.getLogsTableBody();
     const emptyState = document.getElementById('logsEmptyState');
 
     if (logsToShow.length === 0) {
@@ -343,8 +511,19 @@ class LogsController {
   }
 
   renderLogRow(log, isSelected = false) {
-    const actionInfo = this.getAvailableActions().find(a => a.id === log.action);
-    const levelInfo = this.getAvailableLevels().find(l => l.id === log.level);
+  const actionInfo = this.getActionInfo(log.action);
+  const levelInfo = this.getLevelInfo(log.level);
+    const dateLabel = this.formatDate(log.timestamp);
+    const timeLabel = this.formatTime(log.timestamp);
+    const levelLabel = levelInfo?.name || this.formatActionLabel(log.level || 'info');
+    const levelColor = levelInfo?.color || 'secondary';
+    const actionLabel = this.escapeHtml(actionInfo?.name || log.actionLabel || this.formatActionLabel(log.action));
+    const usernameLabel = this.escapeHtml(log.username || '—');
+    const detailsLabel = this.escapeHtml(log.details || '—');
+    const ipLabel = this.escapeHtml(log.ip || '—');
+    const documentIdAttr = log.documentId !== null && log.documentId !== undefined
+      ? this.escapeHtml(String(log.documentId))
+      : '';
     
     return `
       <tr class="log-row${isSelected ? ' selected' : ''}" data-log-id="${log.id}">
@@ -353,39 +532,39 @@ class LogsController {
         </td>
         <td>
           <div class="log-timestamp">
-            <strong>${this.formatTime(log.timestamp)}</strong>
-            <small class="text-muted d-block">${this.formatDate(log.timestamp)}</small>
+            <strong>${timeLabel}</strong>
+            <small class="text-muted d-block">${dateLabel}</small>
           </div>
         </td>
         <td>
-          <span class="badge bg-${levelInfo?.color || 'secondary'} level-badge">
-            ${levelInfo?.name || log.level}
+          <span class="badge bg-${levelColor} level-badge">
+            ${levelLabel}
           </span>
         </td>
         <td>
           <div class="action-info">
             <i class="bi ${actionInfo?.icon || 'bi-circle'} me-2"></i>
-            ${actionInfo?.name || log.action}
+            ${actionLabel}
           </div>
         </td>
         <td>
           <div class="user-info">
-            <strong>${log.username}</strong>
+            <strong>${usernameLabel}</strong>
           </div>
         </td>
         <td>
-          <span class="log-details" title="${log.details}">
-            ${log.details}
+          <span class="log-details" title="${detailsLabel}">
+            ${detailsLabel}
           </span>
         </td>
-        <td>${log.ip}</td>
+        <td>${ipLabel}</td>
         <td>
           <div class="log-actions">
             <button class="btn btn-sm btn-outline-primary" data-action="view" data-log-id="${log.id}">
               <i class="bi bi-eye"></i>
             </button>
-            ${log.documentId ? `
-              <button class="btn btn-sm btn-outline-info" data-action="document" data-log-id="${log.id}" data-document-id="${log.documentId}">
+            ${log.documentId !== null && log.documentId !== undefined ? `
+              <button class="btn btn-sm btn-outline-info" data-action="document" data-log-id="${log.id}" data-document-id="${documentIdAttr}">
                 <i class="bi bi-file-earmark"></i>
               </button>
             ` : ''}
@@ -425,9 +604,16 @@ class LogsController {
   }
 
   highlightSelectedRow() {
-    const rows = document.querySelectorAll('#logsTable tbody tr');
-    rows.forEach((row) => {
-      row.classList.toggle('selected', row.dataset.logId === String(this.selectedLogId));
+    const tbody = this.getLogsTableBody();
+    if (!tbody) return;
+
+    tbody.querySelectorAll('tr').forEach((row) => {
+      const isSelected = row.dataset.logId === String(this.selectedLogId);
+      row.classList.toggle('selected', isSelected);
+      const checkbox = row.querySelector('.log-row-checkbox');
+      if (checkbox) {
+        checkbox.checked = isSelected;
+      }
     });
   }
 
@@ -476,10 +662,20 @@ class LogsController {
 
     this.selectedLogId = null;
     this.highlightSelectedRow();
+
+    ['detailId', 'detailTimestamp', 'detailUser', 'detailIp', 'detailUserAgent', 'detailMessage'].forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = '—';
+      }
+    });
   }
 
   formatDate(timestamp) {
     const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return '—';
+    }
     return date.toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'short',
@@ -489,6 +685,9 @@ class LogsController {
 
   formatTime(timestamp) {
     const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return '—';
+    }
     return date.toLocaleTimeString('es-ES', {
       hour: '2-digit',
       minute: '2-digit',
@@ -601,6 +800,46 @@ class LogsController {
     return totals;
   }
 
+  updateAnalytics() {
+    const dataset = this.filteredLogs.length > 0 ? this.filteredLogs : this.allLogs;
+    const analytics = dataset.reduce((acc, log) => {
+      if (log.username) {
+        acc.uniqueUsers.add(log.username.toLowerCase());
+      }
+      if (log.action === 'upload') {
+        acc.uploads += 1;
+      }
+      if (log.action === 'download') {
+        acc.downloads += 1;
+      }
+
+      const today = acc.todayString;
+      if (log.level === 'error' && typeof log.timestamp === 'string' && log.timestamp.startsWith(today)) {
+        acc.errorsToday += 1;
+      }
+
+      return acc;
+    }, {
+      uniqueUsers: new Set(),
+      uploads: 0,
+      downloads: 0,
+      errorsToday: 0,
+      todayString: new Date().toISOString().split('T')[0]
+    });
+
+    const setMetric = (id, value) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = value;
+      }
+    };
+
+    setMetric('uniqueUsers', analytics.uniqueUsers.size);
+    setMetric('uploadsCount', analytics.uploads);
+    setMetric('downloadsCount', analytics.downloads);
+    setMetric('errorsToday', analytics.errorsToday);
+  }
+
   clearFilters() {
     document.getElementById('filterDate').value = '';
     document.getElementById('filterUser').value = '';
@@ -644,22 +883,26 @@ class LogsController {
     const randomLevel = levels[Math.floor(Math.random() * levels.length)];
     const randomUser = users[Math.floor(Math.random() * users.length)];
     
-    const newLog = {
+    const simulated = this.normalizeLogEntry({
       id: this.allLogs.length + 1,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       action: randomAction.id,
-      actionLabel: randomAction.name,
       level: randomLevel.id,
       username: randomUser,
       details: this.generateLogDetails(randomAction.id),
       ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
       userAgent: 'Simulado',
       documentId: Math.random() > 0.5 ? Math.floor(Math.random() * 100) + 1 : null
-    };
-    
-    this.allLogs.unshift(newLog); // Add to beginning
+    });
+
+    if (!simulated) {
+      return;
+    }
+
+    this.allLogs.unshift(simulated); // Add to beginning
     this.applyFilters();
     this.updateStats();
+    this.updateAnalytics();
     
     // Show notification for new log
     if (this.currentPage === 1) {
@@ -669,7 +912,13 @@ class LogsController {
 
   async exportLogs() {
     try {
-      const csvContent = this.generateCSV();
+      const dataset = this.filteredLogs.length > 0 ? this.filteredLogs : this.allLogs;
+      if (!dataset || dataset.length === 0) {
+        showNotification('No hay registros para exportar.', 'info');
+        return;
+      }
+
+      const csvContent = this.generateCSV(dataset);
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -687,9 +936,9 @@ class LogsController {
     }
   }
 
-  generateCSV() {
+  generateCSV(dataset = []) {
     const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Detalles', 'IP', 'Documento'];
-    const rows = this.filteredLogs.map(log => [
+    const rows = dataset.map(log => [
       this.formatDate(log.timestamp),
       this.formatTime(log.timestamp),
       log.level,
@@ -706,7 +955,9 @@ class LogsController {
   async downloadDailyLog() {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const todayLogs = this.allLogs.filter(log => log.timestamp.startsWith(today));
+      const todayLogs = this.allLogs.filter((log) =>
+        typeof log.timestamp === 'string' && log.timestamp.startsWith(today)
+      );
       
       if (todayLogs.length === 0) {
         showNotification('No hay registros para hoy', 'info');
@@ -747,14 +998,114 @@ class LogsController {
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   }
 
+  handleClearOldLogs(days = 30) {
+    if (!Array.isArray(this.allLogs) || this.allLogs.length === 0) {
+      showNotification('No hay registros para limpiar.', 'info');
+      return;
+    }
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffIso = cutoff.toISOString();
+    const cutoffTime = cutoff.getTime();
+
+    const beforeCount = this.allLogs.length;
+    this.allLogs = this.allLogs.filter((log) => {
+      if (!log?.timestamp) return true;
+      const logDate = new Date(log.timestamp);
+      if (Number.isNaN(logDate.getTime())) {
+        return true;
+      }
+      return logDate.getTime() >= cutoffTime;
+    });
+    const removed = beforeCount - this.allLogs.length;
+
+    this.applyFilters();
+    this.updateStats();
+
+    if (removed > 0) {
+      showNotification(`Se limpiaron ${removed} registros anteriores a ${cutoffIso.split('T')[0]}.`, 'success');
+    } else {
+      showNotification('No se encontraron registros antiguos para eliminar.', 'info');
+    }
+  }
+
+  generateAnalyticsCSV() {
+    const dataset = this.filteredLogs.length > 0 ? this.filteredLogs : this.allLogs;
+    const today = new Date().toISOString().split('T')[0];
+    const analytics = dataset.reduce((acc, log) => {
+      if (log.username) {
+        acc.uniqueUsers.add(log.username.toLowerCase());
+      }
+      if (log.action === 'upload') {
+        acc.uploads += 1;
+      }
+      if (log.action === 'download') {
+        acc.downloads += 1;
+      }
+      if (log.level === 'error' && typeof log.timestamp === 'string' && log.timestamp.startsWith(today)) {
+        acc.errorsToday += 1;
+      }
+      return acc;
+    }, {
+      uniqueUsers: new Set(),
+      uploads: 0,
+      downloads: 0,
+      errorsToday: 0
+    });
+
+    return [
+      ['Métrica', 'Valor'],
+      ['Usuarios únicos', analytics.uniqueUsers.size],
+      ['Subidas', analytics.uploads],
+      ['Descargas', analytics.downloads],
+      ['Errores hoy', analytics.errorsToday],
+      ['Total registros filtrados', dataset.length]
+    ].map((row) => row.join(',')).join('\n');
+  }
+
+  handleExportAnalytics() {
+    const dataset = this.filteredLogs.length > 0 ? this.filteredLogs : this.allLogs;
+    if (!dataset || dataset.length === 0) {
+      showNotification('No hay datos para exportar.', 'info');
+      return;
+    }
+
+    const csvContent = this.generateAnalyticsCSV();
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `analytics_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(anchor);
+
+    showNotification('Se exportó el análisis rápido.', 'success');
+  }
+
+  handleSystemHealthCheck() {
+    const totalLogs = this.allLogs.length;
+    const latestLog = this.allLogs[0];
+    const lastUser = latestLog?.username || 'N/D';
+    const lastAction = latestLog?.actionLabel || this.formatActionLabel(latestLog?.action || 'unknown');
+    const lastTimestamp = latestLog ? `${this.formatDate(latestLog.timestamp)} ${this.formatTime(latestLog.timestamp)}` : 'Sin registros';
+
+    const summary = `Registros totales: ${totalLogs} • Último evento: ${lastAction} (${lastUser}) • Fecha y hora: ${lastTimestamp}`;
+    showNotification(summary, 'info', 5000);
+  }
+
   showLogDetails(logId) {
-    const log = this.allLogs.find((entry) => String(entry.id) === String(logId));
+    const stringId = String(logId);
+    const log = this.filteredLogs.find((entry) => String(entry.id) === stringId)
+      || this.allLogs.find((entry) => String(entry.id) === stringId);
     if (!log) {
       showNotification('No encontramos la información de ese registro.', 'warning');
       return;
     }
 
-    this.selectedLogId = String(logId);
+    this.selectedLogId = stringId;
     this.highlightSelectedRow();
     this.populateLogDetails(log);
   }
