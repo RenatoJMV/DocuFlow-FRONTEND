@@ -149,10 +149,12 @@ Frontend/
 
 ### 📁 Gestión de Archivos
 - ✅ Upload funcionando con frontend existente
+- ✅ Vista principal renombrada a **Archivos Recientes** con orden automático por fecha de subida
 - ✅ Descarga de archivos
 - ✅ Búsqueda y filtrado
 - ✅ Metadatos y versiones
 - ✅ Compartir archivos
+- ✅ Panel de Sincronización GCS muestra métricas reales cuando el backend expone `/api/gcs/stats`
 
 ### 💬 Sistema de Comentarios
 - ✅ Comentarios por documento

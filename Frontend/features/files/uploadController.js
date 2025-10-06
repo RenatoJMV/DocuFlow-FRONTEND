@@ -625,7 +625,8 @@ class UploadController {
         .map(file => this.normalizeFile(file))
         .filter(Boolean);
 
-      this.allFiles = this.stripDemoFiles(normalizedFiles);
+  this.allFiles = this.stripDemoFiles(normalizedFiles);
+  this.allFiles = this.sortFilesByRecency(this.allFiles);
       store.setFiles(this.allFiles);
       console.log('📁 Archivos cargados:', this.allFiles.length);
       
@@ -645,6 +646,8 @@ class UploadController {
     this.filteredFiles = this.allFiles.filter(file => 
       (file.filename || '').toLowerCase().includes(searchTerm)
     );
+
+    this.filteredFiles = this.sortFilesByRecency(this.filteredFiles);
 
     this.currentPage = 1;
     this.renderFiles();
@@ -1048,6 +1051,77 @@ class UploadController {
     return sanitizedFiles;
   }
 
+  sortFilesByRecency(files = []) {
+    if (!Array.isArray(files)) {
+      return [];
+    }
+
+    const sorted = [...files];
+
+    sorted.sort((a, b) => {
+      const dateA = this.parseDateValue(a?.uploadDate ?? a?.uploadDateRaw);
+      const dateB = this.parseDateValue(b?.uploadDate ?? b?.uploadDateRaw);
+
+      const timeA = dateA ? dateA.getTime() : 0;
+      const timeB = dateB ? dateB.getTime() : 0;
+
+      if (timeA === timeB) {
+        const nameA = (a?.filename || '').toLowerCase();
+        const nameB = (b?.filename || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      }
+
+      return timeB - timeA;
+    });
+
+    return sorted;
+  }
+
+  toNumericValue(value) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const sanitized = trimmed.replace(/[^0-9,.-]/g, '').replace(',', '.');
+      if (!sanitized || sanitized === '-' || sanitized === '.') {
+        return null;
+      }
+
+      const parsed = Number(sanitized);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 1) {
+        return this.toNumericValue(value[0]);
+      }
+      return value.length;
+    }
+
+    if (typeof value === 'object') {
+      for (const key of ['value', 'total', 'count', 'length', 'size', 'amount', 'records', 'items']) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const nested = this.toNumericValue(value[key]);
+          if (nested !== null) {
+            return nested;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
   updateViewToggle() {
     document.querySelectorAll('.view-toggle .btn').forEach(btn => {
       btn.classList.remove('active');
@@ -1141,6 +1215,20 @@ class UploadController {
       this.setGcsActionsEnabled(false);
 
       if (gcsUsageEl) gcsUsageEl.textContent = disabled ? 'Desactivado temporalmente' : '—';
+      if (orphanFilesEl) orphanFilesEl.textContent = '—';
+      if (storageUsedEl) storageUsedEl.textContent = '--';
+      if (storageAvailableEl) storageAvailableEl.textContent = '--';
+
+      this.resetStorageIndicator();
+      return;
+    }
+
+    if (gcsStats?.supportsMetrics === false) {
+      this.gcsStatsReady = false;
+      this.showGcsStatusBanner('Las métricas de Google Cloud Storage están desactivadas hasta que el backend exponga el endpoint `/api/gcs/stats`.', { tone: 'info' });
+      this.setGcsActionsEnabled(false);
+
+      if (gcsUsageEl) gcsUsageEl.textContent = '—';
       if (orphanFilesEl) orphanFilesEl.textContent = '—';
       if (storageUsedEl) storageUsedEl.textContent = '--';
       if (storageAvailableEl) storageAvailableEl.textContent = '--';
@@ -1273,10 +1361,18 @@ class UploadController {
       return;
     }
 
-    const totalGcs = stats.totalGcsObjects ?? stats.totalObjects ?? stats.gcsCount ?? stats.bucketCount ?? 0;
-    const totalDb = stats.totalDatabaseRecords ?? stats.totalDbEntries ?? stats.dbCount ?? stats.databaseCount ?? 0;
-    const missingInDb = stats.missingInDatabase ?? stats.missingInDb ?? stats.orphanedInGcs ?? stats.orphaned ?? 0;
-    const missingInGcs = stats.missingInGcs ?? stats.missingObjects ?? stats.recordsWithoutObject ?? 0;
+    const totalGcs = this.toNumericValue(stats.totalGcsObjects)
+      ?? this.toNumericValue(stats.totalObjects)
+      ?? 0;
+    const totalDb = this.toNumericValue(stats.totalDatabaseRecords)
+      ?? this.toNumericValue(stats.totalDbEntries)
+      ?? 0;
+    const missingInDb = this.toNumericValue(stats.missingInDatabase)
+      ?? this.toNumericValue(stats.missingInDb)
+      ?? 0;
+    const missingInGcs = this.toNumericValue(stats.missingInGcs)
+      ?? this.toNumericValue(stats.missingObjects)
+      ?? 0;
 
     if (totalGcsEl) totalGcsEl.textContent = totalGcs;
     if (totalDbEl) totalDbEl.textContent = totalDb;
@@ -1691,6 +1787,87 @@ class UploadController {
     return `<span class="badge gcs-tag-muted">${contentType}</span>`;
   }
 
+  normalizeGcsStatsPayload(stats = {}) {
+    const sources = [
+      stats,
+      stats?.data,
+      stats?.payload,
+      stats?.summary,
+      stats?.overview,
+      stats?.statistics,
+      stats?.stats,
+      stats?.totals,
+      stats?.counts,
+      stats?.metrics,
+      stats?.details,
+      stats?.counters,
+      stats?.meta,
+      stats?.info,
+      stats?.result,
+      stats?.results
+    ].filter(source => source && typeof source === 'object');
+
+    const pick = (keys = []) => {
+      for (const source of sources) {
+        for (const key of keys) {
+          if (Object.prototype.hasOwnProperty.call(source, key)) {
+            const numeric = this.toNumericValue(source[key]);
+            if (numeric !== null) {
+              return numeric;
+            }
+          }
+        }
+      }
+      return null;
+    };
+
+    const message = stats?.message || stats?.statusMessage || stats?.error || null;
+    const ready = stats?.ready !== false
+      && stats?.status !== 503
+      && stats?.enabled !== false
+      && stats?.state !== 'DISABLED'
+      && stats?.available !== false;
+
+    const totalGcsObjects = pick(['totalGcsObjects', 'totalObjects', 'objectsInBucket', 'bucketObjects', 'gcsObjects', 'objectsInGcs', 'bucketObjectCount', 'objectCount', 'bucketCount', 'gcsCount', 'totalBucketObjects', 'bucketTotal', 'bucketFileCount']);
+    const totalDatabaseRecords = pick(['totalDatabaseRecords', 'totalDbEntries', 'databaseRecords', 'dbRecords', 'dbCount', 'databaseCount', 'recordsInDatabase', 'totalRecords', 'databaseEntries', 'recordsCount']);
+    const missingInDatabase = pick(['missingInDatabase', 'missingInDb', 'orphanedInGcs', 'orphanedRecords', 'objectsMissingInDb', 'bucketOrphans', 'gcsOrphans']);
+    const missingInGcs = pick(['missingInGcs', 'missingObjects', 'recordsWithoutObject', 'dbOrphans', 'recordsMissingInGcs', 'databaseOrphans', 'missingRecords']);
+
+    const usedStorageCandidate = pick(['usedStorage', 'storageUsed', 'storageUsage', 'usedBytes', 'bucketSizeBytes', 'totalBytesUsed']);
+    const totalStorageCandidate = pick(['totalStorage', 'storageCapacity', 'storageLimit', 'bucketQuotaBytes', 'quotaBytes']);
+    const orphanedFilesCandidate = pick(['orphanedFiles', 'orphaned', 'orphans', 'orphanCount', 'orphanedObjects']);
+    const storagePercentCandidate = pick(['storageUsagePercent', 'usagePercent', 'storagePercent', 'usedPercent']);
+
+    const fallbackUsedStorage = this.toNumericValue(stats?.usedStorage);
+    const fallbackTotalStorage = this.toNumericValue(stats?.totalStorage);
+    const fallbackOrphaned = this.toNumericValue(stats?.orphanedFiles);
+    const fallbackPercent = this.toNumericValue(stats?.storageUsagePercent);
+
+    const supportsMetrics = [
+      totalGcsObjects,
+      totalDatabaseRecords,
+      usedStorageCandidate ?? fallbackUsedStorage,
+      totalStorageCandidate ?? fallbackTotalStorage,
+      orphanedFilesCandidate ?? fallbackOrphaned
+    ].some(value => value !== null && value !== undefined);
+
+    return {
+      ...stats,
+      ready,
+      message,
+      totalGcsObjects: totalGcsObjects ?? null,
+      totalDatabaseRecords: totalDatabaseRecords ?? null,
+      missingInDatabase: missingInDatabase ?? (ready ? 0 : null),
+      missingInGcs: missingInGcs ?? (ready ? 0 : null),
+      usedStorage: usedStorageCandidate ?? fallbackUsedStorage ?? 0,
+      totalStorage: totalStorageCandidate ?? fallbackTotalStorage ?? null,
+      orphanedFiles: orphanedFilesCandidate ?? fallbackOrphaned ?? 0,
+      storageUsagePercent: storagePercentCandidate ?? fallbackPercent ?? null,
+      supportsMetrics,
+      raw: stats
+    };
+  }
+
   // Obtener estadísticas de Google Cloud Storage
   async getGcsStats(options = {}) {
     const { forceRefresh = false } = options;
@@ -1706,10 +1883,12 @@ class UploadController {
     try {
       const response = await docuFlowAPI.gcs.getStats();
       const stats = response?.data || response || {};
-      const normalized = {
-        ...stats,
-        ready: stats.ready === false ? false : true
-      };
+      const normalized = this.normalizeGcsStatsPayload(stats);
+
+      if (normalized.ready && normalized.supportsMetrics && !featureFlags.isEnabled('gcsStats')) {
+        featureFlags.enable('gcsStats');
+        this.gcsFeatureDisabledNoticeShown = false;
+      }
 
       this.latestGcsStats = normalized;
       this.lastGcsStatsFetchedAt = Date.now();
@@ -1768,7 +1947,9 @@ class UploadController {
       ready: false,
       message,
       status,
-      error: true
+      error: true,
+      supportsMetrics: false,
+      raw: null
     };
   }
 
@@ -2039,6 +2220,11 @@ class UploadController {
 
   // Modal avanzado de estadísticas GCS
   async showAdvancedStatsModal() {
+    if (!featureFlags.isEnabled('gcsStats') && this.latestGcsStats?.supportsMetrics) {
+      featureFlags.enable('gcsStats');
+      this.gcsFeatureDisabledNoticeShown = false;
+    }
+
     if (!featureFlags.isEnabled('gcsStats')) {
       this.notifyGcsFeatureDisabled();
       return;
