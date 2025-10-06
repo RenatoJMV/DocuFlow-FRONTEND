@@ -351,12 +351,26 @@
 }
 
 /* Quick Actions */
-.quick-actions h6 {
+.quick-actions-card {
+  padding: var(--spacing-lg);
+}
+
+.quick-actions-card h6 {
   color: var(--gray-700);
   margin-bottom: var(--spacing-md);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.quick-actions .btn-modern {
+  justify-content: center;
 }
 
 /* Action buttons in table */

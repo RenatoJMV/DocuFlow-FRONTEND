@@ -384,7 +384,11 @@
 }
 
 /* Quick Actions */
-.quick-actions h6 {
+.quick-actions-card {
+  padding: var(--spacing-lg);
+}
+
+.quick-actions-card h6 {
   color: var(--gray-700);
   margin-bottom: var(--spacing-md);
   font-size: var(--font-size-sm);
@@ -392,18 +396,32 @@
   letter-spacing: 0.5px;
 }
 
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.quick-actions .btn-modern {
+  justify-content: center;
+}
+
 /* Permission Templates */
+.permission-templates-card {
+  padding: var(--spacing-lg);
+}
+
 .permission-templates {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
 }
 
 .template-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
+  padding: var(--spacing-md);
   border: 1px solid var(--gray-300);
   border-radius: var(--border-radius);
   cursor: pointer;
