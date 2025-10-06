@@ -87,8 +87,25 @@ class SecurityService {
 
   shouldAddCSRF(url, method) {
     const modifyingMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
-    return modifyingMethods.includes(method?.toUpperCase()) && 
-           !url.includes('/auth/csrf-token');
+    const normalizedMethod = method?.toUpperCase?.();
+    if (!normalizedMethod || !modifyingMethods.includes(normalizedMethod)) {
+      return false;
+    }
+
+    try {
+      const requestUrl = typeof url === 'string'
+        ? new URL(url, window.location.origin)
+        : new URL(url?.url ?? '', window.location.origin);
+
+      const isSameOrigin = requestUrl.origin === window.location.origin;
+      if (!isSameOrigin) {
+        return false;
+      }
+    } catch (error) {
+      // Si la URL no es válida, asumimos que es relativa y continuamos
+    }
+
+    return !String(url).includes('/auth/csrf-token');
   }
 
   setCSRFMetaTag() {
