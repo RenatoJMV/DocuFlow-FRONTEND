@@ -56,6 +56,11 @@ class ApiClient {
       }
     };
 
+    if (config.body instanceof FormData) {
+      delete config.headers['Content-Type'];
+      delete config.headers['content-type'];
+    }
+
     // Aplicar interceptores de request
     for (const interceptor of this.interceptors.request) {
       try {
