@@ -277,7 +277,7 @@ const LOGS_PREFIX = `${API_PREFIX}/logs`;
 const GCS_PREFIX = `${API_PREFIX}/gcs`;
 const PROFILE_PREFIX = `${API_PREFIX}/profile`;
 const EXPORT_PREFIX = `${API_PREFIX}/export`;
-const PERMISSIONS_PREFIX = `${API_PREFIX}/permissions`;
+const PERMISSIONS_PREFIX = '/permissions';
 const NOTIFICATIONS_PREFIX = '/notifications';
 const ADMIN_PREFIX = `${API_PREFIX}/admin`;
 
