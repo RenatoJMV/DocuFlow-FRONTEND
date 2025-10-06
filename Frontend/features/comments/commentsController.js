@@ -318,12 +318,29 @@ class CommentsController {
 
   async loadDocuments() {
     try {
-      const recent = await docuFlowAPI.files.getRecent?.(50);
-      let documents = this.extractArray(recent, ['files', 'data', 'content']);
+      let documents = [];
+      let recent = [];
+
+      if (typeof docuFlowAPI.files.getRecent === 'function') {
+        try {
+          recent = await docuFlowAPI.files.getRecent(50);
+          documents = this.extractArray(recent, ['files', 'data', 'content']);
+        } catch (error) {
+          console.warn('No se pudo obtener la lista de archivos recientes desde el backend. Se usará un fallback.', error);
+          if (error?.status !== 404) {
+            showNotification('No pudimos cargar la lista de documentos recientes. Intentaremos con todos los archivos.', 'info');
+          }
+        }
+      }
 
       if (!documents || documents.length === 0) {
-        const fallback = await docuFlowAPI.files.getAll?.();
-        documents = this.extractArray(fallback, ['files', 'data', 'content']);
+        try {
+          const fallback = await docuFlowAPI.files.getAll?.();
+          documents = this.extractArray(fallback, ['files', 'data', 'content']);
+        } catch (fallbackError) {
+          console.error('Error al obtener el listado completo de archivos para el selector.', fallbackError);
+          documents = [];
+        }
       }
 
       if (!documents || documents.length === 0) {
