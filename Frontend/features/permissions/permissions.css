@@ -73,6 +73,15 @@
 
 .users-management .table {
   margin-bottom: 0;
+  width: 100%;
+  min-width: 720px;
+  table-layout: auto;
+}
+
+.users-management .table thead th,
+.users-management .table tbody td {
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .user-actions-column {
@@ -335,7 +344,9 @@
 .permission-assignment {
   padding: var(--spacing-xl);
   height: fit-content;
+  position: sticky;
   top: var(--spacing-lg);
+  align-self: flex-start;
 }
 
 .assignment-header {

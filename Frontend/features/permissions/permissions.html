@@ -226,12 +226,13 @@
         <div class="modal-body">
           <form id="addUserForm">
             <div class="mb-3">
-              <label for="userName" class="form-label">Nombre de Usuario</label>
+              <label for="userName" class="form-label">Nombre para mostrar</label>
               <input type="text" class="form-control" id="userName" required>
             </div>
             <div class="mb-3">
-              <label for="userEmail" class="form-label">Email</label>
-              <input type="email" class="form-control" id="userEmail" required>
+              <label for="userEmail" class="form-label">Correo</label>
+              <input type="email" class="form-control" id="userEmail" placeholder="usuario@empresa.com" required>
+              <small class="text-muted">Se usará como nombre de usuario en el sistema.</small>
             </div>
             <div class="mb-3">
               <label for="userPassword" class="form-label">Contraseña</label>

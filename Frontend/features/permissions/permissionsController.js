@@ -76,7 +76,7 @@ class PermissionsController {
 
     this.validators.user = new FormValidator('addUserForm');
     this.validators.user
-      .addRule('userName', validators.required, 'El nombre de usuario es obligatorio')
+      .addRule('userName', validators.required, 'El nombre para mostrar es obligatorio')
       .addRule('userEmail', (value) => validators.required(value) && validators.email(value), 'Ingresa un correo válido')
       .addRule('userRole', validators.required, 'Selecciona un rol');
 
@@ -949,17 +949,19 @@ class PermissionsController {
       return;
     }
 
-    const username = document.getElementById('userName')?.value.trim();
-    const email = document.getElementById('userEmail')?.value.trim();
+    const displayName = document.getElementById('userName')?.value.trim();
+    const emailInput = document.getElementById('userEmail')?.value.trim();
     const password = document.getElementById('userPassword')?.value.trim();
     const confirmPassword = document.getElementById('userConfirmPassword')?.value.trim();
     const role = document.getElementById('userRole')?.value;
     const status = document.getElementById('userStatus')?.value || 'active';
 
-    if (!username || !email || !role) {
+    if (!displayName || !emailInput || !role) {
       showNotification('Completa los campos obligatorios.', 'warning');
       return;
     }
+
+    const normalizedEmail = emailInput.toLowerCase();
 
     if (!this.editingUserId && (!password || password.length < 8)) {
       showNotification('La contraseña debe tener al menos 8 caracteres.', 'warning');
@@ -972,9 +974,9 @@ class PermissionsController {
     }
 
     const payload = {
-      username,
-      name: username,
-      email,
+      username: normalizedEmail,
+      name: displayName,
+      email: normalizedEmail,
       role,
       status,
       active: status !== 'inactive'
@@ -1006,7 +1008,10 @@ class PermissionsController {
       await this.fetchUsers({ selectUserId: targetUserId });
     } catch (error) {
       console.error('Error guardando usuario:', error);
-      showNotification('No se pudo guardar el usuario. Revisa los detalles en la consola.', 'error');
+      const message = error?.message?.includes('email')
+        ? 'El correo debe ser válido y único. Revisa los datos ingresados.'
+        : 'No se pudo guardar el usuario. Revisa los detalles en la consola.';
+      showNotification(message, 'error');
     }
   }
 
