@@ -161,6 +161,8 @@ Frontend/
 - ✅ CRUD completo
 - ✅ Validación de permisos
 - ✅ Interfaz responsive
+- ✅ Selector inteligente de documentos con búsqueda por nombre o ID
+- ✅ Limpieza rápida de comentarios de demostración heredados
 
 ### 📊 Dashboard y Estadísticas
 - ✅ Prueba de conexión

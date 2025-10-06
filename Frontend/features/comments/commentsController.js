@@ -1,7 +1,7 @@
 import apiClient, { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
 import { enforcePageAuth } from '../../shared/utils/authGuard.js';
-import { initializeNavbar, showNotification, Pagination, FormValidator } from '../../shared/utils/uiHelpers.js';
+import { initializeNavbar, showNotification, Pagination, FormValidator, formatFileSize, debounce } from '../../shared/utils/uiHelpers.js';
 
 class CommentsController {
   constructor() {
@@ -18,15 +18,26 @@ class CommentsController {
     this.currentFilter = 'all';
     this.pagination = null;
     this.validator = null;
+    this.documents = [];
+    this.documentsById = new Map();
+    this.documentSearchInput = null;
+    this.documentIdInput = null;
+    this.documentSuggestionsContainer = null;
+    this.documentSuggestions = [];
+    this.activeSuggestionIndex = -1;
+    this.debouncedDocumentSearch = debounce((query) => this.performDocumentSearch(query), 150);
+    this.demoCommentsDetected = [];
 
     this.initializeComponents();
     this.setupEventListeners();
+    this.loadDocuments();
     this.loadComments();
   }
 
   initializeComponents() {
     initializeNavbar('comments');
     this.setupFormValidation();
+    this.setupDocumentSelector();
     this.toggleTaskFields(false);
     this.updateSubmitButton('comment');
     this.updateShowingCount();
@@ -37,7 +48,9 @@ class CommentsController {
     this.validator = new FormValidator('newCommentForm');
     this.validator
       .addRule('commentContent', (value) => value && value.trim().length >= 5, 'El comentario debe tener al menos 5 caracteres')
-      .addRule('documentId', (value) => !!value && !Number.isNaN(Number(value)), 'El ID del documento es requerido');
+      .addRule('documentSearch', () => {
+        return Boolean(document.getElementById('documentId')?.value);
+      }, 'Selecciona un documento válido de la lista');
   }
 
   setupEventListeners() {
@@ -74,6 +87,211 @@ class CommentsController {
     this.setupQuickActions();
   }
 
+  setupDocumentSelector() {
+    this.documentSearchInput = document.getElementById('documentSearch');
+    this.documentIdInput = document.getElementById('documentId');
+    this.documentSuggestionsContainer = document.getElementById('documentSuggestions');
+
+    if (!this.documentSearchInput || !this.documentIdInput || !this.documentSuggestionsContainer) {
+      return;
+    }
+
+    this.documentSearchInput.addEventListener('input', (event) => {
+      const value = event.target.value || '';
+      this.clearDocumentSelection(false);
+      this.debouncedDocumentSearch(value);
+    });
+
+    this.documentSearchInput.addEventListener('focus', () => {
+      if (!this.documents.length) {
+        this.debouncedDocumentSearch('');
+        return;
+      }
+
+      if (!this.documentSearchInput.value) {
+        this.renderDocumentSuggestions(this.documents.slice(0, 8));
+      } else {
+        this.performDocumentSearch(this.documentSearchInput.value);
+      }
+    });
+
+    this.documentSearchInput.addEventListener('keydown', (event) => this.handleDocumentSuggestionKeydown(event));
+
+    this.documentSearchInput.addEventListener('blur', () => {
+      setTimeout(() => this.hideDocumentSuggestions(), 150);
+    });
+
+    this.documentSuggestionsContainer.addEventListener('mousedown', (event) => {
+      const item = event.target.closest('.document-suggestion-item');
+      if (!item) return;
+
+      const docId = item.dataset.docId;
+      this.selectDocumentById(docId);
+    });
+  }
+
+  clearDocumentSelection(resetInput = true) {
+    if (this.documentIdInput) {
+      this.documentIdInput.value = '';
+    }
+
+    if (this.documentSearchInput && resetInput) {
+      this.documentSearchInput.value = '';
+    }
+
+    if (this.documentSearchInput?.dataset?.selectedId) {
+      delete this.documentSearchInput.dataset.selectedId;
+    }
+
+    this.activeSuggestionIndex = -1;
+  }
+
+  performDocumentSearch(query = '') {
+    if (!Array.isArray(this.documents) || this.documents.length === 0) {
+      return;
+    }
+
+    const normalized = query.trim().toLowerCase();
+    let results = this.documents;
+
+    if (normalized) {
+      results = this.documents.filter((doc) => {
+        return doc.searchText.includes(normalized) || String(doc.id).includes(normalized);
+      });
+    }
+
+    this.renderDocumentSuggestions(results.slice(0, 10));
+  }
+
+  renderDocumentSuggestions(items = []) {
+    if (!this.documentSuggestionsContainer) return;
+
+    this.documentSuggestions = items;
+
+    if (!items.length) {
+      this.documentSuggestionsContainer.innerHTML = '<div class="px-3 py-2 text-muted small">No se encontraron documentos con ese criterio.</div>';
+      this.documentSuggestionsContainer.classList.remove('d-none');
+      this.activeSuggestionIndex = -1;
+      return;
+    }
+
+    const list = document.createElement('ul');
+    items.forEach((doc, index) => {
+      const listItem = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `document-suggestion-item${index === this.activeSuggestionIndex ? ' active' : ''}`;
+      button.dataset.docId = doc.id;
+      button.dataset.index = index;
+      button.innerHTML = `
+        <strong>${doc.displayName}</strong>
+        <span>ID: ${doc.id}${doc.sizeLabel ? ` · ${doc.sizeLabel}` : ''}${doc.uploadedLabel ? ` · ${doc.uploadedLabel}` : ''}</span>
+      `;
+      listItem.appendChild(button);
+      list.appendChild(listItem);
+    });
+
+    this.documentSuggestionsContainer.innerHTML = '';
+    this.documentSuggestionsContainer.appendChild(list);
+    this.documentSuggestionsContainer.classList.remove('d-none');
+    this.activeSuggestionIndex = Math.min(this.activeSuggestionIndex, items.length - 1);
+    this.highlightActiveSuggestion();
+  }
+
+  hideDocumentSuggestions() {
+    if (!this.documentSuggestionsContainer) return;
+    this.documentSuggestionsContainer.classList.add('d-none');
+    this.documentSuggestionsContainer.innerHTML = '';
+    this.activeSuggestionIndex = -1;
+  }
+
+  handleDocumentSuggestionKeydown(event) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if ((!this.documentSuggestions || this.documentSuggestions.length === 0) && this.documents.length > 0) {
+        this.performDocumentSearch(this.documentSearchInput?.value || '');
+      }
+    }
+
+    if (!this.documentSuggestions || this.documentSuggestions.length === 0) {
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.moveActiveSuggestion(1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.moveActiveSuggestion(-1);
+    } else if (event.key === 'Enter') {
+      if (this.activeSuggestionIndex >= 0 && this.documentSuggestions[this.activeSuggestionIndex]) {
+        event.preventDefault();
+        const doc = this.documentSuggestions[this.activeSuggestionIndex];
+        this.applyDocumentSelection(doc);
+      }
+    } else if (event.key === 'Escape') {
+      this.hideDocumentSuggestions();
+    }
+  }
+
+  moveActiveSuggestion(direction) {
+    if (!this.documentSuggestions.length) return;
+
+    const newIndex = this.activeSuggestionIndex + direction;
+    if (newIndex < 0) {
+      this.activeSuggestionIndex = this.documentSuggestions.length - 1;
+    } else if (newIndex >= this.documentSuggestions.length) {
+      this.activeSuggestionIndex = 0;
+    } else {
+      this.activeSuggestionIndex = newIndex;
+    }
+
+    this.highlightActiveSuggestion();
+  }
+
+  highlightActiveSuggestion() {
+    if (!this.documentSuggestionsContainer) return;
+
+    const buttons = this.documentSuggestionsContainer.querySelectorAll('.document-suggestion-item');
+    buttons.forEach((button, index) => {
+      if (index === this.activeSuggestionIndex) {
+        button.classList.add('active');
+        button.scrollIntoView({ block: 'nearest' });
+      } else {
+        button.classList.remove('active');
+      }
+    });
+  }
+
+  selectDocumentById(docId) {
+    if (!docId) return;
+
+    const documentData = this.documentsById.get(String(docId))
+      || this.documents.find((doc) => String(doc.id) === String(docId));
+
+    if (documentData) {
+      this.applyDocumentSelection(documentData);
+    }
+  }
+
+  applyDocumentSelection(documentData) {
+    if (!documentData) return;
+
+    if (this.documentIdInput) {
+      this.documentIdInput.value = documentData.id;
+    }
+
+    if (this.documentSearchInput) {
+      this.documentSearchInput.value = `${documentData.displayName} (ID: ${documentData.id})`;
+      this.documentSearchInput.dataset.selectedId = String(documentData.id);
+    }
+
+    if (this.validator && this.documentSearchInput) {
+      this.validator.clearFieldError(this.documentSearchInput);
+    }
+
+    this.hideDocumentSuggestions();
+  }
+
   setupQuickActions() {
     const markAllReadBtn = document.getElementById('markAllRead');
     if (markAllReadBtn) {
@@ -88,6 +306,51 @@ class CommentsController {
     const refreshBtn = document.getElementById('refreshComments');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => this.loadComments());
+    }
+
+    this.removeDemoCommentsBtn = document.getElementById('removeDemoComments');
+    if (this.removeDemoCommentsBtn) {
+      this.removeDemoCommentsBtn.addEventListener('click', () => this.cleanupDemoComments());
+    }
+
+    this.updateDemoCleanupState();
+  }
+
+  async loadDocuments() {
+    try {
+      const recent = await docuFlowAPI.files.getRecent?.(50);
+      let documents = this.extractArray(recent, ['files', 'data', 'content']);
+
+      if (!documents || documents.length === 0) {
+        const fallback = await docuFlowAPI.files.getAll?.();
+        documents = this.extractArray(fallback, ['files', 'data', 'content']);
+      }
+
+      if (!documents || documents.length === 0) {
+        const stored = store.getState?.('files') || store.getState?.()?.files || [];
+        documents = Array.isArray(stored) ? stored : [];
+      }
+
+      const normalized = (documents || [])
+        .map((doc) => this.normalizeDocument(doc))
+        .filter(Boolean)
+        .sort((a, b) => (b.uploadedAtValue ?? 0) - (a.uploadedAtValue ?? 0));
+
+      this.documents = normalized;
+      this.documentsById = new Map(normalized.map((doc) => [String(doc.id), doc]));
+
+      if (this.documentSearchInput && document.activeElement === this.documentSearchInput) {
+        this.renderDocumentSuggestions(normalized.slice(0, 8));
+      } else {
+        this.hideDocumentSuggestions();
+      }
+
+      if (this.documentSearchInput && this.documentSearchInput.value) {
+        this.performDocumentSearch(this.documentSearchInput.value);
+      }
+    } catch (error) {
+      console.error('Error al cargar documentos para el selector:', error);
+      showNotification('No se pudieron cargar los documentos recientes. Intenta actualizar más tarde.', 'warning');
     }
   }
 
@@ -153,7 +416,15 @@ class CommentsController {
       await this.loadComments(true);
     } catch (error) {
       console.error('Error creating comment:', error);
-      showNotification('Error al crear el comentario', 'error');
+      if (error?.message === 'documento_invalido') {
+        showNotification('Selecciona un documento válido de la lista antes de guardar.', 'warning');
+        if (this.validator && this.documentSearchInput) {
+          this.validator.showFieldError(this.documentSearchInput, 'Selecciona un documento válido de la lista');
+          this.documentSearchInput.focus();
+        }
+      } else {
+        showNotification('Error al crear el comentario', 'error');
+      }
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerHTML = originalText;
@@ -162,12 +433,23 @@ class CommentsController {
 
   getFormData() {
     const commentType = document.querySelector('input[name="commentType"]:checked')?.value || 'comment';
+    const documentIdRaw = this.documentIdInput?.value || document.getElementById('documentId')?.value || '';
+    const documentId = documentIdRaw ? Number(documentIdRaw) : null;
+
+    if (!Number.isFinite(documentId)) {
+      throw new Error('documento_invalido');
+    }
 
     const formData = {
       content: document.getElementById('commentContent')?.value.trim() || '',
       type: commentType,
-      documentId: parseInt(document.getElementById('documentId')?.value, 10)
+      documentId
     };
+
+    const selectedDocument = this.documentsById.get(String(documentId));
+    if (selectedDocument?.filename) {
+      formData.documentName = selectedDocument.filename;
+    }
 
     if (commentType === 'task') {
       const assignees = document.getElementById('assignees')?.value.trim() || '';
@@ -189,12 +471,22 @@ class CommentsController {
       const comments = this.extractArray(response, ['comments', 'data']);
 
       if (Array.isArray(comments) && comments.length > 0) {
-        this.comments = comments.map((comment) => this.normalizeComment(comment));
+        const normalizedComments = comments.map((comment) => this.normalizeComment(comment));
+        const { sanitized, removed } = this.stripDemoComments(normalizedComments);
+
+        this.comments = sanitized;
+        this.demoCommentsDetected = removed;
+
+        if (removed.length > 0) {
+          showNotification(`Se ocultaron ${removed.length} comentarios de demostración heredados.`, 'info', 2500);
+        }
+
         if (!silent) {
           showNotification(`${this.comments.length} comentarios cargados del servidor`, 'success', 2000);
         }
       } else {
         this.comments = [];
+        this.demoCommentsDetected = [];
         if (!silent) {
           showNotification('No se encontraron comentarios en el servidor', 'info', 2000);
         }
@@ -205,11 +497,13 @@ class CommentsController {
         showNotification('No se pudieron cargar los comentarios. Verifique la API.', 'warning');
       }
       this.comments = [];
+      this.demoCommentsDetected = [];
     }
 
     store.setComments(this.comments);
     this.filterComments();
     this.updateStats();
+    this.updateDemoCleanupState();
   }
 
   extractArray(payload, keys = []) {
@@ -222,21 +516,192 @@ class CommentsController {
     return Array.isArray(payload) ? payload : [];
   }
 
+  normalizeDocument(raw = {}) {
+    if (!raw) return null;
+
+    const id = raw.id ?? raw.documentId ?? raw.fileId ?? raw.uuid ?? raw.identifier;
+    if (!id) {
+      return null;
+    }
+
+    const filename = raw.filename || raw.name || raw.title || `Documento ${id}`;
+    const uploader = raw.uploader || raw.uploadedBy || raw.owner || raw.createdBy || raw.user || 'Sin autor';
+    const rawDate = raw.uploadDate
+      || raw.uploadedAt
+      || raw.createdAt
+      || raw.timestamp
+      || raw.lastModified
+      || raw.creationDate
+      || raw.updatedAt;
+
+    const parsedDate = this.parseDateValue(rawDate);
+    const size = raw.size ?? raw.fileSize ?? raw.bytes ?? raw.length ?? 0;
+
+    return {
+      id,
+      displayName: filename,
+      filename,
+      uploader,
+      uploadedAt: parsedDate ? parsedDate.toISOString() : null,
+      uploadedAtValue: parsedDate ? parsedDate.getTime() : 0,
+      size,
+      sizeLabel: typeof size === 'number' ? formatFileSize(size) : null,
+      uploadedLabel: parsedDate ? this.formatDate(parsedDate.toISOString()) : null,
+      searchText: `${filename} ${uploader} ${id}`.toLowerCase()
+    };
+  }
+
+  parseDateValue(dateValue) {
+    if (!dateValue && dateValue !== 0) return null;
+
+    if (dateValue instanceof Date) {
+      return Number.isNaN(dateValue.getTime()) ? null : dateValue;
+    }
+
+    if (typeof dateValue === 'number') {
+      const normalizedNumber = dateValue < 1e12 ? dateValue * 1000 : dateValue;
+      const dateFromNumber = new Date(normalizedNumber);
+      return Number.isNaN(dateFromNumber.getTime()) ? null : dateFromNumber;
+    }
+
+    if (typeof dateValue === 'string') {
+      const trimmed = dateValue.trim();
+      if (!trimmed) return null;
+
+      const directDate = new Date(trimmed);
+      if (!Number.isNaN(directDate.getTime())) {
+        return directDate;
+      }
+
+      const numeric = Number(trimmed);
+      if (!Number.isNaN(numeric)) {
+        return this.parseDateValue(numeric);
+      }
+    }
+
+    return null;
+  }
+
   normalizeComment(raw = {}) {
     const generatedId = `${Date.now()}-${Math.random()}`;
     const status = raw.status || (raw.resolved ? 'completed' : raw.state) || 'pending';
+    const content = (raw.content || raw.text || 'Sin contenido').toString();
+    const author = (raw.author || raw.user || raw.createdBy || 'Usuario desconocido').toString();
+    const isDemo = this.isDemoComment(raw, content, author);
     return {
       id: raw.id ?? raw.commentId ?? generatedId,
-      content: raw.content || raw.text || 'Sin contenido',
+      content,
       type: raw.type || (raw.isTask ? 'task' : 'comment'),
-      author: raw.author || raw.user || raw.createdBy || 'Usuario desconocido',
+      author,
       createdAt: raw.createdAt || raw.timestamp || new Date().toISOString(),
       status,
       fileId: raw.fileId || null,
       priority: raw.priority || (status === 'completed' ? 'medium' : 'normal'),
       assignees: raw.assignees || raw.users || [],
-      dueDate: raw.dueDate || raw.deadline || null
+      dueDate: raw.dueDate || raw.deadline || null,
+      isDemo
     };
+  }
+
+  isDemoComment(raw = {}, content = '', author = '') {
+    const flags = [raw.isDemo, raw.demo, raw.sample, raw.placeholder, raw.testData, raw.mock];
+    if (flags.some((flag) => flag === true)) {
+      return true;
+    }
+
+    const normalizedContent = content.toLowerCase();
+    const normalizedAuthor = author.toLowerCase();
+    const patterns = ['demo', 'prueba', 'sample', 'placeholder', 'lorem', 'ipsum', 'dummy', 'ejemplo'];
+
+    if (patterns.some((pattern) => normalizedContent.includes(pattern))) {
+      return true;
+    }
+
+    if (patterns.some((pattern) => normalizedAuthor.includes(pattern))) {
+      return true;
+    }
+
+    if (Array.isArray(raw.assignees) && raw.assignees.some((assignee) => String(assignee).toLowerCase().includes('demo'))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  stripDemoComments(comments = []) {
+    if (!Array.isArray(comments)) {
+      return { sanitized: [], removed: [] };
+    }
+
+    const removed = [];
+    const sanitized = comments.filter((comment) => {
+      if (comment && (comment.isDemo || this.isDemoComment(comment, comment.content, comment.author))) {
+        removed.push(comment);
+        return false;
+      }
+      return true;
+    });
+
+    return { sanitized, removed };
+  }
+
+  updateDemoCleanupState() {
+    if (!this.removeDemoCommentsBtn) return;
+
+    const hasDemo = Array.isArray(this.demoCommentsDetected) && this.demoCommentsDetected.length > 0;
+    this.removeDemoCommentsBtn.classList.toggle('d-none', !hasDemo);
+    this.removeDemoCommentsBtn.disabled = !hasDemo;
+
+    if (hasDemo) {
+      this.removeDemoCommentsBtn.textContent = `Eliminar ${this.demoCommentsDetected.length} comentarios demo`;
+    } else {
+      this.removeDemoCommentsBtn.textContent = 'Eliminar comentarios demo';
+    }
+  }
+
+  async cleanupDemoComments() {
+    if (!Array.isArray(this.demoCommentsDetected) || this.demoCommentsDetected.length === 0) {
+      showNotification('No hay comentarios demo para eliminar.', 'info');
+      return;
+    }
+
+    const confirmed = confirm(`Se eliminarán ${this.demoCommentsDetected.length} comentarios de demostración. ¿Deseas continuar?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const ids = this.demoCommentsDetected
+      .map((comment) => comment?.id)
+      .filter((id) => id !== null && id !== undefined);
+
+    if (ids.length === 0) {
+      showNotification('No se detectaron identificadores válidos para eliminar.', 'warning');
+      return;
+    }
+
+    try {
+      showNotification('Eliminando comentarios demo...', 'info');
+      const results = await Promise.allSettled(ids.map((id) => docuFlowAPI.comments.delete(id)));
+
+      const deletedCount = results.filter((result) => result.status === 'fulfilled').length;
+      const failedCount = results.length - deletedCount;
+
+      if (deletedCount > 0) {
+        showNotification(`Se eliminaron ${deletedCount} comentarios demo.`, 'success');
+      }
+
+      if (failedCount > 0) {
+        showNotification(`${failedCount} comentarios demo no pudieron eliminarse.`, 'warning');
+      }
+
+      this.demoCommentsDetected = [];
+      await this.loadComments(true);
+    } catch (error) {
+      console.error('Error al eliminar comentarios demo:', error);
+      showNotification('No fue posible eliminar todos los comentarios demo.', 'error');
+    } finally {
+      this.updateDemoCleanupState();
+    }
   }
 
   filterComments() {
