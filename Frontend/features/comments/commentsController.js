@@ -1,4 +1,5 @@
 import apiClient, { docuFlowAPI } from '../../shared/services/apiClient.js';
+import { apiGetUsers } from '../../shared/services/userService.js';
 import { store } from '../../shared/services/store.js';
 import { enforcePageAuth } from '../../shared/utils/authGuard.js';
 import { initializeNavbar, showNotification, Pagination, FormValidator, formatFileSize, debounce } from '../../shared/utils/uiHelpers.js';
@@ -23,12 +24,23 @@ class CommentsController {
     this.documentSearchInput = null;
     this.documentIdInput = null;
     this.documentSuggestionsContainer = null;
-    this.documentSuggestions = [];
-    this.activeSuggestionIndex = -1;
-    this.debouncedDocumentSearch = debounce((query) => this.performDocumentSearch(query), 150);
+  this.documentSuggestions = [];
+  this.activeSuggestionIndex = -1;
+  this.debouncedDocumentSearch = debounce((query) => this.handleDocumentLookup(query), 180);
     this.demoCommentsDetected = [];
-  this.cachedDocumentsKey = 'docuflow.documents.cache';
+    this.cachedDocumentsKey = 'docuflow.documents.cache';
     this.recentDocumentsBackoffKey = 'docuflow.documents.recent.backoff';
+    this.documentSearchAbortController = null;
+  this.documentDropdownId = 'documentSearchDropdown';
+  this.lastDocumentSearch = '';
+
+    this.users = [];
+  this.userSuggestions = [];
+    this.selectedAssignees = [];
+    this.assigneeInput = null;
+    this.assigneeHiddenInput = null;
+    this.assigneeChipsContainer = null;
+    this.assigneesSuggestionsList = null;
 
     if (typeof window !== 'undefined') {
       window.commentsController = this;
@@ -36,6 +48,7 @@ class CommentsController {
 
     this.initializeComponents();
     this.setupEventListeners();
+    this.loadUsers();
     this.loadDocuments();
     this.loadComments();
   }
@@ -43,11 +56,198 @@ class CommentsController {
   initializeComponents() {
     initializeNavbar('comments');
     this.setupFormValidation();
+    this.setupAssigneesSelector();
     this.setupDocumentSelector();
     this.toggleTaskFields(false);
     this.updateSubmitButton('comment');
     this.updateShowingCount();
     this.updateStats();
+  }
+
+  async loadUsers() {
+    try {
+      const { success, users } = await apiGetUsers();
+      if (!success) {
+        throw new Error('No se pudieron obtener usuarios');
+      }
+
+      this.users = Array.isArray(users) ? users : [];
+      this.populateAssigneeSuggestions();
+    } catch (error) {
+      console.error('Error cargando usuarios para asignación:', error);
+      this.users = [];
+      this.populateAssigneeSuggestions();
+      showNotification('No se pudo cargar la lista de usuarios. Puedes escribir manualmente.', 'info');
+    }
+  }
+
+  setupAssigneesSelector() {
+    this.assigneeInput = document.getElementById('assigneeInput');
+    this.assigneeHiddenInput = document.getElementById('assignees');
+    this.assigneeChipsContainer = document.getElementById('assigneeChips');
+    this.assigneesSuggestionsList = document.getElementById('assigneesSuggestions');
+
+    if (!this.assigneeInput || !this.assigneeHiddenInput || !this.assigneeChipsContainer || !this.assigneesSuggestionsList) {
+      return;
+    }
+
+    this.assigneeInput.addEventListener('keydown', (event) => this.handleAssigneeKeydown(event));
+    this.assigneeInput.addEventListener('input', () => this.handleAssigneeInput());
+    this.assigneeInput.addEventListener('blur', () => {
+      setTimeout(() => this.applyPendingAssignee(), 120);
+    });
+
+    this.updateAssigneeChips();
+    this.populateAssigneeSuggestions();
+  }
+
+  populateAssigneeSuggestions() {
+    if (!this.assigneesSuggestionsList) return;
+
+    this.assigneesSuggestionsList.innerHTML = '';
+
+    const uniqueUsers = (this.users || [])
+      .map((user) => this.normalizeUserSuggestion(user))
+      .filter(Boolean)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    this.userSuggestions = uniqueUsers;
+
+    uniqueUsers.forEach((user) => {
+      const option = document.createElement('option');
+      option.value = user.displayName;
+      option.dataset.userId = user.id;
+      option.label = user.email ? `${user.displayName} (${user.email})` : user.displayName;
+      this.assigneesSuggestionsList.appendChild(option);
+    });
+  }
+
+  normalizeUserSuggestion(raw = {}) {
+    if (!raw) return null;
+
+    const id = raw.id ?? raw.userId ?? raw.uuid ?? raw.identifier;
+    const name = raw.name || `${raw.firstName || ''} ${raw.lastName || ''}`.trim();
+    const email = raw.email || raw.username || raw.user || null;
+    const displayName = name || email || `Usuario ${id ?? ''}`.trim();
+
+    if (!displayName) {
+      return null;
+    }
+
+    return {
+      id,
+      name,
+      email,
+      displayName
+    };
+  }
+
+  matchUserSuggestion(value) {
+    if (!value) return null;
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return null;
+
+    return (this.userSuggestions || []).find((user) => {
+      if (user.email && user.email.toLowerCase() === normalized) return true;
+      if (user.displayName && user.displayName.toLowerCase() === normalized) return true;
+      if (user.name && user.name.toLowerCase() === normalized) return true;
+      return false;
+    }) || null;
+  }
+
+  handleAssigneeInput() {
+    if (!this.assigneeInput) return;
+
+    const value = this.assigneeInput.value;
+    if (value.includes(',')) {
+      const parts = value.split(',');
+      parts.forEach((part, index) => {
+        const trimmed = part.trim();
+        if (trimmed) {
+          this.addAssignee(trimmed);
+        }
+        if (index === parts.length - 1) {
+          this.assigneeInput.value = '';
+        }
+      });
+    }
+  }
+
+  handleAssigneeKeydown(event) {
+    if (!this.assigneeInput) return;
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const value = this.assigneeInput.value.trim();
+      if (value) {
+        this.addAssignee(value);
+        this.assigneeInput.value = '';
+      }
+    } else if (event.key === 'Backspace' && !this.assigneeInput.value && this.selectedAssignees.length > 0) {
+      event.preventDefault();
+      this.removeAssignee(this.selectedAssignees[this.selectedAssignees.length - 1]);
+    }
+  }
+
+  applyPendingAssignee() {
+    if (!this.assigneeInput) return;
+    const value = this.assigneeInput.value.trim();
+    if (value) {
+      this.addAssignee(value);
+      this.assigneeInput.value = '';
+    }
+  }
+
+  addAssignee(value) {
+    if (!value) return;
+    const suggestion = this.matchUserSuggestion(value);
+    const valueKey = suggestion?.email || suggestion?.displayName || suggestion?.name || value;
+    const label = suggestion
+      ? `${suggestion.displayName}${suggestion.email ? ` (${suggestion.email})` : ''}`
+      : value;
+
+    const exists = this.selectedAssignees.some((item) => item.value.toLowerCase() === valueKey.toLowerCase());
+    if (exists) return;
+
+    this.selectedAssignees.push({ value: valueKey, label });
+    this.updateAssigneeChips();
+  }
+
+  removeAssignee(value) {
+    const valueKey = typeof value === 'string' ? value : value?.value;
+    if (!valueKey) return;
+    this.selectedAssignees = this.selectedAssignees.filter((item) => item.value !== valueKey);
+    this.updateAssigneeChips();
+  }
+
+  updateAssigneeChips() {
+    if (!this.assigneeChipsContainer || !this.assigneeHiddenInput) return;
+
+    this.assigneeChipsContainer.innerHTML = '';
+
+    this.selectedAssignees.forEach((assignee) => {
+      const chip = document.createElement('span');
+      chip.className = 'assignee-chip';
+      chip.innerHTML = `
+        <i class="bi bi-person-badge"></i>
+        <span>${assignee.label}</span>
+        <button type="button" aria-label="Eliminar asignado">
+          <i class="bi bi-x"></i>
+        </button>
+      `;
+      chip.querySelector('button')?.addEventListener('click', () => this.removeAssignee(assignee.value));
+      this.assigneeChipsContainer.appendChild(chip);
+    });
+
+    this.assigneeHiddenInput.value = this.selectedAssignees.map((item) => item.value).join(',');
+  }
+
+  resetAssigneesSelector() {
+    this.selectedAssignees = [];
+    if (this.assigneeInput) {
+      this.assigneeInput.value = '';
+    }
+    this.updateAssigneeChips();
   }
 
   setupFormValidation() {
@@ -98,7 +298,7 @@ class CommentsController {
     this.documentIdInput = document.getElementById('documentId');
     this.documentSuggestionsContainer = document.getElementById('documentSuggestions');
 
-    if (!this.documentSearchInput || !this.documentIdInput || !this.documentSuggestionsContainer) {
+    if (!this.documentSearchInput || !this.documentIdInput) {
       return;
     }
 
@@ -109,30 +309,22 @@ class CommentsController {
     });
 
     this.documentSearchInput.addEventListener('focus', () => {
-      if (!this.documents.length) {
-        this.debouncedDocumentSearch('');
-        return;
-      }
-
-      if (!this.documentSearchInput.value) {
-        this.renderDocumentSuggestions(this.documents.slice(0, 8));
-      } else {
-        this.performDocumentSearch(this.documentSearchInput.value);
+      if (this.documentSearchInput.value) {
+        this.handleDocumentLookup(this.documentSearchInput.value, { open: true });
       }
     });
-
-    this.documentSearchInput.addEventListener('keydown', (event) => this.handleDocumentSuggestionKeydown(event));
 
     this.documentSearchInput.addEventListener('blur', () => {
-      setTimeout(() => this.hideDocumentSuggestions(), 150);
+      setTimeout(() => this.hideDocumentDropdown(), 120);
     });
 
-    this.documentSuggestionsContainer.addEventListener('mousedown', (event) => {
-      const item = event.target.closest('.document-suggestion-item');
-      if (!item) return;
-
-      const docId = item.dataset.docId;
-      this.selectDocumentById(docId);
+    document.addEventListener('click', (event) => {
+      const dropdown = document.getElementById(this.documentDropdownId);
+      if (!dropdown) return;
+      if (event.target === this.documentSearchInput || dropdown.contains(event.target)) {
+        return;
+      }
+      this.hideDocumentDropdown();
     });
   }
 
@@ -150,133 +342,134 @@ class CommentsController {
     }
 
     this.activeSuggestionIndex = -1;
+    if (this.documentSuggestionsContainer) {
+      this.documentSuggestionsContainer.classList.add('d-none');
+      this.documentSuggestionsContainer.innerHTML = '';
+    }
+
+    this.hideDocumentDropdown();
   }
 
-  performDocumentSearch(query = '') {
-    if (!Array.isArray(this.documents) || this.documents.length === 0) {
+  handleDocumentLookup(query = '', { open = false } = {}) {
+    const normalized = (query || '').trim();
+    this.lastDocumentSearch = normalized;
+
+    if (this.documentSearchAbortController) {
+      this.documentSearchAbortController.abort();
+    }
+
+    if (normalized.length === 0) {
+      this.renderDocumentLookupResults([]);
       return;
     }
 
-    const normalized = query.trim().toLowerCase();
-    let results = this.documents;
+    const localMatches = this.filterLocalDocuments(normalized);
+    this.renderDocumentLookupResults(localMatches.slice(0, 6), open || localMatches.length > 0);
 
-    if (normalized) {
-      results = this.documents.filter((doc) => {
-        return doc.searchText.includes(normalized) || String(doc.id).includes(normalized);
-      });
-    }
-
-    this.renderDocumentSuggestions(results.slice(0, 10));
+    this.searchDocumentsRemotely(normalized);
   }
 
-  renderDocumentSuggestions(items = []) {
-    if (!this.documentSuggestionsContainer) return;
+  filterLocalDocuments(query) {
+    const normalized = query.toLowerCase();
 
-    this.documentSuggestions = items;
+    return (this.documents || []).filter((doc) => {
+      const searchText = doc.searchText || '';
+      if (searchText.includes(normalized)) return true;
+      return String(doc.id).includes(normalized);
+    });
+  }
+
+  async searchDocumentsRemotely(query) {
+    try {
+      this.documentSearchAbortController = new AbortController();
+      const endpoint = `/files/search?query=${encodeURIComponent(query)}`;
+      const response = await apiClient.get(endpoint, {
+        showLoading: false,
+        showErrorNotification: false,
+        signal: this.documentSearchAbortController.signal
+      });
+
+      if (this.lastDocumentSearch !== query) {
+        return;
+      }
+
+      const remoteDocs = this.extractArray(response, ['files', 'data', 'content'])
+        .map((doc) => this.normalizeDocument(doc))
+        .filter(Boolean);
+
+      if (remoteDocs.length > 0) {
+        this.mergeDocuments(remoteDocs);
+        const combined = this.filterLocalDocuments(query);
+        this.renderDocumentLookupResults(combined.slice(0, 6), true);
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.warn('Error en búsqueda remota de documentos:', error);
+    } finally {
+      this.documentSearchAbortController = null;
+    }
+  }
+
+  mergeDocuments(documents = []) {
+    if (!Array.isArray(documents) || documents.length === 0) return;
+
+    documents.forEach((doc) => {
+      if (!doc || !doc.id) return;
+      this.documentsById.set(String(doc.id), doc);
+
+      const existingIndex = this.documents.findIndex((item) => String(item.id) === String(doc.id));
+      if (existingIndex >= 0) {
+        this.documents[existingIndex] = doc;
+      } else {
+        this.documents.push(doc);
+      }
+    });
+
+    this.documents.sort((a, b) => (b.uploadedAtValue ?? 0) - (a.uploadedAtValue ?? 0));
+  }
+
+  renderDocumentLookupResults(items = [], forceOpen = false) {
+    if (!this.documentSearchInput) return;
+
+    let dropdown = document.getElementById(this.documentDropdownId);
+
+    if (!dropdown) {
+      dropdown = document.createElement('div');
+      dropdown.id = this.documentDropdownId;
+      dropdown.className = 'document-search-dropdown dropdown-menu';
+      this.documentSearchInput.parentNode?.appendChild(dropdown);
+    }
+
+    dropdown.innerHTML = '';
 
     if (!items.length) {
-      this.documentSuggestionsContainer.innerHTML = '<div class="px-3 py-2 text-muted small">No se encontraron documentos con ese criterio.</div>';
-      this.documentSuggestionsContainer.classList.remove('d-none');
-      this.activeSuggestionIndex = -1;
+      dropdown.innerHTML = '<button type="button" class="dropdown-item disabled text-muted">No se encontraron documentos</button>';
+      if (forceOpen) {
+        dropdown.classList.add('show');
+      } else {
+        dropdown.classList.remove('show');
+      }
       return;
     }
 
-    const list = document.createElement('ul');
-    items.forEach((doc, index) => {
-      const listItem = document.createElement('li');
+    items.forEach((doc) => {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `document-suggestion-item${index === this.activeSuggestionIndex ? ' active' : ''}`;
+      button.className = 'dropdown-item document-result-item';
       button.dataset.docId = doc.id;
-      button.dataset.index = index;
       button.innerHTML = `
-        <strong>${doc.displayName}</strong>
-        <span>ID: ${doc.id}${doc.sizeLabel ? ` · ${doc.sizeLabel}` : ''}${doc.uploadedLabel ? ` · ${doc.uploadedLabel}` : ''}</span>
+        <div class="document-result-title">${doc.displayName}</div>
+        <div class="document-result-meta">ID: ${doc.id}${doc.sizeLabel ? ` • ${doc.sizeLabel}` : ''}${doc.uploadedLabel ? ` • ${doc.uploadedLabel}` : ''}</div>
       `;
-      listItem.appendChild(button);
-      list.appendChild(listItem);
-    });
-
-    this.documentSuggestionsContainer.innerHTML = '';
-    this.documentSuggestionsContainer.appendChild(list);
-    this.documentSuggestionsContainer.classList.remove('d-none');
-    this.activeSuggestionIndex = Math.min(this.activeSuggestionIndex, items.length - 1);
-    this.highlightActiveSuggestion();
-  }
-
-  hideDocumentSuggestions() {
-    if (!this.documentSuggestionsContainer) return;
-    this.documentSuggestionsContainer.classList.add('d-none');
-    this.documentSuggestionsContainer.innerHTML = '';
-    this.activeSuggestionIndex = -1;
-  }
-
-  handleDocumentSuggestionKeydown(event) {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if ((!this.documentSuggestions || this.documentSuggestions.length === 0) && this.documents.length > 0) {
-        this.performDocumentSearch(this.documentSearchInput?.value || '');
-      }
-    }
-
-    if (!this.documentSuggestions || this.documentSuggestions.length === 0) {
-      return;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      this.moveActiveSuggestion(1);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      this.moveActiveSuggestion(-1);
-    } else if (event.key === 'Enter') {
-      if (this.activeSuggestionIndex >= 0 && this.documentSuggestions[this.activeSuggestionIndex]) {
+      button.addEventListener('mousedown', (event) => {
         event.preventDefault();
-        const doc = this.documentSuggestions[this.activeSuggestionIndex];
         this.applyDocumentSelection(doc);
-      }
-    } else if (event.key === 'Escape') {
-      this.hideDocumentSuggestions();
-    }
-  }
-
-  moveActiveSuggestion(direction) {
-    if (!this.documentSuggestions.length) return;
-
-    const newIndex = this.activeSuggestionIndex + direction;
-    if (newIndex < 0) {
-      this.activeSuggestionIndex = this.documentSuggestions.length - 1;
-    } else if (newIndex >= this.documentSuggestions.length) {
-      this.activeSuggestionIndex = 0;
-    } else {
-      this.activeSuggestionIndex = newIndex;
-    }
-
-    this.highlightActiveSuggestion();
-  }
-
-  highlightActiveSuggestion() {
-    if (!this.documentSuggestionsContainer) return;
-
-    const buttons = this.documentSuggestionsContainer.querySelectorAll('.document-suggestion-item');
-    buttons.forEach((button, index) => {
-      if (index === this.activeSuggestionIndex) {
-        button.classList.add('active');
-        button.scrollIntoView({ block: 'nearest' });
-      } else {
-        button.classList.remove('active');
-      }
+        this.hideDocumentDropdown();
+      });
+      dropdown.appendChild(button);
     });
-  }
 
-  selectDocumentById(docId) {
-    if (!docId) return;
-
-    const documentData = this.documentsById.get(String(docId))
-      || this.documents.find((doc) => String(doc.id) === String(docId));
-
-    if (documentData) {
-      this.applyDocumentSelection(documentData);
-    }
+    dropdown.classList.add('show');
   }
 
   applyDocumentSelection(documentData) {
@@ -294,8 +487,14 @@ class CommentsController {
     if (this.validator && this.documentSearchInput) {
       this.validator.clearFieldError(this.documentSearchInput);
     }
+    this.hideDocumentDropdown();
+  }
 
-    this.hideDocumentSuggestions();
+  hideDocumentDropdown() {
+    const dropdown = document.getElementById(this.documentDropdownId);
+    if (dropdown) {
+      dropdown.classList.remove('show');
+    }
   }
 
   setupQuickActions() {
@@ -375,13 +574,7 @@ class CommentsController {
       }
 
       if (this.documentSearchInput && document.activeElement === this.documentSearchInput) {
-        this.renderDocumentSuggestions(normalized.slice(0, 8));
-      } else {
-        this.hideDocumentSuggestions();
-      }
-
-      if (this.documentSearchInput && this.documentSearchInput.value) {
-        this.performDocumentSearch(this.documentSearchInput.value);
+        this.handleDocumentLookup(this.documentSearchInput.value || '', { open: true });
       }
     } catch (error) {
       console.error('Error al cargar documentos para el selector:', error);
@@ -469,6 +662,10 @@ class CommentsController {
         field.classList.remove('show');
       }
     });
+
+    if (!isTask) {
+      this.resetAssigneesSelector();
+    }
   }
 
   updateSubmitButton(type) {
@@ -556,11 +753,11 @@ class CommentsController {
     }
 
     if (commentType === 'task') {
-      const assignees = document.getElementById('assignees')?.value.trim() || '';
+      const assignees = this.assigneeHiddenInput?.value.trim() || '';
       const dueDate = document.getElementById('dueDate')?.value || null;
       const priority = document.getElementById('priority')?.value || 'medium';
 
-      formData.assignees = assignees ? assignees.split(',').map((email) => email.trim()) : [];
+      formData.assignees = assignees ? assignees.split(',').map((value) => value.trim()) : [];
       formData.dueDate = dueDate || null;
       formData.priority = priority;
     }
@@ -746,11 +943,16 @@ class CommentsController {
       return 'comment';
     }
 
-    const hasExplicitTaskSignals = Boolean(
-      (raw.dueDate || raw.deadline) && (raw.assignees || raw.users)
+    const hasTaskIndicators = Boolean(
+      raw.dueDate
+      || raw.deadline
+      || raw.priority
+      || raw.taskPriority
+      || (Array.isArray(raw.assignees) && raw.assignees.length > 0)
+      || (Array.isArray(raw.users) && raw.users.length > 0)
     );
 
-    if (hasExplicitTaskSignals) {
+    if (hasTaskIndicators) {
       return 'task';
     }
 
@@ -1027,9 +1229,14 @@ class CommentsController {
     const typeClass = isTask ? 'task' : 'comment';
     const completedClass = comment.status === 'completed' ? 'completed' : '';
     const priorityClass = comment.priority ? `priority-${comment.priority}` : '';
-  const documentLabel = comment.documentName || comment.documentInfo?.name || null;
     const documentId = comment.documentId || comment.fileId || comment.documentInfo?.id || null;
-  const documentUrl = comment.documentInfo?.url || null;
+    const documentData = documentId ? this.documentsById.get(String(documentId)) : null;
+    const documentLabel = comment.documentName
+      || comment.documentInfo?.name
+      || documentData?.displayName
+      || documentData?.filename
+      || null;
+    const documentUrl = comment.documentInfo?.url || documentData?.url || null;
     const statusLabel = comment.status === 'completed' ? 'Completada' : 'Pendiente';
 
     return `

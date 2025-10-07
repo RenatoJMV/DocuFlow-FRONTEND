@@ -123,10 +123,15 @@
             </div>
 
             <div class="mb-3 task-fields d-none">
-              <label for="assignees" class="form-label text-gray-700">Asignados</label>
-              <input type="text" id="assignees" class="form-control" 
-                   placeholder="Usuarios asignados (separados por coma)">
-              <small class="form-text text-gray-500">Ej: juan@email.com, maria@email.com</small>
+              <label for="assigneeInput" class="form-label text-gray-700">Asignados</label>
+              <div class="assignees-control card-modern-light" id="assigneesControl">
+                <div class="assignee-chips" id="assigneeChips"></div>
+                <input type="text" id="assigneeInput" class="form-control assignee-input"
+                       placeholder="Escribe un nombre o correo y presiona Enter" autocomplete="off" list="assigneesSuggestions">
+                <datalist id="assigneesSuggestions"></datalist>
+                <input type="hidden" id="assignees" value="">
+              </div>
+              <small class="form-text text-gray-500">Selecciona usuarios existentes o escribe nombres manualmente; usa Enter o coma para añadir varios.</small>
             </div>
 
             <div class="mb-3 task-fields d-none">
