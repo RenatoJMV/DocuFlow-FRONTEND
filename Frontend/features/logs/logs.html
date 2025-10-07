@@ -59,6 +59,9 @@
               <small class="text-gray-500" id="recentLogsSummary"></small>
             </div>
             <div class="d-flex gap-2 align-items-center">
+              <button class="btn-modern btn-modern-outline btn-sm" id="openDailyArchives" data-bs-toggle="modal" data-bs-target="#dailyArchivesModal">
+                <i class="bi bi-calendar3 me-1"></i>Archivos diarios
+              </button>
               <button class="btn-modern btn-modern-outline btn-sm" id="refreshLogs">
                 <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
               </button>
@@ -130,14 +133,6 @@
               <h5 class="text-gray-600 mt-3">Sin actividad reciente</h5>
               <p class="text-gray-500">Las actividades aparecerán aquí en cuanto ocurran en las últimas 24 horas.</p>
             </div>
-          </div>
-
-          <div class="daily-archives card-modern mt-4">
-            <div class="d-flex align-items-center justify-content-between flex-wrap mb-3">
-              <h6 class="mb-0 text-gray-700 text-uppercase">Archivos diarios</h6>
-              <small class="text-gray-500">Registros anteriores a 24 horas</small>
-            </div>
-            <div id="dailyArchivesList" class="daily-archives-list"></div>
           </div>
         </div>
       </div>
@@ -244,6 +239,39 @@
               <i class="bi bi-heart-pulse me-2"></i>Estado del Sistema
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Archives Modal -->
+  <div class="modal fade" id="dailyArchivesModal" tabindex="-1" aria-labelledby="dailyArchivesTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="dailyArchivesTitle">
+            <i class="bi bi-calendar3 me-2"></i>Archivos diarios
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3 align-items-end mb-3">
+            <div class="col-md-6">
+              <label class="form-label text-gray-700" for="dailyArchiveDate">Selecciona una fecha</label>
+              <input type="date" id="dailyArchiveDate" class="form-control">
+            </div>
+            <div class="col-md-6 text-md-end">
+              <button class="btn btn-outline-secondary btn-sm" id="clearDailyArchiveFilter">
+                <i class="bi bi-x-circle me-1"></i>Mostrar todo
+              </button>
+            </div>
+          </div>
+          <div id="dailyArchivesSummary" class="text-gray-500 small mb-3"></div>
+          <div id="dailyArchivesList" class="daily-archives-list"></div>
+        </div>
+        <div class="modal-footer justify-content-between">
+          <small class="text-gray-500">Los archivos sin actividad incluyen <strong>#</strong> en su nombre para identificarlos.</small>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
         </div>
       </div>
     </div>

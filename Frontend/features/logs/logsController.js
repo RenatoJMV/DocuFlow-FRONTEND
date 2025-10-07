@@ -29,6 +29,7 @@ class LogsController {
     this.timeZoneLabel = 'Perú (UTC-5)';
     this.recentLogs = [];
     this.dailyArchives = [];
+  this.archiveFilterDate = '';
   this.formatterCache = new Map();
     
     this.initializeComponents();
@@ -581,6 +582,12 @@ class LogsController {
         raw.occurredAt
       ]
     );
+    let rawTimestamp = this.normalizeNullableValue(timestampCandidate, { treatNA: false });
+    if (rawTimestamp instanceof Date) {
+      rawTimestamp = rawTimestamp.toISOString();
+    } else if (typeof rawTimestamp === 'number' && Number.isFinite(rawTimestamp)) {
+      rawTimestamp = new Date(rawTimestamp).toISOString();
+    }
     const timestamp = this.normalizeTimestamp(timestampCandidate);
 
     const userInfo = this.resolveUserInfo(raw);
@@ -635,6 +642,7 @@ class LogsController {
       actionIcon: actionInfo?.icon || null,
       username: userInfo.primary,
       userSecondary: userInfo.secondary,
+  rawTimestamp: rawTimestamp || null,
   targetLabel,
       details: detailInfo.primary,
       detailContext: detailInfo.context,
@@ -733,6 +741,33 @@ class LogsController {
     const archivesList = document.getElementById('dailyArchivesList');
     if (archivesList) {
       archivesList.addEventListener('click', (event) => this.handleArchiveClick(event));
+    }
+
+    const archiveModal = document.getElementById('dailyArchivesModal');
+    if (archiveModal) {
+      archiveModal.addEventListener('show.bs.modal', () => {
+        this.renderDailyArchives();
+      });
+    }
+
+    const archiveDateInput = document.getElementById('dailyArchiveDate');
+    if (archiveDateInput) {
+      archiveDateInput.addEventListener('change', (event) => {
+        this.archiveFilterDate = event.target.value || '';
+        this.renderDailyArchives();
+      });
+    }
+
+    const clearArchiveFilterBtn = document.getElementById('clearDailyArchiveFilter');
+    if (clearArchiveFilterBtn) {
+      clearArchiveFilterBtn.addEventListener('click', () => {
+        const dateInput = document.getElementById('dailyArchiveDate');
+        if (dateInput) {
+          dateInput.value = '';
+        }
+        this.archiveFilterDate = '';
+        this.renderDailyArchives();
+      });
     }
   }
 
@@ -1016,6 +1051,11 @@ class LogsController {
       : '';
 
     const timestampInfo = this.formatDateTimeForTimeline(log.timestamp);
+    const originalInfo = this.getOriginalTimestampInfo(log.rawTimestamp);
+    const originalLabel = this.escapeHtml(originalInfo.label);
+    const originalZone = this.escapeHtml(originalInfo.zoneLabel);
+    const peruvianLabel = `${this.escapeHtml(timestampInfo.dateLabel)} · ${this.escapeHtml(timestampInfo.timeLabel)}`;
+    const peruvianZone = this.escapeHtml(timestampInfo.zoneLabel);
     const relativeLabel = this.formatRelativeTimestamp(log.timestamp);
     const ipLabel = this.escapeHtml(log.ip || '—');
     const documentIdAttr = log.documentId !== null && log.documentId !== undefined
@@ -1028,7 +1068,7 @@ class LogsController {
         <div class="timeline-card">
           <div class="timeline-meta">
             <div>
-              <strong>${timestampInfo.dateLabel} · ${timestampInfo.timeLabel}</strong>
+              <strong>${peruvianLabel}</strong>
               <div class="timeline-relative">
                 <i class="bi bi-clock-history"></i>
                 <span>${relativeLabel || '—'}</span>
@@ -1036,8 +1076,13 @@ class LogsController {
             </div>
             <div class="timeline-timezone">
               <i class="bi bi-geo-alt"></i>
-              <span>${timestampInfo.zoneLabel}</span>
+              <span>${peruvianZone}</span>
             </div>
+          </div>
+
+          <div class="timeline-times">
+            <span><i class="bi bi-record-circle"></i><code>${originalLabel}</code> (${originalZone})</span>
+            <span><i class="bi bi-flag"></i>${peruvianLabel} (${peruvianZone})</span>
           </div>
 
           <div class="timeline-content">
@@ -1145,9 +1190,16 @@ class LogsController {
       }
     };
 
-  setText('detailId', log.id);
-  const timelineInfo = this.formatDateTimeForTimeline(log.timestamp);
-  setText('detailTimestamp', `${timelineInfo.dateLabel} ${timelineInfo.timeLabel} (${timelineInfo.zoneLabel})`);
+    setText('detailId', log.id);
+    const timelineInfo = this.formatDateTimeForTimeline(log.timestamp);
+    const originalInfo = this.getOriginalTimestampInfo(log.rawTimestamp);
+    const detailTimestamp = document.getElementById('detailTimestamp');
+    if (detailTimestamp) {
+      detailTimestamp.innerHTML = `
+        <div><strong>Hora original:</strong> ${this.escapeHtml(originalInfo.label)} (${this.escapeHtml(originalInfo.zoneLabel)})</div>
+        <div><strong>Hora Perú:</strong> ${this.escapeHtml(timelineInfo.dateLabel)} ${this.escapeHtml(timelineInfo.timeLabel)} (${this.escapeHtml(timelineInfo.zoneLabel)})</div>
+      `;
+    }
     const userLabel = [log.username || 'Sistema', log.userSecondary].filter(Boolean);
     setText('detailUser', userLabel.join(' · ') || 'Sistema');
     setText('detailIp', log.ip || 'N/A');
@@ -1284,6 +1336,51 @@ class LogsController {
       second: '2-digit',
       hour12: false
     }).format(date);
+  }
+
+  getOriginalTimestampInfo(rawTimestamp) {
+    if (rawTimestamp === null || rawTimestamp === undefined) {
+      return { label: '—', zoneLabel: 'Zona desconocida' };
+    }
+
+    if (rawTimestamp instanceof Date) {
+      return { label: rawTimestamp.toISOString(), zoneLabel: 'UTC' };
+    }
+
+    if (typeof rawTimestamp === 'number' && Number.isFinite(rawTimestamp)) {
+      return { label: new Date(rawTimestamp).toISOString(), zoneLabel: 'UTC' };
+    }
+
+    if (typeof rawTimestamp === 'string') {
+      const trimmed = rawTimestamp.trim();
+      if (!trimmed) {
+        return { label: '—', zoneLabel: 'Zona desconocida' };
+      }
+      return {
+        label: trimmed,
+        zoneLabel: this.extractTimeZoneFromString(trimmed)
+      };
+    }
+
+    return { label: String(rawTimestamp), zoneLabel: 'Zona desconocida' };
+  }
+
+  extractTimeZoneFromString(value) {
+    const match = (value || '').match(/(Z|[+-]\d{2}:\d{2}|[+-]\d{4})$/);
+    if (!match) {
+      return 'Zona desconocida';
+    }
+
+    const token = match[1];
+    if (token === 'Z') {
+      return 'UTC';
+    }
+
+    if (/^[+-]\d{4}$/.test(token)) {
+      return `UTC${token.slice(0, 3)}:${token.slice(3)}`;
+    }
+
+    return `UTC${token}`;
   }
 
   formatRelativeTimestamp(timestamp) {
@@ -1429,23 +1526,14 @@ class LogsController {
       }
     }
 
-    const labelFormatter = this.getIntlFormatter('archive-label', {
-      timeZone: this.timeZone,
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-
     return Array.from(grouped.entries())
       .map(([dateKey, entries]) => {
-        const baseDate = this.createDateFromKey(dateKey);
         return {
           dateKey,
           logs: entries,
           count: entries.length,
           isEmpty: entries.length === 0,
-          humanLabel: labelFormatter.format(baseDate),
+          humanLabel: this.formatArchiveLabel(dateKey),
           fileName: `log_${dateKey}${entries.length === 0 ? '_VACIO' : ''}.csv`
         };
       })
@@ -1455,15 +1543,47 @@ class LogsController {
   renderDailyArchives() {
     const container = document.getElementById('dailyArchivesList');
     if (!container) return;
+    const summary = document.getElementById('dailyArchivesSummary');
 
     if (!this.dailyArchives || this.dailyArchives.length === 0) {
+      if (summary) {
+        summary.textContent = 'No se han generado registros diarios aún.';
+      }
       container.innerHTML = `
         <div class="text-gray-500 small">No hay registros diarios archivados todavía.</div>
       `;
       return;
     }
 
-    container.innerHTML = this.dailyArchives
+    const filterKey = this.archiveFilterDate;
+    let archivesToRender = [...this.dailyArchives];
+
+    if (filterKey) {
+      const ensured = this.ensureArchiveForDate(filterKey);
+      archivesToRender = ensured ? [ensured] : [];
+    } else {
+      archivesToRender = archivesToRender.slice(0, 30);
+    }
+
+    if (summary) {
+      if (filterKey) {
+        const friendlyLabel = this.capitalizeFirst(this.formatArchiveLabel(filterKey));
+        summary.textContent = archivesToRender.length === 0
+          ? `No se encontraron registros para ${friendlyLabel} (${filterKey}).`
+          : `Mostrando registros para ${friendlyLabel} (${filterKey}).`;
+      } else {
+        summary.textContent = `Total de archivos generados: ${this.dailyArchives.length}.`;
+      }
+    }
+
+    if (archivesToRender.length === 0) {
+      container.innerHTML = `
+        <div class="text-gray-500 small">No se encontraron registros para la fecha seleccionada.</div>
+      `;
+      return;
+    }
+
+    container.innerHTML = archivesToRender
       .map((archive) => `
         <div class="archive-item${archive.isEmpty ? ' empty' : ''}" data-archive-date="${archive.dateKey}">
           <div class="archive-meta">
@@ -1478,6 +1598,44 @@ class LogsController {
         </div>
       `)
       .join('');
+  }
+
+  ensureArchiveForDate(dateKey) {
+    if (!dateKey) return null;
+    let entry = this.dailyArchives.find((item) => item.dateKey === dateKey);
+    if (entry) {
+      return entry;
+    }
+
+    entry = this.createEmptyArchive(dateKey);
+    this.dailyArchives.push(entry);
+    this.dailyArchives.sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+    return entry;
+  }
+
+  createEmptyArchive(dateKey) {
+    return {
+      dateKey,
+      logs: [],
+      count: 0,
+      isEmpty: true,
+      humanLabel: this.formatArchiveLabel(dateKey),
+      fileName: `log_${dateKey}_VACIO.csv`
+    };
+  }
+
+  formatArchiveLabel(dateKey) {
+    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dateKey || '')) {
+      return dateKey || '';
+    }
+    const baseDate = this.createDateFromKey(dateKey);
+    return this.getIntlFormatter('archive-label', {
+      timeZone: this.timeZone,
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }).format(baseDate);
   }
 
   downloadArchive(archive) {

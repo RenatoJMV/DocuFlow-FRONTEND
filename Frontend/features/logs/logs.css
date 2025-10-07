@@ -190,6 +190,34 @@
   gap: var(--spacing-xs);
 }
 
+.timeline-times {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-sm);
+}
+
+.timeline-times span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  word-break: break-word;
+}
+
+.timeline-times span i {
+  color: var(--primary-blue);
+  font-size: 0.75rem;
+}
+
+.timeline-times code {
+  font-family: 'Roboto Mono', monospace;
+  background: var(--gray-100);
+  border-radius: var(--border-radius-sm);
+  padding: 0 var(--spacing-3xs);
+}
+
 .timeline-content {
   display: grid;
   gap: var(--spacing-sm);
@@ -298,18 +326,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: var(--spacing-xs);
 }
 
 .archive-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: var(--spacing-md);
   border-radius: var(--border-radius);
   background: var(--white);
   border: 1px solid var(--gray-100);
   box-shadow: var(--shadow-xs);
   transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  gap: var(--spacing-lg);
 }
 
 .archive-item:hover {
@@ -333,6 +365,7 @@
 .archive-meta strong {
   color: var(--gray-800);
   font-size: var(--font-size-sm);
+  text-transform: capitalize;
 }
 
 .archive-meta small {
@@ -342,6 +375,23 @@
 .archive-actions {
   display: flex;
   gap: var(--spacing-xs);
+}
+
+.archive-actions .btn {
+  white-space: nowrap;
+}
+
+#dailyArchivesSummary {
+  color: var(--gray-600);
+}
+
+.daily-archives-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.daily-archives-list::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: var(--border-radius-pill);
 }
 
 /* Log Level Badges */
