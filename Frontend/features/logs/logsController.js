@@ -216,19 +216,42 @@ class LogsController {
     return date.toISOString();
   }
 
+  normalizeNullableValue(value, { treatNA = true } = {}) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed === '') {
+        return null;
+      }
+      if (treatNA && ['n/a', 'na', 'null', 'undefined'].includes(trimmed.toLowerCase())) {
+        return null;
+      }
+      return trimmed;
+    }
+
+    return value;
+  }
+
   pickFirstLabel(candidates = [], preferredKeys = [], options = {}) {
     if (!Array.isArray(candidates)) {
-      return this.extractLabel(candidates, preferredKeys, options);
+      return this.normalizeNullableValue(
+        this.extractLabel(candidates, preferredKeys, options)
+      );
     }
 
     for (const candidate of candidates) {
-      const label = this.extractLabel(candidate, preferredKeys, options);
+      const label = this.normalizeNullableValue(
+        this.extractLabel(candidate, preferredKeys, options)
+      );
       if (label) {
         return label;
       }
     }
 
-    return '';
+    return null;
   }
 
   extractLabel(value, preferredKeys = [], options = {}) {
@@ -328,9 +351,29 @@ class LogsController {
       { includeKeys: false, deep: true }
     );
 
+    const target = this.pickFirstLabel(
+      [
+        raw.target,
+        raw.targetUser,
+        raw.targetName,
+        raw.metadata?.target,
+        raw.metadata?.targetName,
+        raw.details?.target,
+        raw.details?.targetName,
+        raw.payload?.target,
+        raw.payload?.targetName
+      ],
+      ['name', 'fullName', 'username', 'userName', 'email'],
+      { includeKeys: false, deep: true }
+    );
+
+    const normalizedSecondary = secondary && secondary !== primary ? secondary : '';
+    const normalizedTarget = target && target !== primary && target !== normalizedSecondary ? target : '';
+
     return {
       primary,
-      secondary: secondary && secondary !== primary ? secondary : ''
+      secondary: normalizedSecondary,
+      target: normalizedTarget
     };
   }
 
@@ -545,6 +588,21 @@ class LogsController {
     const userInfo = this.resolveUserInfo(raw);
     const detailInfo = this.resolveDetailInfo(raw, normalizedActionKey);
     const documentInfo = this.resolveDocumentInfo(raw);
+    const targetLabel = userInfo.target || this.pickFirstLabel(
+      [
+        raw.target,
+        raw.targetUser,
+        raw.targetName,
+        raw.metadata?.target,
+        raw.metadata?.targetName,
+        raw.details?.target,
+        raw.details?.targetName,
+        raw.payload?.target,
+        raw.payload?.targetName
+      ],
+      ['name', 'fullName', 'username', 'userName', 'email'],
+      { includeKeys: false, deep: true }
+    ) || null;
 
     const ip = this.pickFirstLabel(
       [raw.ip, raw.ipAddress, raw.remoteIp, raw.sourceIp, raw.clientIp, raw.originIp]
@@ -579,6 +637,7 @@ class LogsController {
       actionIcon: actionInfo?.icon || null,
       username: userInfo.primary,
       userSecondary: userInfo.secondary,
+  targetLabel,
       details: detailInfo.primary,
       detailContext: detailInfo.context,
       ip,
@@ -929,6 +988,7 @@ class LogsController {
     const actionIcon = this.escapeHtml(actionInfo?.icon || this.getFallbackIconForAction(log.action));
     const usernameLabel = this.escapeHtml(log.username || '—');
     const userSecondary = log.userSecondary ? `<small class="text-muted d-block">${this.escapeHtml(log.userSecondary)}</small>` : '';
+    const targetInfo = log.targetLabel ? `<small class="text-muted d-block">Objetivo: ${this.escapeHtml(log.targetLabel)}</small>` : '';
 
     const detailsPrimary = this.escapeHtml(log.details || '—');
     const detailTitle = this.escapeHtml(log.details || '');
@@ -981,6 +1041,7 @@ class LogsController {
           <div class="user-info">
             <strong>${usernameLabel}</strong>
             ${userSecondary}
+            ${targetInfo}
           </div>
         </td>
         <td>
@@ -1429,7 +1490,7 @@ class LogsController {
   }
 
   generateCSV(dataset = []) {
-    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Usuario secundario', 'Detalles', 'Contexto', 'IP', 'Documento', 'ID Documento'];
+    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Usuario secundario', 'Objetivo', 'Detalles', 'Contexto', 'IP', 'Documento', 'ID Documento'];
     const rows = dataset.map((log) => {
       const values = [
         this.formatDate(log.timestamp),
@@ -1438,6 +1499,7 @@ class LogsController {
         log.actionLabel || log.action || '',
         log.username || 'Sistema',
         log.userSecondary || '',
+        log.targetLabel || '',
         log.details || '',
         log.detailContext || '',
         log.ip || 'N/A',
@@ -1484,7 +1546,7 @@ class LogsController {
   }
 
   generateDailyCSV(logs) {
-    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Usuario secundario', 'Detalles', 'Contexto', 'IP', 'Documento', 'ID Documento'];
+    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Usuario secundario', 'Objetivo', 'Detalles', 'Contexto', 'IP', 'Documento', 'ID Documento'];
     const rows = logs.map((log) => {
       const values = [
         this.formatDate(log.timestamp),
@@ -1493,6 +1555,7 @@ class LogsController {
         log.actionLabel || log.action || '',
         log.username || 'Sistema',
         log.userSecondary || '',
+        log.targetLabel || '',
         log.details || '',
         log.detailContext || '',
         log.ip || 'N/A',
