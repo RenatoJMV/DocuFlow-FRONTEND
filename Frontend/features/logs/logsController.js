@@ -1,7 +1,7 @@
 import { docuFlowAPI } from '../../shared/services/apiClient.js';
 import { store } from '../../shared/services/store.js';
 import { enforcePageAuth } from '../../shared/utils/authGuard.js';
-import { initializeNavbar, showNotification, Pagination } from '../../shared/utils/uiHelpers.js';
+import { initializeNavbar, showNotification } from '../../shared/utils/uiHelpers.js';
 
 class LogsController {
   constructor() {
@@ -22,17 +22,14 @@ class LogsController {
       level: ''
     };
     this.selectedLogId = null;
-    this.pagination = new Pagination('logsPaginationContainer', {
-      itemsPerPage: this.itemsPerPage,
-      currentPage: this.currentPage,
-      onPageChange: (page) => {
-        this.currentPage = page;
-        this.renderLogs();
-        this.updatePagination();
-      }
-    });
+    this.pagination = null;
     this.actionLookup = null;
     this.levelLookup = null;
+    this.timeZone = 'America/Lima';
+    this.timeZoneLabel = 'Perú (UTC-5)';
+    this.recentLogs = [];
+    this.dailyArchives = [];
+  this.formatterCache = new Map();
     
     this.initializeComponents();
     this.setupEventListeners();
@@ -45,6 +42,7 @@ class LogsController {
     
     // Setup filters
     this.setupFilters();
+    this.updateTimezoneInfo();
   }
 
   setupFilters() {
@@ -178,7 +176,7 @@ class LogsController {
   }
 
   getLogsTableBody() {
-    return document.getElementById('logsTableBody') || document.querySelector('#logsTable tbody');
+    return document.getElementById('recentLogsContainer');
   }
 
   formatActionLabel(actionId) {
@@ -731,6 +729,11 @@ class LogsController {
     if (logsTableBody) {
       logsTableBody.addEventListener('click', (event) => this.handleLogsTableClick(event));
     }
+
+    const archivesList = document.getElementById('dailyArchivesList');
+    if (archivesList) {
+      archivesList.addEventListener('click', (event) => this.handleArchiveClick(event));
+    }
   }
 
   debounceFilter() {
@@ -883,22 +886,20 @@ class LogsController {
     const tbody = this.getLogsTableBody();
     if (tbody) {
       tbody.innerHTML = `
-        <tr>
-          <td colspan="8" class="text-center py-4">
-            <div class="spinner-border text-primary me-2" role="status">
-              <span class="visually-hidden">Cargando...</span>
-            </div>
-            Cargando registros...
-          </td>
-        </tr>
+        <div class="timeline-loading">
+          <div class="spinner-border text-primary me-2" role="status">
+            <span class="visually-hidden">Cargando...</span>
+          </div>
+          Cargando actividades recientes...
+        </div>
       `;
     }
   }
 
   applyFilters() {
     const dateFilter = document.getElementById('filterDate')?.value || '';
-  const userFilterInput = document.getElementById('filterUser');
-  const userFilter = userFilterInput?.value ? userFilterInput.value.toLowerCase() : '';
+    const userFilterInput = document.getElementById('filterUser');
+    const userFilter = userFilterInput?.value ? userFilterInput.value.toLowerCase() : '';
     const actionFilter = document.getElementById('filterAction')?.value || '';
     const levelFilter = document.getElementById('filterLevel')?.value || '';
 
@@ -909,167 +910,169 @@ class LogsController {
       level: levelFilter
     };
 
-    this.filteredLogs = this.allLogs.filter(log => {
-      let match = true;
+    const now = Date.now();
+    const threshold = now - (24 * 60 * 60 * 1000);
+    const recentLogs = [];
+    const archivedLogs = [];
 
-      // Date filter
-      if (dateFilter) {
-        const logDate = (typeof log.timestamp === 'string'
-          ? log.timestamp
-          : this.normalizeTimestamp(log.timestamp)
-        ).split('T')[0];
-        match = match && logDate === dateFilter;
+    for (const log of this.allLogs) {
+      const timestamp = new Date(log.timestamp).getTime();
+      if (Number.isNaN(timestamp)) {
+        continue;
       }
 
-      // User filter
-      if (userFilter) {
-        match = match && log.username?.toLowerCase().includes(userFilter);
+      if (timestamp >= threshold) {
+        recentLogs.push(log);
+      } else {
+        archivedLogs.push(log);
       }
+    }
 
-      // Action filter
-      if (actionFilter) {
-        match = match && log.action === actionFilter;
-      }
+  this.recentLogs = recentLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  this.dailyArchives = this.buildDailyArchives(archivedLogs);
+    this.renderDailyArchives();
 
-      // Level filter
-      if (levelFilter) {
-        match = match && log.level === levelFilter;
-      }
+    let filtered = [...this.recentLogs];
 
-      return match;
-    });
+    if (dateFilter) {
+      filtered = filtered.filter((log) => this.formatPeruDateKey(log.timestamp) === dateFilter);
+    }
+
+    if (userFilter) {
+      filtered = filtered.filter((log) => log.username?.toLowerCase().includes(userFilter));
+    }
+
+    if (actionFilter) {
+      filtered = filtered.filter((log) => log.action === actionFilter);
+    }
+
+    if (levelFilter) {
+      filtered = filtered.filter((log) => log.level === levelFilter);
+    }
+
+    this.filteredLogs = filtered;
 
     const selectedVisible = this.filteredLogs.some((log) => String(log.id) === String(this.selectedLogId));
     if (!selectedVisible) {
       this.clearLogDetailsPanel();
     }
 
-    this.currentPage = 1;
     this.renderLogs();
-    this.updatePagination();
     this.updateAnalytics();
     this.updateFilterInfo();
+    this.updateShowingCount();
+    this.updateTimezoneInfo();
   }
 
   renderLogs() {
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
-    const logsToShow = this.filteredLogs.slice(startIndex, endIndex);
+    const logsToShow = this.filteredLogs;
 
-    const tbody = this.getLogsTableBody();
+    const listContainer = this.getLogsTableBody();
     const emptyState = document.getElementById('logsEmptyState');
 
     if (logsToShow.length === 0) {
-      if (tbody) tbody.innerHTML = '';
+      if (listContainer) listContainer.innerHTML = '';
       if (emptyState) emptyState.classList.remove('d-none');
-      this.updateShowingCount();
       return;
     }
 
     if (emptyState) emptyState.classList.add('d-none');
 
-    if (tbody) {
-      tbody.innerHTML = logsToShow
-        .map((log) => this.renderLogRow(log, String(log.id) === String(this.selectedLogId)))
+    if (listContainer) {
+      listContainer.innerHTML = logsToShow
+        .map((log) => this.renderTimelineItem(log, String(log.id) === String(this.selectedLogId)))
         .join('');
     }
 
-    this.updateShowingCount();
     this.highlightSelectedRow();
   }
 
-  renderLogRow(log, isSelected = false) {
+  renderTimelineItem(log, isSelected = false) {
     const actionInfo = this.getActionInfo(log.action);
     const levelInfo = this.getLevelInfo(log.level);
 
-    const levelLabel = levelInfo?.name || this.formatActionLabel(log.level || 'info');
+    const levelLabel = this.escapeHtml(levelInfo?.name || this.formatActionLabel(log.level || 'info'));
     const levelColor = levelInfo?.color || 'secondary';
+    const markerClass = levelColor ? `level-${levelColor}` : '';
     const actionLabel = this.escapeHtml(actionInfo?.name || log.actionLabel || this.formatActionLabel(log.action));
     const actionIcon = this.escapeHtml(actionInfo?.icon || this.getFallbackIconForAction(log.action));
     const usernameLabel = this.escapeHtml(log.username || '—');
-    const userSecondary = log.userSecondary ? `<small class="text-muted d-block">${this.escapeHtml(log.userSecondary)}</small>` : '';
-    const targetInfo = log.targetLabel ? `<small class="text-muted d-block">Objetivo: ${this.escapeHtml(log.targetLabel)}</small>` : '';
+    const userSecondary = log.userSecondary ? `<div class="timeline-context">${this.escapeHtml(log.userSecondary)}</div>` : '';
+    const targetInfo = log.targetLabel ? `<div class="timeline-context">Objetivo: ${this.escapeHtml(log.targetLabel)}</div>` : '';
 
     const detailsPrimary = this.escapeHtml(log.details || '—');
-    const detailTitle = this.escapeHtml(log.details || '');
-    const detailContext = log.detailContext ? `<small class="text-muted d-block">${this.escapeHtml(log.detailContext)}</small>` : '';
+    const detailContext = log.detailContext ? `<div class="timeline-context">${this.escapeHtml(log.detailContext)}</div>` : '';
 
     const metadataChips = [];
     if (log.documentName) {
-      metadataChips.push(`<span class="badge rounded-pill bg-light text-dark border"><i class="bi bi-file-earmark-text me-1"></i>${this.escapeHtml(log.documentName)}</span>`);
+      metadataChips.push(`<span class="timeline-chip"><i class="bi bi-file-earmark-text"></i>${this.escapeHtml(log.documentName)}</span>`);
     }
     if (log.documentId && log.documentId !== log.documentName) {
-      metadataChips.push(`<span class="badge rounded-pill bg-light text-muted border">ID: ${this.escapeHtml(String(log.documentId))}</span>`);
+      metadataChips.push(`<span class="timeline-chip">ID ${this.escapeHtml(String(log.documentId))}</span>`);
     }
-    const documentSummary = log.documentSummary ? `<small class="text-muted d-block mt-1">${this.escapeHtml(log.documentSummary)}</small>` : '';
+    const documentSummary = log.documentSummary ? `<div class="timeline-context">${this.escapeHtml(log.documentSummary)}</div>` : '';
     const metadataBlock = metadataChips.length > 0
-      ? `<div class="d-flex flex-wrap gap-1 mt-2">${metadataChips.join('')}</div>`
+      ? `<div class="timeline-chips">${metadataChips.join('')}</div>`
       : '';
 
+    const timestampInfo = this.formatDateTimeForTimeline(log.timestamp);
     const relativeLabel = this.formatRelativeTimestamp(log.timestamp);
-    const dateLabel = this.formatDate(log.timestamp);
-    const timeLabel = this.formatTime(log.timestamp);
     const ipLabel = this.escapeHtml(log.ip || '—');
-
     const documentIdAttr = log.documentId !== null && log.documentId !== undefined
       ? this.escapeHtml(String(log.documentId))
       : '';
 
     return `
-      <tr class="log-row${isSelected ? ' selected' : ''}" data-log-id="${log.id}">
-        <td>
-          <input type="checkbox" class="form-check-input log-row-checkbox" data-log-id="${log.id}">
-        </td>
-        <td>
-          <div class="log-timestamp">
-            <strong>${relativeLabel || timeLabel}</strong>
-            <small class="text-muted d-block">${dateLabel} · ${timeLabel}</small>
+      <article class="timeline-item${isSelected ? ' selected' : ''}" data-log-id="${log.id}">
+        <span class="timeline-marker ${markerClass}"></span>
+        <div class="timeline-card">
+          <div class="timeline-meta">
+            <div>
+              <strong>${timestampInfo.dateLabel} · ${timestampInfo.timeLabel}</strong>
+              <div class="timeline-relative">
+                <i class="bi bi-clock-history"></i>
+                <span>${relativeLabel || '—'}</span>
+              </div>
+            </div>
+            <div class="timeline-timezone">
+              <i class="bi bi-geo-alt"></i>
+              <span>${timestampInfo.zoneLabel}</span>
+            </div>
           </div>
-        </td>
-        <td>
-          <span class="badge bg-${levelColor} level-badge">
-            ${levelLabel}
-          </span>
-        </td>
-        <td>
-          <div class="action-info">
-            <i class="bi ${actionIcon || 'bi-circle'} me-2"></i>
-            <span class="fw-semibold">${actionLabel}</span>
-          </div>
-        </td>
-        <td>
-          <div class="user-info">
-            <strong>${usernameLabel}</strong>
-            ${userSecondary}
-            ${targetInfo}
-          </div>
-        </td>
-        <td>
-          <div class="log-details-cell">
-            <span class="log-row-details" title="${detailTitle}">
-              ${detailsPrimary}
-            </span>
+
+          <div class="timeline-content">
+            <div class="timeline-title">
+              <span class="timeline-level badge bg-${levelColor}">${levelLabel}</span>
+              <i class="bi ${actionIcon} text-primary"></i>
+              <span>${actionLabel}</span>
+            </div>
+
+            <div class="timeline-user">
+              <strong>${usernameLabel}</strong>
+              ${userSecondary}
+              ${targetInfo}
+            </div>
+
+            <div class="timeline-details">${detailsPrimary}</div>
             ${detailContext}
             ${metadataBlock}
             ${documentSummary}
-          </div>
-        </td>
-        <td>
-          <span class="text-monospace">${ipLabel}</span>
-        </td>
-        <td>
-          <div class="log-actions">
-            <button class="btn btn-sm btn-outline-primary" data-action="view" data-log-id="${log.id}">
-              <i class="bi bi-eye"></i>
-            </button>
-            ${(log.documentId !== null && log.documentId !== undefined) || log.documentName ? `
-              <button class="btn btn-sm btn-outline-info" data-action="document" data-log-id="${log.id}" data-document-id="${documentIdAttr}" ${log.documentName ? `data-document-name="${this.escapeHtml(log.documentName)}"` : ''}>
-                <i class="bi bi-file-earmark"></i>
+
+            <div class="timeline-ip">IP: ${ipLabel}</div>
+
+            <div class="timeline-actions">
+              <button class="btn btn-sm btn-outline-primary" data-action="view" data-log-id="${log.id}">
+                <i class="bi bi-eye"></i>
               </button>
-            ` : ''}
+              ${(log.documentId !== null && log.documentId !== undefined) || log.documentName ? `
+                <button class="btn btn-sm btn-outline-info" data-action="document" data-log-id="${log.id}" data-document-id="${documentIdAttr}" ${log.documentName ? `data-document-name="${this.escapeHtml(log.documentName)}"` : ''}>
+                  <i class="bi bi-file-earmark"></i>
+                </button>
+              ` : ''}
+            </div>
           </div>
-        </td>
-      </tr>
+        </div>
+      </article>
     `;
   }
 
@@ -1091,28 +1094,35 @@ class LogsController {
       return;
     }
 
-    if (event.target.matches('.log-row-checkbox')) {
-      event.stopPropagation();
+    const item = event.target.closest('[data-log-id]');
+    if (!item) return;
+
+    this.showLogDetails(item.dataset.logId);
+  }
+
+  handleArchiveClick(event) {
+    const downloadButton = event.target.closest('[data-archive-download]');
+    if (!downloadButton) {
       return;
     }
 
-    const row = event.target.closest('tr[data-log-id]');
-    if (!row) return;
+    const archiveDate = downloadButton.dataset.archiveDownload;
+    const archive = this.dailyArchives.find((item) => item.dateKey === archiveDate);
+    if (!archive) {
+      showNotification('No se encontró el archivo solicitado.', 'warning');
+      return;
+    }
 
-    this.showLogDetails(row.dataset.logId);
+    this.downloadArchive(archive);
   }
 
   highlightSelectedRow() {
-    const tbody = this.getLogsTableBody();
-    if (!tbody) return;
+    const container = this.getLogsTableBody();
+    if (!container) return;
 
-    tbody.querySelectorAll('tr').forEach((row) => {
-      const isSelected = row.dataset.logId === String(this.selectedLogId);
-      row.classList.toggle('selected', isSelected);
-      const checkbox = row.querySelector('.log-row-checkbox');
-      if (checkbox) {
-        checkbox.checked = isSelected;
-      }
+    container.querySelectorAll('.timeline-item').forEach((item) => {
+      const isSelected = item.dataset.logId === String(this.selectedLogId);
+      item.classList.toggle('selected', isSelected);
     });
   }
 
@@ -1135,8 +1145,9 @@ class LogsController {
       }
     };
 
-    setText('detailId', log.id);
-    setText('detailTimestamp', `${this.formatDate(log.timestamp)} ${this.formatTime(log.timestamp)}`);
+  setText('detailId', log.id);
+  const timelineInfo = this.formatDateTimeForTimeline(log.timestamp);
+  setText('detailTimestamp', `${timelineInfo.dateLabel} ${timelineInfo.timeLabel} (${timelineInfo.zoneLabel})`);
     const userLabel = [log.username || 'Sistema', log.userSecondary].filter(Boolean);
     setText('detailUser', userLabel.join(' · ') || 'Sistema');
     setText('detailIp', log.ip || 'N/A');
@@ -1184,16 +1195,80 @@ class LogsController {
     });
   }
 
+  getIntlFormatter(cacheKey, options) {
+    if (!this.formatterCache.has(cacheKey)) {
+      this.formatterCache.set(cacheKey, new Intl.DateTimeFormat('es-PE', options));
+    }
+    return this.formatterCache.get(cacheKey);
+  }
+
+  formatPeruDateKey(timestamp) {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    return this.getIntlFormatter('peru-date-key', {
+      timeZone: this.timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(date);
+  }
+
+  formatDateTimeForTimeline(timestamp) {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return {
+        dateLabel: '—',
+        timeLabel: '—',
+        zoneLabel: this.timeZoneLabel
+      };
+    }
+
+    const dateLabel = this.getIntlFormatter('timeline-date', {
+      timeZone: this.timeZone,
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+
+    const timeLabel = this.getIntlFormatter('timeline-time', {
+      timeZone: this.timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(date);
+
+    const timeZoneParts = this.getIntlFormatter('timeline-timezone', {
+      timeZone: this.timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+      hour12: false
+    }).formatToParts(date);
+
+    const zoneLabel = timeZoneParts.find((part) => part.type === 'timeZoneName')?.value || this.timeZoneLabel;
+
+    return {
+      dateLabel,
+      timeLabel,
+      zoneLabel
+    };
+  }
+
   formatDate(timestamp) {
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) {
       return '—';
     }
-    return date.toLocaleDateString('es-ES', {
+
+    return this.getIntlFormatter('date-short', {
+      timeZone: this.timeZone,
       year: 'numeric',
       month: 'short',
       day: 'numeric'
-    });
+    }).format(date);
   }
 
   formatTime(timestamp) {
@@ -1201,11 +1276,14 @@ class LogsController {
     if (Number.isNaN(date.getTime())) {
       return '—';
     }
-    return date.toLocaleTimeString('es-ES', {
+
+    return this.getIntlFormatter('time-hms', {
+      timeZone: this.timeZone,
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
-    });
+      second: '2-digit',
+      hour12: false
+    }).format(date);
   }
 
   formatRelativeTimestamp(timestamp) {
@@ -1249,33 +1327,25 @@ class LogsController {
   }
 
   updatePagination() {
-    if (!this.pagination) {
-      this.pagination = new Pagination('logsPaginationContainer', {
-        itemsPerPage: this.itemsPerPage,
-        currentPage: this.currentPage,
-        onPageChange: (page) => {
-          this.currentPage = page;
-          this.renderLogs();
-          this.updatePagination();
-        }
-      });
-    }
-
-    this.pagination.setItemsPerPage(this.itemsPerPage);
-    this.pagination.currentPage = this.currentPage;
-    this.pagination.render(this.filteredLogs.length);
+    // La vista de timeline muestra todas las actividades recientes sin paginación.
   }
 
   updateShowingCount() {
-    const showingElement = document.getElementById('showingLogsCount');
-    const totalElement = document.getElementById('totalLogsCount');
-    
-    if (showingElement && totalElement) {
-      const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-      const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredLogs.length);
-      
-      showingElement.textContent = this.filteredLogs.length > 0 ? `${startIndex + 1}-${endIndex}` : '0';
-      totalElement.textContent = this.filteredLogs.length;
+    const summaryElement = document.getElementById('recentLogsSummary');
+    if (!summaryElement) return;
+
+    const totalRecent = this.recentLogs.length;
+    const filtered = this.filteredLogs.length;
+
+    if (filtered === 0) {
+      summaryElement.textContent = 'Sin actividad registrada en las últimas 24 horas.';
+      return;
+    }
+
+    if (filtered === totalRecent) {
+      summaryElement.textContent = `Mostrando ${filtered} actividad${filtered === 1 ? '' : 'es'} generada en las últimas 24 horas.`;
+    } else {
+      summaryElement.textContent = `Mostrando ${filtered} de ${totalRecent} actividad${totalRecent === 1 ? '' : 'es'} recientes (24 h).`;
     }
   }
 
@@ -1300,6 +1370,162 @@ class LogsController {
     } else {
       filterInfo.classList.add('d-none');
     }
+  }
+
+  updateTimezoneInfo() {
+    const timezoneElement = document.getElementById('timezoneInfo');
+    if (!timezoneElement) return;
+
+    const currentInfo = this.formatDateTimeForTimeline(Date.now());
+    timezoneElement.textContent = `Horario oficial: Perú (${currentInfo.zoneLabel})`;
+  }
+
+  buildDailyArchives(logs = []) {
+    const grouped = new Map();
+
+    logs.forEach((log) => {
+      const key = this.formatPeruDateKey(log.timestamp);
+      if (!key) return;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key).push(log);
+    });
+
+    grouped.forEach((entries) => {
+      entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    });
+
+    const todayKey = this.formatPeruDateKey(Date.now());
+    const yesterdayKey = todayKey ? this.shiftPeruDateKey(todayKey, -1) : null;
+
+    const keysSet = new Set(grouped.keys());
+    if (yesterdayKey) {
+      keysSet.add(yesterdayKey);
+      if (!grouped.has(yesterdayKey)) {
+        grouped.set(yesterdayKey, []);
+      }
+    }
+
+    if (keysSet.size === 0 && yesterdayKey) {
+      keysSet.add(yesterdayKey);
+      grouped.set(yesterdayKey, []);
+    }
+
+    const sortedKeys = Array.from(keysSet).sort();
+    if (sortedKeys.length > 0) {
+      const firstKey = sortedKeys[0];
+      const lastKey = yesterdayKey || sortedKeys[sortedKeys.length - 1];
+
+      let cursor = this.createDateFromKey(firstKey);
+      const endDate = this.createDateFromKey(lastKey);
+
+      while (cursor <= endDate) {
+        const key = this.formatPeruDateKey(cursor);
+        if (key && !grouped.has(key)) {
+          grouped.set(key, []);
+        }
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    }
+
+    const labelFormatter = this.getIntlFormatter('archive-label', {
+      timeZone: this.timeZone,
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    return Array.from(grouped.entries())
+      .map(([dateKey, entries]) => {
+        const baseDate = this.createDateFromKey(dateKey);
+        return {
+          dateKey,
+          logs: entries,
+          count: entries.length,
+          isEmpty: entries.length === 0,
+          humanLabel: labelFormatter.format(baseDate),
+          fileName: `log_${dateKey}${entries.length === 0 ? '_VACIO' : ''}.csv`
+        };
+      })
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  }
+
+  renderDailyArchives() {
+    const container = document.getElementById('dailyArchivesList');
+    if (!container) return;
+
+    if (!this.dailyArchives || this.dailyArchives.length === 0) {
+      container.innerHTML = `
+        <div class="text-gray-500 small">No hay registros diarios archivados todavía.</div>
+      `;
+      return;
+    }
+
+    container.innerHTML = this.dailyArchives
+      .map((archive) => `
+        <div class="archive-item${archive.isEmpty ? ' empty' : ''}" data-archive-date="${archive.dateKey}">
+          <div class="archive-meta">
+            <strong>${this.escapeHtml(this.capitalizeFirst(archive.humanLabel))}</strong>
+            <small>${archive.isEmpty ? 'Sin actividad registrada' : `${archive.count} evento${archive.count === 1 ? '' : 's'}`}</small>
+          </div>
+          <div class="archive-actions">
+            <button class="btn btn-sm btn-outline-secondary" data-archive-download="${archive.dateKey}">
+              <i class="bi bi-download me-1"></i>${archive.isEmpty ? 'Descargar registro vacío' : 'Descargar CSV'}
+            </button>
+          </div>
+        </div>
+      `)
+      .join('');
+  }
+
+  downloadArchive(archive) {
+    const content = this.generateArchiveContent(archive);
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = archive.fileName;
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+
+    showNotification(`Archivo ${archive.isEmpty ? 'vacío' : 'con actividad'} generado para ${archive.humanLabel}`, 'success');
+  }
+
+  generateArchiveContent(archive) {
+    if (!archive || !Array.isArray(archive.logs)) {
+      return '# SIN ACTIVIDAD\n';
+    }
+
+    if (archive.logs.length === 0) {
+      const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Usuario secundario', 'Objetivo', 'Detalles', 'Contexto', 'IP', 'Documento', 'ID Documento'];
+      return [`# SIN ACTIVIDAD`, headers.join(',')].join('\n') + '\n';
+    }
+
+    return this.generateDailyCSV(archive.logs);
+  }
+
+  createDateFromKey(key) {
+    const [year, month, day] = (key || '').split('-').map(Number);
+    if (!year || !month || !day) {
+      return new Date();
+    }
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  }
+
+  shiftPeruDateKey(baseKey, offsetDays) {
+    if (!baseKey) return '';
+    const baseDate = this.createDateFromKey(baseKey);
+    baseDate.setUTCDate(baseDate.getUTCDate() + offsetDays);
+    return this.formatPeruDateKey(baseDate);
+  }
+
+  capitalizeFirst(value) {
+    if (!value) return '';
+    return value.charAt(0).toUpperCase() + value.slice(1);
   }
 
   updateStats() {
@@ -1332,10 +1558,10 @@ class LogsController {
   }
 
   calculateStats() {
-    const today = new Date().toISOString().split('T')[0];
+    const todayKey = this.formatPeruDateKey(Date.now());
 
     const totals = this.allLogs.reduce((acc, log) => {
-      if (typeof log.timestamp === 'string' && log.timestamp.startsWith(today)) {
+      if (this.formatPeruDateKey(log.timestamp) === todayKey) {
         acc.today += 1;
       }
       if (['error', 'critical', 'fatal'].includes(log.level)) {
@@ -1367,7 +1593,7 @@ class LogsController {
       }
 
       const today = acc.todayString;
-      if (['error', 'critical', 'fatal'].includes(log.level) && typeof log.timestamp === 'string' && log.timestamp.startsWith(today)) {
+      if (['error', 'critical', 'fatal'].includes(log.level) && this.formatPeruDateKey(log.timestamp) === today) {
         acc.errorsToday += 1;
       }
 
@@ -1377,7 +1603,7 @@ class LogsController {
       uploads: 0,
       downloads: 0,
       errorsToday: 0,
-      todayString: new Date().toISOString().split('T')[0]
+      todayString: this.formatPeruDateKey(Date.now())
     });
 
     const setMetric = (id, value) => {
@@ -1394,10 +1620,15 @@ class LogsController {
   }
 
   clearFilters() {
-    document.getElementById('filterDate').value = '';
-    document.getElementById('filterUser').value = '';
-    document.getElementById('filterAction').value = '';
-    document.getElementById('filterLevel').value = '';
+    const dateInput = document.getElementById('filterDate');
+    const userInput = document.getElementById('filterUser');
+    const actionSelect = document.getElementById('filterAction');
+    const levelSelect = document.getElementById('filterLevel');
+
+    if (dateInput) dateInput.value = '';
+    if (userInput) userInput.value = '';
+    if (actionSelect) actionSelect.value = '';
+    if (levelSelect) levelSelect.value = '';
     
     this.applyFilters();
     showNotification('Filtros limpiados', 'info');
@@ -1465,7 +1696,7 @@ class LogsController {
 
   async exportLogs() {
     try {
-      const dataset = this.filteredLogs.length > 0 ? this.filteredLogs : this.allLogs;
+  const dataset = this.filteredLogs.length > 0 ? this.filteredLogs : this.recentLogs;
       if (!dataset || dataset.length === 0) {
         showNotification('No hay registros para exportar.', 'info');
         return;
@@ -1517,9 +1748,9 @@ class LogsController {
 
   async downloadDailyLog() {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const todayKey = this.formatPeruDateKey(Date.now());
       const todayLogs = this.allLogs.filter((log) =>
-        typeof log.timestamp === 'string' && log.timestamp.startsWith(today)
+        this.formatPeruDateKey(log.timestamp) === todayKey
       );
       
       if (todayLogs.length === 0) {
@@ -1532,7 +1763,7 @@ class LogsController {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `log_diario_${today}.csv`;
+      a.download = `log_diario_${todayKey}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
