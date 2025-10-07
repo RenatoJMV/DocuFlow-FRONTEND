@@ -38,8 +38,7 @@ class PermissionsController {
     this.permissionLookup = new Map();
     this.searchQuery = '';
     this.currentUser = null;
-    this.selectedUserId = null;
-    this.tableSelection = new Set();
+  this.selectedUserId = null;
     this.loadingInitialData = false;
     this.editingUserId = null;
     this.passwordTargetUserId = null;
@@ -63,9 +62,9 @@ class PermissionsController {
     this.forms.addUser = document.getElementById('addUserForm');
     this.forms.changePassword = document.getElementById('changePasswordForm');
 
-    this.setupValidators();
-    this.setupModals();
-    this.setTableLoading(true);
+  this.setupValidators();
+  this.setupModals();
+  this.setUsersLoading(true);
   }
 
   setupValidators() {
@@ -139,10 +138,9 @@ class PermissionsController {
       saveUserBtn.addEventListener('click', () => this.handleSaveUser());
     }
 
-    const usersTable = document.getElementById('usersTable');
-    if (usersTable) {
-      usersTable.addEventListener('click', (event) => this.handleUsersTableClick(event));
-      usersTable.addEventListener('change', (event) => this.handleUsersTableChange(event));
+    const usersTimeline = document.getElementById('usersTimeline');
+    if (usersTimeline) {
+      usersTimeline.addEventListener('click', (event) => this.handleUsersTimelineClick(event));
     }
 
     const userSelect = document.getElementById('userSelect');
@@ -169,11 +167,6 @@ class PermissionsController {
           this.updatePermissionPreview(this.getPermissionsFromForm());
         }
       });
-    }
-
-    const selectAll = document.getElementById('selectAll');
-    if (selectAll) {
-      selectAll.addEventListener('change', (event) => this.handleSelectAllChange(event.target.checked));
     }
 
     const refreshBtn = document.getElementById('refreshPermissions');
@@ -220,7 +213,7 @@ class PermissionsController {
 
     this.loadingInitialData = true;
     const previousUserId = keepSelection ? this.selectedUserId : null;
-    this.setTableLoading(true);
+  this.setUsersLoading(true);
 
     try {
       const [usersRes, rolesRes, catalogRes, templatesRes] = await Promise.all([
@@ -239,7 +232,7 @@ class PermissionsController {
       this.buildPermissionLookup();
 
       this.filterUsers();
-      this.renderUsersTable();
+  this.renderUsersTimeline();
       this.renderUserSelect();
       this.renderRoleSelect();
       this.renderPermissionCatalog();
@@ -275,102 +268,123 @@ class PermissionsController {
       showNotification('Error al cargar los datos desde el servidor', 'error');
       this.users = [];
       this.filteredUsers = [];
-      this.renderUsersTable();
+      this.renderUsersTimeline();
       this.renderUserSelect();
       this.updateStats();
       this.resetPermissionForm();
     } finally {
-      this.setTableLoading(false);
+      this.setUsersLoading(false);
       this.loadingInitialData = false;
     }
   }
 
-  setTableLoading(isLoading) {
-    const tableBody = document.getElementById('usersTable');
-    if (!tableBody) return;
+  setUsersLoading(isLoading) {
+    const timeline = document.getElementById('usersTimeline');
+    const emptyState = document.getElementById('usersEmptyState');
+    const summary = document.getElementById('usersSummary');
+    if (!timeline) return;
 
     if (isLoading) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="7" class="text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">Cargando...</span>
-            </div>
-          </td>
-        </tr>
+      timeline.innerHTML = `
+        <div class="permissions-timeline-loading">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+          </div>
+        </div>
       `;
+      emptyState?.classList.add('d-none');
+      if (summary) {
+        summary.textContent = 'Cargando usuarios…';
+      }
     }
   }
 
-  renderUsersTable() {
-    const tableBody = document.getElementById('usersTable');
+  renderUsersTimeline() {
+    const timeline = document.getElementById('usersTimeline');
     const emptyState = document.getElementById('usersEmptyState');
-    const showingCount = document.getElementById('showingUsersCount');
-    const totalCount = document.getElementById('totalUsersCount');
+    const summary = document.getElementById('usersSummary');
 
-    if (!tableBody) {
+    if (!timeline) {
       return;
     }
 
-    const validSelections = new Set();
-    this.filteredUsers.forEach((user) => {
-      if (this.tableSelection.has(user.id)) {
-        validSelections.add(user.id);
-      }
-    });
-    this.tableSelection = validSelections;
-
     if (this.filteredUsers.length === 0) {
-      tableBody.innerHTML = '';
+      timeline.innerHTML = '';
       emptyState?.classList.remove('d-none');
     } else {
       emptyState?.classList.add('d-none');
-      tableBody.innerHTML = this.filteredUsers.map((user) => this.renderUserRow(user)).join('');
+      timeline.innerHTML = this.filteredUsers.map((user) => this.renderUserTimelineItem(user)).join('');
     }
 
-    if (showingCount) {
-      showingCount.textContent = this.filteredUsers.length;
-    }
-    if (totalCount) {
-      totalCount.textContent = this.users.length;
+    if (summary) {
+      if (summary) {
+        summary.textContent = 'Cargando usuarios…';
+      }
+      const total = this.users.length;
+      const filtered = this.filteredUsers.length;
+      if (filtered === 0) {
+        summary.textContent = 'Sin usuarios que coincidan con la búsqueda actual.';
+      } else if (filtered === total) {
+        summary.textContent = `Total de usuarios en el sistema: ${total}.`;
+      } else {
+        summary.textContent = `Mostrando ${filtered} de ${total} usuarios.`;
+      }
     }
 
-    this.syncSelectAllCheckbox();
-    this.highlightSelectedRow(this.selectedUserId);
+    this.highlightSelectedEntry(this.selectedUserId);
   }
 
-  renderUserRow(user) {
+  renderUserTimelineItem(user) {
     const isSelected = user.id === this.selectedUserId;
     const roleLabel = this.getRoleDisplayName(user.role);
     const statusBadge = this.getStatusBadge(user.status);
-    const lastLoginLabel = user.lastLogin
-      ? `${formatDate(user.lastLogin)} · ${formatRelativeTime(user.lastLogin)}`
-      : '—';
+    const normalizedStatus = (user.status || '').toLowerCase();
+    const markerStatusClass = ['inactive', 'inactivo', 'disabled', 'suspended'].includes(normalizedStatus)
+      ? 'status-inactive'
+      : 'status-active';
+    const displayName = user.name || user.username || 'Usuario sin nombre';
+  const usernameLabel = user.username ? `@${user.username}` : 'Sin alias definido';
+    const emailLabel = user.email || 'Sin correo registrado';
+    const hasLastLogin = Boolean(user.lastLogin);
+    const lastLoginAbsolute = hasLastLogin ? formatDate(user.lastLogin) : '';
+    const lastLoginRelative = hasLastLogin ? formatRelativeTime(user.lastLogin) : '';
+    const initials = this.getUserInitials(displayName);
 
     return `
-      <tr data-user-id="${user.id}" class="${isSelected ? 'table-active' : ''}">
-        <td>
-          <input type="checkbox" class="form-check-input user-row-checkbox" data-user-id="${user.id}" ${
-            this.tableSelection.has(user.id) ? 'checked' : ''
-          }>
-        </td>
-        <td>
-          <div class="d-flex align-items-center gap-2">
-            <div class="avatar bg-light rounded-circle d-flex align-items-center justify-content-center">
-              <i class="bi bi-person"></i>
+      <article class="permission-entry${isSelected ? ' selected' : ''}" data-user-id="${user.id}">
+  <span class="permission-marker ${markerStatusClass}"></span>
+        <div class="permission-card">
+          <div class="permission-header">
+            <div class="permission-identity">
+              <div class="permission-avatar">${initials}</div>
+              <div>
+                <div class="permission-name">${displayName}</div>
+                <div class="permission-username">${usernameLabel}</div>
+              </div>
             </div>
-            <div>
-              <div class="fw-semibold text-gray-800">${user.name || user.username}</div>
-              <div class="text-muted small">@${user.username || 'sin-usuario'}</div>
+            <div class="permission-role">
+              <i class="bi bi-person-gear"></i>
+              <span>${roleLabel}</span>
             </div>
           </div>
-        </td>
-        <td>${user.email || '—'}</td>
-        <td><span class="badge bg-light text-dark fw-semibold">${roleLabel}</span></td>
-        <td>${statusBadge}</td>
-        <td class="text-muted small">${lastLoginLabel}</td>
-        <td class="user-actions-column">
-          <div class="user-row-actions">
+          <div class="permission-body">
+            <div class="permission-row permission-email">
+              <i class="bi bi-envelope"></i>
+              <span>${emailLabel}</span>
+            </div>
+            <div class="permission-row permission-status">
+              <i class="bi bi-shield-check"></i>
+              ${statusBadge}
+            </div>
+            <div class="permission-row permission-last-login">
+              <i class="bi bi-clock-history"></i>
+              <div>
+                <span>${hasLastLogin ? lastLoginAbsolute : 'Sin registro de acceso'}</span>
+                ${hasLastLogin ? `<small>${lastLoginRelative}</small>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="permission-actions">
             <button class="btn btn-outline-primary btn-sm" data-action="assign" data-user-id="${user.id}" title="Asignar permisos">
               <i class="bi bi-shield-check"></i>
             </button>
@@ -384,8 +398,8 @@ class PermissionsController {
               <i class="bi bi-trash"></i>
             </button>
           </div>
-        </td>
-      </tr>
+        </div>
+      </article>
     `;
   }
 
@@ -403,6 +417,27 @@ class PermissionsController {
       return '<span class="badge bg-secondary">Inactivo</span>';
     }
     return '<span class="badge bg-success">Activo</span>';
+  }
+
+  getUserInitials(name) {
+    if (!name) {
+      return '?';
+    }
+    const parts = String(name)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (parts.length === 0) {
+      return '?';
+    }
+    const first = parts[0]?.[0] || '';
+    const second = parts[1]?.[0] || '';
+    const initials = `${first}${second}`.trim().toUpperCase();
+    if (initials) {
+      return initials;
+    }
+    const fallback = String(name).trim()[0];
+    return fallback ? fallback.toUpperCase() : '?';
   }
 
   renderUserSelect() {
@@ -612,7 +647,7 @@ class PermissionsController {
   applyUserSearch(value) {
     this.searchQuery = (value || '').trim();
     this.filterUsers();
-    this.renderUsersTable();
+    this.renderUsersTimeline();
   }
 
   async selectUser(userId, { scrollIntoView = false } = {}) {
@@ -634,13 +669,13 @@ class PermissionsController {
 
     this.setSelectValue('userSelect', userId);
     this.setSelectValue('roleSelect', user.role || '');
-    this.highlightSelectedRow(userId);
+    this.highlightSelectedEntry(userId);
 
     await this.loadUserPermissions(userId);
 
     if (scrollIntoView) {
-      const row = Array.from(document.querySelectorAll('tr[data-user-id]')).find((element) => element.dataset.userId === userId);
-      row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const entry = Array.from(document.querySelectorAll('.permission-entry[data-user-id]')).find((element) => element.dataset.userId === userId);
+      entry?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 
@@ -651,9 +686,9 @@ class PermissionsController {
     }
   }
 
-  highlightSelectedRow(userId) {
-    document.querySelectorAll('tr[data-user-id]').forEach((row) => {
-      row.classList.toggle('table-active', row.dataset.userId === userId);
+  highlightSelectedEntry(userId) {
+    document.querySelectorAll('.permission-entry[data-user-id]').forEach((entry) => {
+      entry.classList.toggle('selected', entry.dataset.userId === userId);
     });
   }
 
@@ -808,7 +843,7 @@ class PermissionsController {
       this.currentUser.role = roleId;
       this.applyRoleTemplateIfAvailable(roleId);
       showNotification('Rol actualizado correctamente.', 'success');
-      this.renderUsersTable();
+  this.renderUsersTimeline();
       this.renderUserSelect();
     } catch (error) {
       console.error('Error actualizando el rol:', error);
@@ -857,7 +892,7 @@ class PermissionsController {
     showNotification('Plantilla de permisos aplicada. Guarda los cambios para confirmar.', 'success');
   }
 
-  handleUsersTableClick(event) {
+  handleUsersTimelineClick(event) {
     const actionButton = event.target.closest('[data-action]');
     if (actionButton) {
       const userId = actionButton.dataset.userId;
@@ -882,60 +917,10 @@ class PermissionsController {
       return;
     }
 
-    const row = event.target.closest('tr[data-user-id]');
-    if (row && !event.target.closest('input[type="checkbox"]')) {
-      this.selectUser(row.dataset.userId, { scrollIntoView: false });
+    const entry = event.target.closest('.permission-entry[data-user-id]');
+    if (entry) {
+      this.selectUser(entry.dataset.userId, { scrollIntoView: false });
     }
-  }
-
-  handleUsersTableChange(event) {
-    if (!event.target.matches('.user-row-checkbox')) {
-      return;
-    }
-
-    const userId = event.target.dataset.userId;
-    if (event.target.checked) {
-      this.tableSelection.add(userId);
-    } else {
-      this.tableSelection.delete(userId);
-    }
-    this.syncSelectAllCheckbox();
-  }
-
-  handleSelectAllChange(checked) {
-    const checkboxes = document.querySelectorAll('.user-row-checkbox');
-    if (checkboxes.length === 0) {
-      return;
-    }
-
-    checkboxes.forEach((checkbox) => {
-      checkbox.checked = checked;
-      if (checked) {
-        this.tableSelection.add(checkbox.dataset.userId);
-      } else {
-        this.tableSelection.delete(checkbox.dataset.userId);
-      }
-    });
-
-    this.syncSelectAllCheckbox();
-  }
-
-  syncSelectAllCheckbox() {
-    const selectAll = document.getElementById('selectAll');
-    if (!selectAll) {
-      return;
-    }
-
-    const checkboxes = Array.from(document.querySelectorAll('.user-row-checkbox'));
-    if (checkboxes.length === 0) {
-      selectAll.checked = false;
-      selectAll.indeterminate = false;
-      return;
-    }
-
-    const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
-    selectAll.checked = checkedCount === checkboxes.length;
-    selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
   }
 
   async handleSaveUser() {
@@ -1020,7 +1005,7 @@ class PermissionsController {
       const response = await apiGetUsers();
       this.users = this.normalizeUsers(response?.users || []);
       this.filterUsers();
-      this.renderUsersTable();
+  this.renderUsersTimeline();
       this.renderUserSelect();
       this.updateStats();
 

@@ -64,41 +64,16 @@
             </div>
           </div>
 
-          <div class="table-container">
-            <div class="table-responsive">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>
-                      <input type="checkbox" class="form-check-input" id="selectAll">
-                    </th>
-                    <th>Usuario</th>
-                    <th>Email</th>
-                    <th>Rol Actual</th>
-                    <th>Estado</th>
-                    <th>Última Conexión</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="usersTable">
-                  <!-- Users will be rendered here -->
-                </tbody>
-              </table>
-            </div>
+          <div class="users-timeline-wrapper">
+            <div id="usersSummary" class="text-gray-500 small mb-3"></div>
+            <div class="users-timeline-container">
+              <div id="usersTimeline" class="permissions-timeline"></div>
 
-            <!-- Empty State -->
-            <div id="usersEmptyState" class="empty-state d-none">
-              <i class="bi bi-people display-1 text-gray-400"></i>
-              <h5 class="text-gray-600 mt-3">Nada que ver por aquí…</h5>
-              <p class="text-gray-500">En cuanto haya usuarios, los listaremos con honores.</p>
-            </div>
-
-            <!-- Pagination -->
-            <div class="d-flex align-items-center justify-content-between mt-4">
-              <div class="pagination-info text-gray-600 small">
-                Mostrando <span id="showingUsersCount">0</span> de <span id="totalUsersCount">0</span> usuarios
+              <div id="usersEmptyState" class="empty-state d-none">
+                <i class="bi bi-people display-1 text-gray-400"></i>
+                <h5 class="text-gray-600 mt-3">Nada que ver por aquí…</h5>
+                <p class="text-gray-500">En cuanto haya usuarios, los listaremos con honores.</p>
               </div>
-              <div id="usersPaginationContainer"></div>
             </div>
           </div>
         </div>

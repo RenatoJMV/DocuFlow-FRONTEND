@@ -203,12 +203,36 @@ class LogsController {
   }
 
   normalizeTimestamp(value) {
-    if (!value) {
+    if (value === null || value === undefined || value === '') {
       return new Date().toISOString();
     }
 
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) {
+    let date = null;
+
+    if (value instanceof Date) {
+      date = value;
+    } else if (typeof value === 'number' && Number.isFinite(value)) {
+      date = new Date(value);
+    } else if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return new Date().toISOString();
+      }
+
+      const normalized = trimmed.replace(/\s+/, 'T');
+      const isoPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+      const hasTimeZone = /(Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+
+      if (!hasTimeZone && isoPattern.test(normalized)) {
+        date = new Date(`${normalized}Z`);
+      } else {
+        date = new Date(trimmed);
+      }
+    } else {
+      date = new Date(value);
+    }
+
+    if (!date || Number.isNaN(date.getTime())) {
       return new Date().toISOString();
     }
 
@@ -1366,8 +1390,14 @@ class LogsController {
   }
 
   extractTimeZoneFromString(value) {
-    const match = (value || '').match(/(Z|[+-]\d{2}:\d{2}|[+-]\d{4})$/);
+    const trimmed = (value || '').trim();
+    const match = trimmed.match(/(Z|[+-]\d{2}:\d{2}|[+-]\d{4})$/);
     if (!match) {
+      const normalized = trimmed.replace(/\s+/, 'T');
+      const isoPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+      if (isoPattern.test(normalized)) {
+        return 'UTC (asumido)';
+      }
       return 'Zona desconocida';
     }
 
