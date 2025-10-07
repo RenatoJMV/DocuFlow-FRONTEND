@@ -391,14 +391,46 @@ const docuFlowAPI = {
 
   // 👤 PERFIL DE USUARIO
   profile: {
-    get: () => apiClient.get(PROFILE_PREFIX),
-    update: (profileData) => apiClient.put(PROFILE_PREFIX, profileData),
-    changePassword: (passwordData) => apiClient.put(`${PROFILE_PREFIX}/password`, passwordData),
-    uploadAvatar: (formData) => apiClient.request(`${PROFILE_PREFIX}/avatar`, {
-      method: 'POST',
-      body: formData,
-      headers: {}
-    })
+    async getCurrent(options = {}) {
+      try {
+        return await apiClient.get(`${PROFILE_PREFIX}/me`, options);
+      } catch (error) {
+        if (error?.status === 404 || error?.status === 405) {
+          return apiClient.get(PROFILE_PREFIX, options);
+        }
+        throw error;
+      }
+    },
+    get: (options = {}) => apiClient.get(PROFILE_PREFIX, options),
+    update: (profileData, options = {}) => apiClient.put(PROFILE_PREFIX, profileData, options),
+    changePassword: (passwordData, options = {}) => apiClient.put(`${PROFILE_PREFIX}/password`, passwordData, options),
+    async uploadAvatar(avatar, options = {}) {
+      const { fieldName = 'avatar', ...requestOptions } = options;
+      let formData = avatar;
+
+      if (!(formData instanceof FormData)) {
+        formData = new FormData();
+        if (avatar) {
+          formData.append(fieldName, avatar);
+        }
+      }
+
+      return apiClient.request(`${PROFILE_PREFIX}/avatar`, {
+        method: 'POST',
+        body: formData,
+        headers: {},
+        ...requestOptions
+      });
+    },
+    removeAvatar: (options = {}) => apiClient.delete(`${PROFILE_PREFIX}/avatar`, options),
+    getActivity: (params = {}, options = {}) => {
+      const queryString = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== null)).toString();
+      return apiClient.get(`${PROFILE_PREFIX}/activity${queryString ? `?${queryString}` : ''}`, options);
+    },
+    getPreferences: (options = {}) => apiClient.get(`${PROFILE_PREFIX}/preferences`, options),
+    updatePreferences: (preferences, options = {}) => apiClient.put(`${PROFILE_PREFIX}/preferences`, preferences, options),
+    getStats: (options = {}) => apiClient.get(`${PROFILE_PREFIX}/stats`, options),
+    getSessions: (options = {}) => apiClient.get(`${PROFILE_PREFIX}/sessions`, options)
   },
 
   // 📤 EXPORTACIÓN

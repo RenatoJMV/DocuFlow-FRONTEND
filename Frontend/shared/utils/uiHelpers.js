@@ -23,6 +23,14 @@ export function showError(elementId, message) {
 
 // Sistema moderno de notificaciones
 export function showNotification(message, type = 'info', duration = 4000) {
+  let container = document.getElementById('notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    container.className = 'notification-container';
+    document.body.appendChild(container);
+  }
+
   const notification = document.createElement('div');
   notification.className = `notification notification-${type}`;
   notification.innerHTML = `
@@ -32,26 +40,30 @@ export function showNotification(message, type = 'info', duration = 4000) {
       <button class="notification-close" aria-label="Cerrar">&times;</button>
     </div>
   `;
-  
-  document.body.appendChild(notification);
-  
-  // Auto remove
-  const timeoutId = setTimeout(() => {
-    if (notification.parentNode) {
-      notification.remove();
-    }
-  }, duration);
-  
-  // Manual close
-  notification.querySelector('.notification-close').onclick = () => {
-    clearTimeout(timeoutId);
-    notification.style.animation = 'slideOut 0.3s ease-in';
+
+  container.appendChild(notification);
+
+  const removeNotification = () => {
+    notification.style.animation = 'slideOut 0.25s ease-in forwards';
     setTimeout(() => {
       if (notification.parentNode) {
         notification.remove();
       }
-    }, 300);
+      if (container.childElementCount === 0 && container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
+    }, 260);
   };
+
+  const timeoutId = window.setTimeout(removeNotification, Math.max(duration, 1200));
+
+  const closeButton = notification.querySelector('.notification-close');
+  if (closeButton) {
+    closeButton.addEventListener('click', () => {
+      clearTimeout(timeoutId);
+      removeNotification();
+    });
+  }
 }
 
 function getIconForType(type) {

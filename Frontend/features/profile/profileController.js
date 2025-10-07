@@ -19,6 +19,7 @@ class ProfileController {
     this.preferences = {};
     this.avatarFile = null;
     this.isEditing = false;
+  this.statsLoaded = false;
     
     // Elementos del DOM
     this.profileForm = null;
@@ -36,8 +37,8 @@ class ProfileController {
       await this.loadUserProfile();
       this.initializeEventListeners();
       this.setupAvatarUpload();
-      this.loadActivityHistory();
-      this.loadUserPreferences();
+      await this.loadActivityHistory();
+      await this.loadUserPreferences();
       this.initializeProfileTabs();
     } catch (error) {
       console.error('Error initializing profile controller:', error);
@@ -46,23 +47,54 @@ class ProfileController {
   }
 
   // Cargar perfil del usuario actual
-  async loadUserProfile() {
+  async loadUserProfile({ forceRefresh = false, suppressLoader = false } = {}) {
+    const loaderMessage = forceRefresh ? 'Actualizando perfil...' : 'Cargando perfil...';
+
     try {
-      showLoading('Cargando perfil...');
-      
-      const response = await docuFlowAPI.profile.getCurrent();
-      
-      if (response.success) {
-        this.profileData = response.data;
-        this.currentUser = response.data.user;
-        this.populateProfileForm();
-        this.updateProfileDisplay();
+      if (!suppressLoader) {
+        showLoading(loaderMessage);
       }
+
+  const response = await docuFlowAPI.profile.getCurrent({ showLoading: false });
+      const payload = response?.data ?? response;
+
+      if (response?.success === false && (!payload || Object.keys(payload).length === 0 || (!payload.user && !payload.username))) {
+        throw new Error(response?.message || 'No se pudo obtener el perfil del usuario');
+      }
+
+      if (!payload) {
+        throw new Error('Perfil no disponible');
+      }
+
+  this.profileData = this.normalizeProfileData(payload);
+  this.preferences = this.normalizePreferences(this.profileData.preferences || this.preferences || {});
+  this.profileData.preferences = this.preferences;
+  this.statsLoaded = this.hasMeaningfulStats(this.profileData.stats);
+  this.applyPreferences();
+      this.currentUser = this.extractCurrentUser(this.profileData);
+
+      if (this.currentUser) {
+        try {
+          localStorage.setItem('user', JSON.stringify(this.currentUser));
+        } catch (storageError) {
+          console.warn('No se pudo persistir el usuario actualizado:', storageError);
+        }
+        store.setUser(this.currentUser);
+      }
+
+      this.populateProfileForm();
+      this.updateProfileDisplay();
+      await this.ensureProfileStats(forceRefresh);
+
+      return this.profileData;
     } catch (error) {
       console.error('Error loading user profile:', error);
       showNotification('Error al cargar el perfil', 'error');
+      throw error;
     } finally {
-      hideLoading();
+      if (!suppressLoader) {
+        hideLoading();
+      }
     }
   }
 
@@ -98,48 +130,44 @@ class ProfileController {
   updateProfileDisplay() {
     if (!this.profileData) return;
 
-    // Actualizar información en el header
-    const fullName = `${this.profileData.firstName || ''} ${this.profileData.lastName || ''}`.trim();
-    
-    const elements = {
-      'user-name-display': fullName || this.profileData.username,
-      'user-email-display': this.profileData.email,
-      'user-role-display': this.profileData.role || 'Usuario',
-      'user-department-display': this.profileData.department || 'Sin departamento',
-      'user-last-login': this.formatDate(this.profileData.lastLogin),
-      'user-member-since': this.formatDate(this.profileData.createdAt)
-    };
+    const fullName = this.profileData.fullName || `${this.profileData.firstName || ''} ${this.profileData.lastName || ''}`.trim() || this.profileData.username || 'Usuario';
+    const roleLabel = this.getRoleDisplayName(this.profileData.role);
 
-    Object.entries(elements).forEach(([id, value]) => {
-      const element = document.getElementById(id);
-      if (element) {
-        element.textContent = value;
-      }
-    });
+    this.updateElementText('user-name-display', fullName);
+    this.updateElementText('user-email-display', this.profileData.email || 'Sin correo');
+    this.updateElementText('user-role-display', roleLabel);
+    const roleBadge = document.getElementById('user-role-display');
+    if (roleBadge) {
+      roleBadge.dataset.role = (this.profileData.role || '').toString().toLowerCase();
+    }
+    this.updateElementText('user-department-display', this.profileData.department || 'Sin departamento');
+    this.updateElementText('user-last-login', this.formatDateDisplayObject(this.profileData.lastLogin));
+    this.updateElementText('user-member-since', this.formatDateDisplayObject(this.profileData.createdAt));
+    this.updateElementText('stats-last-activity', this.formatDateDisplayObject(this.profileData.lastActivity || this.profileData.stats?.lastActivity));
 
-    // Actualizar estadísticas del usuario
+    this.updateNavIdentity(fullName);
+    this.updateAvatarDisplay();
     this.updateUserStats();
   }
 
   // Actualizar estadísticas del usuario
   updateUserStats() {
-    if (!this.profileData.stats) return;
+    if (!this.profileData) return;
 
-    const stats = this.profileData.stats;
-    const elements = {
-      'stats-files-uploaded': stats.filesUploaded || 0,
-      'stats-comments-made': stats.commentsMade || 0,
-      'stats-total-storage': this.formatFileSize(stats.totalStorageUsed || 0),
-      'stats-login-count': stats.loginCount || 0,
-      'stats-last-activity': this.formatDate(stats.lastActivity)
-    };
+    const stats = this.normalizeStats(this.profileData.stats || {});
+    this.profileData.stats = stats;
 
-    Object.entries(elements).forEach(([id, value]) => {
-      const element = document.getElementById(id);
-      if (element) {
-        element.textContent = value;
-      }
-    });
+    if (stats.lastActivity && !this.profileData.lastActivity) {
+      this.profileData.lastActivity = stats.lastActivity;
+    }
+
+    const combinedInteractions = (stats.commentsMade || 0) + (stats.tasksCreated || 0) + (stats.tasksCompleted || 0);
+
+    this.updateElementText('stats-files-uploaded', stats.filesUploaded ?? 0);
+    this.updateElementText('stats-comments-made', combinedInteractions);
+    this.updateElementText('stats-total-storage', this.formatFileSize(stats.totalStorageUsed || 0));
+    this.updateElementText('stats-login-count', stats.loginCount ?? 0);
+    this.updateElementText('stats-last-activity', this.formatDateDisplayObject(stats.lastActivity || this.profileData.lastActivity));
   }
 
   // Inicializar event listeners
@@ -175,6 +203,11 @@ class ProfileController {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', (event) => this.handleProfileLogout(event));
     }
+
+    const extraLogoutLinks = document.querySelectorAll('[data-nav-action="logout"], [data-action="logout"]');
+    extraLogoutLinks.forEach(link => {
+      link.addEventListener('click', (event) => this.handleProfileLogout(event));
+    });
 
     // Formulario de preferencias
     this.preferencesForm = document.getElementById('preferences-form');
@@ -292,26 +325,35 @@ class ProfileController {
   updateAvatarDisplay() {
     const avatarElements = document.querySelectorAll('.user-avatar, #avatar-preview');
     const avatarUrl = this.profileData?.avatarUrl;
-    
+    const initials = this.getUserInitials();
+
     avatarElements.forEach(element => {
+      const isLargeAvatar = element.classList.contains('user-avatar-large') || element.id === 'avatar-preview';
+
+      if (!element.dataset.defaultAvatar) {
+        element.dataset.defaultAvatar = element.getAttribute('data-default-avatar') || element.getAttribute('src') || '../../shared/assets/default-avatar.png';
+      }
+
+      const defaultSrc = element.dataset.defaultAvatar;
+      const initialsElement = element.closest('.avatar-container')?.querySelector('.user-initials');
+
       if (avatarUrl) {
         element.src = avatarUrl;
         element.style.display = 'block';
-      } else {
-        // Mostrar iniciales como fallback
-        const initials = this.getUserInitials();
-        element.style.display = 'none';
-        
-        // Crear elemento de iniciales si no existe
-        let initialsElement = element.nextElementSibling;
-        if (!initialsElement || !initialsElement.classList.contains('user-initials')) {
-          initialsElement = document.createElement('div');
-          initialsElement.className = 'user-initials';
-          element.parentNode.insertBefore(initialsElement, element.nextSibling);
+        if (initialsElement) {
+          initialsElement.style.display = 'none';
         }
-        
-        initialsElement.textContent = initials;
-        initialsElement.style.display = 'flex';
+      } else {
+        if (isLargeAvatar) {
+          element.style.display = 'none';
+          if (initialsElement) {
+            initialsElement.textContent = initials;
+            initialsElement.style.display = 'flex';
+          }
+        } else {
+          element.src = defaultSrc;
+          element.style.display = 'block';
+        }
       }
     });
   }
@@ -354,31 +396,37 @@ class ProfileController {
 
   // Alternar modo de edición
   toggleEditMode() {
-    this.isEditing = !this.isEditing;
-    
-    const editableFields = document.querySelectorAll('.profile-field input, .profile-field textarea, .profile-field select');
-    const editBtn = document.getElementById('edit-profile-btn');
-    const cancelBtn = document.getElementById('cancel-edit-btn');
-    const submitBtn = document.getElementById('save-profile-btn');
-    
-    editableFields.forEach(field => {
-      field.disabled = !this.isEditing;
-    });
-    
-    if (editBtn) editBtn.style.display = this.isEditing ? 'none' : 'inline-block';
-    if (cancelBtn) cancelBtn.style.display = this.isEditing ? 'inline-block' : 'none';
-    if (submitBtn) submitBtn.style.display = this.isEditing ? 'inline-block' : 'none';
-    
+    this.setEditMode(!this.isEditing);
+
     if (this.isEditing) {
       showNotification('Modo de edición activado', 'info');
     }
   }
 
+  setEditMode(isEditing) {
+    this.isEditing = Boolean(isEditing);
+
+    const editableFields = document.querySelectorAll('.profile-field input, .profile-field textarea, .profile-field select');
+    const editBtn = document.getElementById('edit-profile-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    const submitBtn = document.getElementById('save-profile-btn');
+
+    editableFields.forEach(field => {
+      field.disabled = !this.isEditing;
+      if (!this.isEditing) {
+        field.blur();
+      }
+    });
+
+    if (editBtn) editBtn.style.display = this.isEditing ? 'none' : 'inline-block';
+    if (cancelBtn) cancelBtn.style.display = this.isEditing ? 'inline-block' : 'none';
+    if (submitBtn) submitBtn.style.display = this.isEditing ? 'inline-block' : 'none';
+  }
+
   // Cancelar edición
   cancelEdit() {
-    this.isEditing = false;
     this.populateProfileForm(); // Restaurar datos originales
-    this.toggleEditMode();
+    this.setEditMode(false);
     showNotification('Cambios cancelados', 'info');
   }
 
@@ -392,33 +440,43 @@ class ProfileController {
       showLoading('Actualizando perfil...');
       
       const formData = new FormData(this.profileForm);
-      const profileData = Object.fromEntries(formData.entries());
-      
+      const profileData = this.buildProfileUpdatePayload(formData);
+
       const response = await docuFlowAPI.profile.update(profileData);
-      
-      if (response.success) {
-        this.profileData = { ...this.profileData, ...profileData };
-        this.updateProfileDisplay();
-        this.toggleEditMode();
-        showNotification('Perfil actualizado exitosamente', 'success');
+
+      if (response?.success === false) {
+        throw new Error(response?.message || 'No se pudo actualizar el perfil');
       }
+
+      await this.loadUserProfile({ forceRefresh: true, suppressLoader: true });
+      this.setEditMode(false);
+      showNotification('Perfil actualizado exitosamente', 'success');
     } catch (error) {
       console.error('Error updating profile:', error);
-      showNotification('Error al actualizar el perfil', 'error');
+      showNotification(error?.message || 'Error al actualizar el perfil', 'error');
     } finally {
       hideLoading();
     }
   }
 
   // Cargar historial de actividad
-  async loadActivityHistory() {
+  async loadActivityHistory(forceRefresh = false) {
     try {
-      const response = await docuFlowAPI.profile.getActivity();
-      
-      if (response.success) {
-        this.activityHistory = response.data;
+      if (!forceRefresh && Array.isArray(this.profileData?.activityHistory) && this.profileData.activityHistory.length) {
+        this.activityHistory = this.profileData.activityHistory;
         this.renderActivityHistory();
+        return;
       }
+
+      const response = await docuFlowAPI.profile.getActivity({}, { showLoading: false });
+      const activity = response?.data ?? response ?? [];
+
+      this.activityHistory = Array.isArray(activity) ? activity : [];
+      if (this.profileData) {
+        this.profileData.activityHistory = this.activityHistory;
+      }
+
+      this.renderActivityHistory();
     } catch (error) {
       console.error('Error loading activity history:', error);
     }
@@ -476,29 +534,43 @@ class ProfileController {
   }
 
   // Cargar preferencias del usuario
-  async loadUserPreferences() {
+  async loadUserPreferences(forceRefresh = false) {
     try {
-      const response = await docuFlowAPI.profile.getPreferences();
-      
-      if (response.success) {
-        this.preferences = response.data;
+      if (!forceRefresh && this.preferences && Object.keys(this.preferences).length > 0) {
         this.populatePreferencesForm();
+        this.applyPreferences();
+        return;
       }
+
+      const response = await docuFlowAPI.profile.getPreferences({ showLoading: false });
+      const preferences = response?.data ?? response ?? {};
+
+      this.preferences = this.normalizePreferences(preferences, this.preferences);
+      if (this.profileData) {
+        this.profileData.preferences = this.preferences;
+      }
+
+      this.populatePreferencesForm();
+      this.applyPreferences();
     } catch (error) {
       console.error('Error loading preferences:', error);
+      if (this.preferences && Object.keys(this.preferences).length > 0) {
+        this.populatePreferencesForm();
+      }
     }
   }
 
   // Poblar formulario de preferencias
   populatePreferencesForm() {
+    if (!this.preferences) return;
+
     const elements = {
       'pref-language': this.preferences.language || 'es',
-      'pref-timezone': this.preferences.timezone || 'UTC-5',
       'pref-theme': this.preferences.theme || 'light',
-      'pref-notifications': this.preferences.emailNotifications || false,
-      'pref-sound': this.preferences.soundNotifications || false,
-      'pref-auto-save': this.preferences.autoSave || true,
-      'pref-file-preview': this.preferences.filePreview || true
+      'pref-notifications': Boolean(this.preferences.emailNotifications),
+      'pref-sound': Boolean(this.preferences.soundNotifications),
+      'pref-auto-save': this.preferences.autoSave !== false,
+      'pref-file-preview': this.preferences.filePreview !== false
     };
 
     Object.entries(elements).forEach(([id, value]) => {
@@ -522,28 +594,49 @@ class ProfileController {
       
       const formData = new FormData(this.preferencesForm);
       const preferences = {};
-      
-      // Procesar datos del formulario
-      for (let [key, value] of formData.entries()) {
-        preferences[key.replace('pref-', '')] = value;
+
+      const mapPreferenceKey = (rawKey) => {
+        const normalized = rawKey.replace('pref-', '');
+        const dictionary = {
+          language: 'language',
+          theme: 'theme',
+          notifications: 'emailNotifications',
+          sound: 'soundNotifications',
+          'auto-save': 'autoSave',
+          'file-preview': 'filePreview'
+        };
+        return dictionary[normalized] || normalized;
+      };
+
+      for (const [key, value] of formData.entries()) {
+        const mappedKey = mapPreferenceKey(key);
+        if (['emailNotifications', 'soundNotifications', 'autoSave', 'filePreview'].includes(mappedKey)) {
+          continue;
+        }
+        preferences[mappedKey] = typeof value === 'string' ? value.trim() : value;
       }
-      
-      // Procesar checkboxes
+
       const checkboxes = this.preferencesForm.querySelectorAll('input[type="checkbox"]');
       checkboxes.forEach(checkbox => {
-        const key = checkbox.id.replace('pref-', '');
-        preferences[key] = checkbox.checked;
+        const mappedKey = mapPreferenceKey(checkbox.id);
+        preferences[mappedKey] = checkbox.checked;
       });
       
       const response = await docuFlowAPI.profile.updatePreferences(preferences);
       
-      if (response.success) {
-        this.preferences = { ...this.preferences, ...preferences };
-        showNotification('Preferencias actualizadas exitosamente', 'success');
-        
-        // Aplicar cambios inmediatamente
-        this.applyPreferences();
+      if (response?.success === false) {
+        throw new Error(response?.message || 'No se pudieron actualizar las preferencias');
       }
+
+      this.preferences = this.normalizePreferences({ ...this.preferences, ...preferences });
+      if (this.profileData) {
+        this.profileData.preferences = this.preferences;
+      }
+
+      showNotification('Preferencias actualizadas exitosamente', 'success');
+      
+      // Aplicar cambios inmediatamente
+      this.applyPreferences();
     } catch (error) {
       console.error('Error updating preferences:', error);
       showNotification('Error al actualizar las preferencias', 'error');
@@ -559,9 +652,21 @@ class ProfileController {
       document.documentElement.setAttribute('data-theme', this.preferences.theme);
     }
     
+    if (this.preferences.language) {
+      document.documentElement.setAttribute('lang', this.preferences.language);
+    }
+    
     // Aplicar configuración de notificaciones
     if (window.notificationController) {
       window.notificationController.setSoundEnabled(this.preferences.soundNotifications);
+    }
+
+    if (store?.setPreference) {
+      store.setPreference('autoSave', this.preferences.autoSave !== false);
+      store.setPreference('filePreview', this.preferences.filePreview !== false);
+      if (this.preferences.timezone) {
+        store.setPreference('timezone', this.preferences.timezone);
+      }
     }
     
     // Guardar en localStorage para persistencia
@@ -659,6 +764,224 @@ class ProfileController {
     });
   }
 
+  getRoleDisplayName(role) {
+    if (!role) return 'Usuario';
+
+    const normalized = role.toString().toUpperCase();
+    const dictionary = {
+      ADMIN: 'Administrador',
+      ADMINISTRATOR: 'Administrador',
+      SUPERADMIN: 'Super Administrador',
+      USER: 'Usuario',
+      STUDENT: 'Estudiante',
+      ESTUDIANTE: 'Estudiante',
+      MODERATOR: 'Moderador',
+      MANAGER: 'Manager',
+      ANALYST: 'Analista'
+    };
+
+    return dictionary[normalized] || role;
+  }
+
+  updateElementText(id, value) {
+    const element = document.getElementById(id);
+    if (!element) return;
+
+    if (value && typeof value === 'object') {
+      const text = value.text ?? value.value ?? 'N/A';
+      element.textContent = text;
+      if (value.title) {
+        element.setAttribute('title', value.title);
+      } else {
+        element.removeAttribute('title');
+      }
+    } else {
+      element.textContent = value ?? 'N/A';
+      element.removeAttribute('title');
+    }
+  }
+
+  formatDateDisplayObject(date) {
+    if (!date) {
+      return { text: 'N/A', title: 'Sin registro' };
+    }
+
+    return {
+      text: this.formatDate(date),
+      title: this.formatRelativeTime(date)
+    };
+  }
+
+  normalizePreferences(raw = {}, fallback = {}) {
+    return {
+      language: raw.language || raw.locale || fallback.language || 'es',
+      theme: raw.theme || raw.colorScheme || fallback.theme || 'light',
+      emailNotifications: raw.emailNotifications ?? raw.notifications ?? raw.email_notifications ?? fallback.emailNotifications ?? false,
+      soundNotifications: raw.soundNotifications ?? raw.sound_notifications ?? raw.sounds ?? fallback.soundNotifications ?? false,
+      autoSave: raw.autoSave ?? raw.auto_save ?? fallback.autoSave ?? true,
+      filePreview: raw.filePreview ?? raw.file_preview ?? fallback.filePreview ?? true,
+      timezone: raw.timezone || raw.timeZone || fallback.timezone || 'UTC-5'
+    };
+  }
+
+  normalizeStats(raw = {}) {
+    const filesUploaded = raw.filesUploaded ?? raw.files_count ?? raw.totalFiles ?? 0;
+    const commentsMade = raw.commentsMade ?? raw.comments_count ?? raw.totalComments ?? 0;
+    const tasksCreated = raw.tasksCreated ?? raw.tasks_count ?? raw.totalTasks ?? raw.tasks ?? 0;
+    const tasksCompleted = raw.tasksCompleted ?? raw.tasks_completed ?? raw.completedTasks ?? 0;
+    const loginCount = raw.loginCount ?? raw.successfulLogins ?? raw.login_count ?? raw.logins ?? 0;
+    const totalStorageUsed = raw.totalStorageUsed ?? raw.storageUsed ?? raw.totalStorage ?? raw.storage ?? 0;
+    const lastActivity = raw.lastActivity ?? raw.lastActivityAt ?? raw.lastActionAt ?? raw.lastInteractionAt ?? null;
+
+    return {
+      ...raw,
+      filesUploaded: Number(filesUploaded) || 0,
+      commentsMade: Number(commentsMade) || 0,
+      tasksCreated: Number(tasksCreated) || 0,
+      tasksCompleted: Number(tasksCompleted) || 0,
+      loginCount: Number(loginCount) || 0,
+      totalStorageUsed: Number(totalStorageUsed) || 0,
+      lastActivity
+    };
+  }
+
+  normalizeProfileData(raw = {}) {
+    const user = raw.user || raw.profile || raw || {};
+    const stats = this.normalizeStats(raw.stats || user.stats || raw.activityStats || {});
+    const preferences = this.normalizePreferences(raw.preferences || user.preferences || {}, this.preferences || {});
+    const activityHistory = Array.isArray(raw.activityHistory) ? raw.activityHistory : Array.isArray(raw.activity) ? raw.activity : [];
+
+    let fullName = raw.fullName || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    const username = user.username || raw.username || (user.email ? user.email.split('@')[0] : '');
+
+    if (!fullName) {
+      fullName = username || user.email || 'Usuario';
+    }
+
+    const normalized = {
+      id: user.id ?? raw.id ?? null,
+      username,
+      email: user.email || raw.email || '',
+      firstName: user.firstName || raw.firstName || '',
+      lastName: user.lastName || raw.lastName || '',
+      fullName,
+      phone: user.phone || raw.phone || '',
+      department: user.department || raw.department || '',
+      position: user.position || raw.position || '',
+      location: user.location || raw.location || '',
+      bio: user.bio || raw.bio || '',
+      timezone: user.timezone || raw.timezone || preferences.timezone || 'UTC-5',
+      role: user.role || raw.role || 'Usuario',
+      avatarUrl: user.avatarUrl || user.avatar || raw.avatarUrl || null,
+      createdAt: user.createdAt || raw.createdAt || raw.registeredAt || null,
+      lastLogin: user.lastLogin || raw.lastLogin || raw.lastAccessAt || user.lastAccessAt || null,
+      lastActivity: raw.lastActivity || stats.lastActivity || user.lastActivity || raw.lastActionAt || user.lastActionAt || null,
+      stats,
+      preferences,
+      activityHistory,
+      sessions: Array.isArray(raw.sessions) ? raw.sessions : []
+    };
+
+    normalized.user = {
+      ...user,
+      stats
+    };
+    normalized.preferences = preferences;
+    normalized.raw = raw;
+
+    return normalized;
+  }
+
+  extractCurrentUser(profile = {}) {
+    if (!profile) return null;
+    const fullName = profile.fullName || `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+
+    return {
+      id: profile.id,
+      username: profile.username,
+      email: profile.email,
+      name: fullName || profile.username || profile.email || 'Usuario',
+      role: profile.role,
+      avatarUrl: profile.avatarUrl,
+      department: profile.department,
+      lastLogin: profile.lastLogin,
+      createdAt: profile.createdAt
+    };
+  }
+
+  hasMeaningfulStats(stats = {}) {
+    return Boolean(
+      stats.filesUploaded ||
+      stats.commentsMade ||
+      stats.tasksCreated ||
+      stats.tasksCompleted ||
+      stats.loginCount ||
+      stats.totalStorageUsed ||
+      stats.lastActivity
+    );
+  }
+
+  async ensureProfileStats(forceRefresh = false) {
+    if (!this.profileData) return;
+
+    if (!forceRefresh && this.statsLoaded && this.hasMeaningfulStats(this.profileData.stats)) {
+      this.updateUserStats();
+      return;
+    }
+
+    try {
+      const response = await docuFlowAPI.profile.getStats({ showLoading: false });
+      const statsPayload = response?.data ?? response;
+
+      if (statsPayload) {
+        this.profileData.stats = this.normalizeStats(statsPayload);
+        this.statsLoaded = true;
+      }
+    } catch (error) {
+      if (forceRefresh) {
+        console.warn('No se pudieron actualizar las estadísticas del perfil:', error);
+      }
+    } finally {
+      this.updateUserStats();
+    }
+  }
+
+  updateNavIdentity(displayName) {
+    const navName = document.getElementById('nav-username');
+    const navRole = document.getElementById('nav-role');
+
+    if (navName) {
+      navName.textContent = displayName || this.profileData?.username || 'Usuario';
+    }
+
+    if (navRole) {
+      navRole.textContent = this.getRoleDisplayName(this.profileData?.role);
+    }
+  }
+
+  buildProfileUpdatePayload(formData) {
+    const payload = {};
+
+    for (const [key, value] of formData.entries()) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        payload[key] = trimmed === '' ? null : trimmed;
+      } else {
+        payload[key] = value;
+      }
+    }
+
+    if (!payload.username && this.profileData?.username) {
+      payload.username = this.profileData.username;
+    }
+
+    if (!payload.timezone && this.profileData?.timezone) {
+      payload.timezone = this.profileData.timezone;
+    }
+
+    return payload;
+  }
+
   // Formatear fecha
   formatDate(dateString) {
     if (!dateString) return 'N/A';
@@ -702,9 +1025,9 @@ class ProfileController {
 
   // Refrescar datos del perfil
   async refreshProfile() {
-    await this.loadUserProfile();
-    await this.loadActivityHistory();
-    await this.loadUserPreferences();
+    await this.loadUserProfile({ forceRefresh: true });
+    await this.loadActivityHistory(true);
+    await this.loadUserPreferences(true);
     showNotification('Perfil actualizado', 'success');
   }
 

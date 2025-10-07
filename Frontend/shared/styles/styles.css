@@ -270,6 +270,17 @@ body {
   }
 }
 
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -293,11 +304,19 @@ body {
 }
 
 /* Sistema de notificaciones */
-.notification {
+.notification-container {
   position: fixed;
   top: var(--spacing-lg);
   right: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
   z-index: 9999;
+}
+
+.notification {
+  position: relative;
   min-width: 300px;
   max-width: 400px;
   padding: var(--spacing-md);
@@ -356,6 +375,21 @@ body {
 
 .notification-close:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 576px) {
+  .notification-container {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: calc(100% - 2 * var(--spacing-lg));
+    align-items: center;
+  }
+
+  .notification {
+    min-width: unset;
+    width: 100%;
+  }
 }
 
 /* Loading global */

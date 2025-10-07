@@ -350,6 +350,11 @@
   border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
+.navbar .nav-link #nav-role {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
 /* Indicador de carga */
 .loading-overlay {
   position: fixed;
