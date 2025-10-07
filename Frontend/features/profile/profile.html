@@ -48,7 +48,7 @@
         <ul class="navbar-nav">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
-              <img src="../../shared/assets/default-avatar.png" data-default-avatar="../../shared/assets/default-avatar.png" alt="Avatar" class="user-avatar me-2" width="32" height="32">
+              <img src="../../shared/assets/default-avatar.svg" data-default-avatar="../../shared/assets/default-avatar.svg" alt="Avatar" class="user-avatar me-2" width="32" height="32">
               <span class="d-flex flex-column align-items-start lh-1">
                 <span id="nav-username">Usuario</span>
                 <small id="nav-role" class="text-muted text-capitalize">Rol</small>
@@ -73,7 +73,7 @@
           <!-- Información básica del usuario -->
           <div class="profile-header text-center">
             <div class="avatar-container">
-              <img id="avatar-preview" src="../../shared/assets/default-avatar.png" alt="Avatar" class="user-avatar-large">
+              <img id="avatar-preview" src="../../shared/assets/default-avatar.svg" alt="Avatar" class="user-avatar-large">
               <div class="user-initials" style="display: none;"></div>
               <div class="avatar-actions">
                 <button type="button" class="btn btn-sm btn-primary" id="avatar-upload-btn">
@@ -218,13 +218,13 @@
                     <div class="col-md-6">
                       <div class="profile-field mb-3">
                         <label for="profile-username" class="form-label">Nombre de Usuario</label>
-                        <input type="text" class="form-control" id="profile-username" name="username" disabled>
+                        <input type="text" class="form-control" id="profile-username" name="username" autocomplete="username" disabled>
                       </div>
                     </div>
                     <div class="col-md-6">
                       <div class="profile-field mb-3">
                         <label for="profile-email" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="profile-email" name="email" disabled>
+                        <input type="email" class="form-control" id="profile-email" name="email" autocomplete="email" disabled>
                       </div>
                     </div>
                   </div>
@@ -233,13 +233,13 @@
                     <div class="col-md-6">
                       <div class="profile-field mb-3">
                         <label for="profile-firstName" class="form-label">Nombre</label>
-                        <input type="text" class="form-control" id="profile-firstName" name="firstName" disabled>
+                        <input type="text" class="form-control" id="profile-firstName" name="firstName" autocomplete="given-name" disabled>
                       </div>
                     </div>
                     <div class="col-md-6">
                       <div class="profile-field mb-3">
                         <label for="profile-lastName" class="form-label">Apellido</label>
-                        <input type="text" class="form-control" id="profile-lastName" name="lastName" disabled>
+                        <input type="text" class="form-control" id="profile-lastName" name="lastName" autocomplete="family-name" disabled>
                       </div>
                     </div>
                   </div>
@@ -248,13 +248,13 @@
                     <div class="col-md-6">
                       <div class="profile-field mb-3">
                         <label for="profile-phone" class="form-label">Teléfono</label>
-                        <input type="tel" class="form-control" id="profile-phone" name="phone" disabled>
+                        <input type="tel" class="form-control" id="profile-phone" name="phone" autocomplete="tel" disabled>
                       </div>
                     </div>
                     <div class="col-md-6">
                       <div class="profile-field mb-3">
                         <label for="profile-department" class="form-label">Departamento</label>
-                        <select class="form-select" id="profile-department" name="department" disabled>
+                        <select class="form-select" id="profile-department" name="department" autocomplete="organization" disabled>
                           <option value="">Seleccionar departamento</option>
                           <option value="IT">Tecnología</option>
                           <option value="HR">Recursos Humanos</option>
@@ -271,13 +271,13 @@
                     <div class="col-md-6">
                       <div class="profile-field mb-3">
                         <label for="profile-position" class="form-label">Cargo</label>
-                        <input type="text" class="form-control" id="profile-position" name="position" disabled>
+                        <input type="text" class="form-control" id="profile-position" name="position" autocomplete="organization-title" disabled>
                       </div>
                     </div>
                     <div class="col-md-6">
                       <div class="profile-field mb-3">
                         <label for="profile-location" class="form-label">Ubicación</label>
-                        <input type="text" class="form-control" id="profile-location" name="location" disabled>
+                        <input type="text" class="form-control" id="profile-location" name="location" autocomplete="address-level2" disabled>
                       </div>
                     </div>
                   </div>

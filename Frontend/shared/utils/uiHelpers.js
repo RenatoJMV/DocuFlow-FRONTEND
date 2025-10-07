@@ -90,6 +90,10 @@ export function showLoading(show = true) {
   }
 }
 
+export function hideLoading() {
+  showLoading(false);
+}
+
 // Sistema de navegación moderno
 export function createNavbar(currentPage = '') {
   return `

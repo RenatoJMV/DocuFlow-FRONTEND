@@ -331,7 +331,7 @@ class ProfileController {
       const isLargeAvatar = element.classList.contains('user-avatar-large') || element.id === 'avatar-preview';
 
       if (!element.dataset.defaultAvatar) {
-        element.dataset.defaultAvatar = element.getAttribute('data-default-avatar') || element.getAttribute('src') || '../../shared/assets/default-avatar.png';
+        element.dataset.defaultAvatar = element.getAttribute('data-default-avatar') || element.getAttribute('src') || '../../shared/assets/default-avatar.svg';
       }
 
       const defaultSrc = element.dataset.defaultAvatar;

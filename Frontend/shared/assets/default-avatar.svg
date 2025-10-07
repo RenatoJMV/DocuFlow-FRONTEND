@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Avatar genérico</title>
+  <desc id="desc">Ícono circular genérico utilizado como avatar por defecto.</desc>
+  <defs>
+    <linearGradient id="avatarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d6efd" />
+      <stop offset="100%" stop-color="#4dabf7" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="64" fill="url(#avatarGradient)" />
+  <path d="M64 26a24 24 0 1 1 0 48a24 24 0 0 1 0-48zm0 56c22.091 0 40 13.431 40 30v6H24v-6c0-16.569 17.909-30 40-30z" fill="#ffffff" opacity="0.85" />
+</svg>
