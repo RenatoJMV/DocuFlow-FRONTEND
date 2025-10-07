@@ -138,6 +138,24 @@
   background: rgba(79, 140, 255, 0.1);
 }
 
+.log-timestamp strong {
+  font-size: var(--font-size-sm);
+  color: var(--gray-800);
+}
+
+.log-details-cell .badge {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.log-details-cell .badge i {
+  margin-right: 0.25rem;
+}
+
+.log-details-cell small {
+  font-size: var(--font-size-xs);
+}
+
 /* Log Level Badges */
 .log-level {
   padding: var(--spacing-xs) var(--spacing-sm);

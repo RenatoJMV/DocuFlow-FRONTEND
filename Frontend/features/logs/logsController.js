@@ -77,24 +77,51 @@ class LogsController {
     return [
       { id: 'login', name: 'Iniciar sesión', icon: 'bi-box-arrow-in-right' },
       { id: 'logout', name: 'Cerrar sesión', icon: 'bi-box-arrow-right' },
+      { id: 'session_timeout', name: 'Sesión expirada', icon: 'bi-hourglass-split' },
+      { id: 'auth_failure', name: 'Error de autenticación', icon: 'bi-exclamation-octagon' },
       { id: 'upload', name: 'Subir archivo', icon: 'bi-upload' },
+      { id: 'file_upload', name: 'Subida de archivo', icon: 'bi-cloud-upload' },
       { id: 'download', name: 'Descargar archivo', icon: 'bi-download' },
+      { id: 'file_download', name: 'Descarga de archivo', icon: 'bi-cloud-download' },
       { id: 'delete', name: 'Eliminar archivo', icon: 'bi-trash' },
+      { id: 'file_delete', name: 'Eliminación de archivo', icon: 'bi-trash3' },
+      { id: 'restore', name: 'Restaurar archivo', icon: 'bi-arrow-counterclockwise' },
+      { id: 'file_restore', name: 'Restauración de archivo', icon: 'bi-arrow-counterclockwise' },
       { id: 'edit', name: 'Editar archivo', icon: 'bi-pencil' },
+      { id: 'document_update', name: 'Actualizar documento', icon: 'bi-pencil-square' },
+      { id: 'view', name: 'Visualizar documento', icon: 'bi-eye' },
+      { id: 'document_view', name: 'Visualización de documento', icon: 'bi-eye' },
       { id: 'share', name: 'Compartir archivo', icon: 'bi-share' },
+      { id: 'file_share', name: 'Compartir archivo', icon: 'bi-share' },
+      { id: 'preview', name: 'Previsualizar', icon: 'bi-eye-fill' },
       { id: 'comment', name: 'Comentar', icon: 'bi-chat-text' },
+      { id: 'comment_added', name: 'Comentario agregado', icon: 'bi-chat-left-dots' },
       { id: 'permission_change', name: 'Cambio de permisos', icon: 'bi-shield-check' },
       { id: 'role_change', name: 'Cambio de rol', icon: 'bi-person-gear' },
-      { id: 'system_error', name: 'Error del sistema', icon: 'bi-exclamation-triangle' }
+      { id: 'audit', name: 'Auditoría', icon: 'bi-clipboard-check' },
+      { id: 'export', name: 'Exportación', icon: 'bi-download' },
+      { id: 'analytics_export', name: 'Exportación de analítica', icon: 'bi-graph-up-arrow' },
+      { id: 'integration_sync', name: 'Sincronización', icon: 'bi-arrow-repeat' },
+      { id: 'system_health_check', name: 'Chequeo de salud', icon: 'bi-heart-pulse' },
+      { id: 'system_error', name: 'Error del sistema', icon: 'bi-exclamation-triangle' },
+      { id: 'security_alert', name: 'Alerta de seguridad', icon: 'bi-shield-exclamation' },
+      { id: 'api_request', name: 'Llamada API', icon: 'bi-braces' },
+      { id: 'unknown', name: 'Evento', icon: 'bi-info-circle' }
     ];
   }
 
   getAvailableLevels() {
     return [
       { id: 'info', name: 'Información', color: 'info' },
+      { id: 'notice', name: 'Aviso', color: 'primary' },
+      { id: 'success', name: 'Éxito', color: 'success' },
       { id: 'warning', name: 'Advertencia', color: 'warning' },
       { id: 'error', name: 'Error', color: 'danger' },
-      { id: 'success', name: 'Éxito', color: 'success' }
+      { id: 'critical', name: 'Crítico', color: 'danger' },
+      { id: 'fatal', name: 'Fatal', color: 'dark' },
+      { id: 'debug', name: 'Debug', color: 'secondary' },
+      { id: 'trace', name: 'Trace', color: 'secondary' },
+      { id: 'audit', name: 'Auditoría', color: 'info' }
     ];
   }
 
@@ -102,14 +129,38 @@ class LogsController {
     if (!this.actionLookup) {
       this.actionLookup = new Map();
       this.getAvailableActions().forEach((action) => {
-        this.actionLookup.set(action.id, action);
+        const variants = new Set([
+          action.id,
+          action.id.replace(/_/g, '-'),
+          action.id.replace(/-/g, '_'),
+          action.id.replace(/\s+/g, '_'),
+          action.id.replace(/\s+/g, '-'),
+          action.id.toUpperCase(),
+          action.id.toLowerCase()
+        ]);
+
+        variants.forEach((variant) => {
+          if (!variant) return;
+          this.actionLookup.set(variant.toString().toLowerCase(), action);
+        });
       });
     }
 
     if (!this.levelLookup) {
       this.levelLookup = new Map();
       this.getAvailableLevels().forEach((level) => {
-        this.levelLookup.set(level.id, level);
+        const variants = new Set([
+          level.id,
+          level.id.replace(/_/g, '-'),
+          level.id.replace(/-/g, '_'),
+          level.id.toUpperCase(),
+          level.id.toLowerCase()
+        ]);
+
+        variants.forEach((variant) => {
+          if (!variant) return;
+          this.levelLookup.set(variant.toString().toLowerCase(), level);
+        });
       });
     }
   }
@@ -117,13 +168,13 @@ class LogsController {
   getActionInfo(actionId) {
     if (!actionId) return null;
     this.ensureLookups();
-    return this.actionLookup.get(actionId) || null;
+    return this.actionLookup.get(actionId.toString().toLowerCase()) || null;
   }
 
   getLevelInfo(levelId) {
     if (!levelId) return null;
     this.ensureLookups();
-    return this.levelLookup.get(levelId) || null;
+    return this.levelLookup.get(levelId.toString().toLowerCase()) || null;
   }
 
   getLogsTableBody() {
@@ -165,83 +216,376 @@ class LogsController {
     return date.toISOString();
   }
 
+  pickFirstLabel(candidates = [], preferredKeys = [], options = {}) {
+    if (!Array.isArray(candidates)) {
+      return this.extractLabel(candidates, preferredKeys, options);
+    }
+
+    for (const candidate of candidates) {
+      const label = this.extractLabel(candidate, preferredKeys, options);
+      if (label) {
+        return label;
+      }
+    }
+
+    return '';
+  }
+
+  extractLabel(value, preferredKeys = [], options = {}) {
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed;
+    }
+
+    if (typeof value === 'number' || typeof value === 'bigint') {
+      return String(value);
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (typeof value === 'boolean') {
+      return options.booleanAsWord ? (value ? 'Sí' : 'No') : String(value);
+    }
+
+    if (Array.isArray(value)) {
+      const parts = value
+        .map((item) => this.extractLabel(item, preferredKeys, options))
+        .filter(Boolean);
+      return parts.join(options.arraySeparator || ', ');
+    }
+
+    if (typeof value === 'object') {
+      for (const key of preferredKeys) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const label = this.extractLabel(value[key], preferredKeys, options);
+          if (label) {
+            return label;
+          }
+        }
+      }
+
+      if (options.deep) {
+        for (const childValue of Object.values(value)) {
+          const deepLabel = this.extractLabel(childValue, preferredKeys, options);
+          if (deepLabel) {
+            return deepLabel;
+          }
+        }
+      }
+
+      const entries = Object.entries(value)
+        .map(([key, val]) => {
+          const normalized = this.extractLabel(val, preferredKeys, options);
+          if (!normalized) return '';
+          if (options.includeKeys === false) {
+            return normalized;
+          }
+          return `${this.formatActionLabel(key)}: ${normalized}`;
+        })
+        .filter(Boolean);
+
+      return entries.join(options.entrySeparator || ' · ');
+    }
+
+    return '';
+  }
+
+  resolveUserInfo(raw) {
+    const primary = this.pickFirstLabel(
+      [
+        raw.username,
+        raw.user,
+        raw.userName,
+        raw?.user?.name,
+        raw?.user?.username,
+        raw.actor,
+        raw.performedBy,
+        raw.account,
+        raw.owner,
+        raw.identity,
+        raw.email
+      ],
+      ['name', 'fullName', 'username', 'userName', 'displayName', 'email'],
+      { includeKeys: false, deep: true }
+    ) || 'Sistema';
+
+    const secondary = this.pickFirstLabel(
+      [
+        raw?.user?.email,
+        raw.email,
+        raw?.user?.username,
+        raw.metadata?.userEmail,
+        raw.details?.userEmail,
+        raw.accountEmail
+      ],
+      ['email', 'username', 'userName'],
+      { includeKeys: false, deep: true }
+    );
+
+    return {
+      primary,
+      secondary: secondary && secondary !== primary ? secondary : ''
+    };
+  }
+
+  resolveDetailInfo(raw, actionKey) {
+    const primary = this.truncateText(
+      this.pickFirstLabel(
+        [
+          raw.details,
+          raw.detail,
+          raw.message,
+          raw.description,
+          raw.eventDescription,
+          raw.summary,
+          raw.info,
+          raw.result,
+          raw.payload?.message,
+          raw.responseMessage
+        ],
+        ['message', 'description', 'detail', 'summary', 'info', 'result', 'status', 'reason', 'error'],
+        { includeKeys: false, deep: true, arraySeparator: '; ' }
+      ) || `${this.formatActionLabel(actionKey)} · Sin detalles`,
+      220
+    );
+
+    const context = this.truncateText(
+      this.pickFirstLabel(
+        [
+          raw.metadata,
+          raw.context,
+          raw.payload,
+          raw.additionalInfo,
+          raw.data,
+          raw.resource,
+          raw.environment,
+          raw.details?.metadata
+        ],
+        ['fileName', 'documentName', 'name', 'title', 'path', 'reference', 'status', 'changes'],
+        { includeKeys: true, deep: true, entrySeparator: ' · ' }
+      ),
+      260
+    );
+
+    return { primary, context };
+  }
+
+  resolveDocumentInfo(raw) {
+    const sources = [
+      raw.document,
+      raw.resource,
+      raw.entity,
+      raw.file,
+      raw.payload?.document,
+      raw.details?.document,
+      raw.metadata?.document
+    ];
+
+    const id = this.pickFirstLabel(
+      [
+        raw.documentId,
+        raw.documentReference,
+        raw.document?.id,
+        raw.document?.documentId,
+        raw.details?.documentId,
+        raw.metadata?.documentId
+      ],
+      ['id', 'documentId', 'reference'],
+      { includeKeys: false, deep: true }
+    );
+
+    const name = this.pickFirstLabel(
+      [
+        raw.documentName,
+        raw.documentTitle,
+        raw.document?.name,
+        raw.document?.title,
+        raw.fileName,
+        raw.metadata?.fileName,
+        raw.details?.fileName
+      ],
+      ['name', 'title', 'fileName', 'documentName'],
+      { includeKeys: false, deep: true }
+    ) || this.pickFirstLabel(
+      sources,
+      ['name', 'title', 'fileName', 'documentName'],
+      { includeKeys: false, deep: true }
+    );
+
+    const summary = this.truncateText(
+      this.pickFirstLabel(
+        sources,
+        ['name', 'title', 'fileName', 'documentName', 'path', 'type'],
+        { includeKeys: true, deep: true, entrySeparator: ' · ' }
+      ),
+      200
+    );
+
+    return {
+      id: id || null,
+      name: name || null,
+      summary: summary && summary !== name ? summary : ''
+    };
+  }
+
+  truncateText(value, maxLength = 140) {
+    if (!value || typeof value !== 'string') {
+      return value || '';
+    }
+
+    if (value.length <= maxLength) {
+      return value;
+    }
+
+    return `${value.slice(0, maxLength - 1)}…`;
+  }
+
+  extractLogsArray(payload) {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+
+    const candidates = [
+      payload.logs,
+      payload.data,
+      payload.data?.logs,
+      payload.data?.content,
+      payload.content,
+      payload.items,
+      payload.results,
+      payload._embedded?.logs
+    ];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate;
+      }
+    }
+
+    if (typeof payload === 'object') {
+      const nestedArrays = Object.values(payload).filter((value) => Array.isArray(value));
+      if (nestedArrays.length === 1) {
+        return nestedArrays[0];
+      }
+
+      const structured = nestedArrays.find((array) =>
+        array.some((item) => item && typeof item === 'object' && (item.action || item.timestamp || item.date))
+      );
+
+      if (structured) {
+        return structured;
+      }
+    }
+
+    return [];
+  }
+
   normalizeLogEntry(raw) {
     if (!raw || typeof raw !== 'object') {
       return null;
     }
 
-    const actionCandidate = [
-      raw.action,
-      raw.actionType,
-      raw.eventType,
-      raw.event,
-      raw.type
-    ].find(Boolean) || 'unknown';
-    const actionKey = actionCandidate.toString().toLowerCase();
-    const actionInfo = this.getActionInfo(actionKey);
+    const actionCandidate = this.pickFirstLabel(
+      [
+        raw.action,
+        raw.actionType,
+        raw.eventType,
+        raw.event,
+        raw.operation,
+        raw.type,
+        raw.eventName
+      ],
+      [],
+      { includeKeys: false }
+    ) || 'unknown';
 
-    const levelCandidate = [
-      raw.level,
-      raw.severity,
-      raw.status,
-      raw.logLevel
-    ].find(Boolean);
-    const normalizedLevel = levelCandidate
-      ? levelCandidate.toString().toLowerCase()
-      : this.mapActionToLevel(actionKey);
+    const rawActionString = actionCandidate.toString().trim();
+    const normalizedActionKey = rawActionString
+      .replace(/[^a-zA-Z0-9_-]+/g, '_')
+      .replace(/[_-]+/g, '_')
+      .toLowerCase() || 'unknown';
 
-    const timestampCandidate = raw.timestamp || raw.createdAt || raw.date || raw.eventDate || raw.loggedAt;
+    const actionInfo = this.getActionInfo(normalizedActionKey)
+      || this.getActionInfo(rawActionString.toLowerCase())
+      || this.getActionInfo(rawActionString.replace(/\s+/g, '-').toLowerCase());
+
+    const levelCandidate = this.pickFirstLabel(
+      [
+        raw.level,
+        raw.severity,
+        raw.status,
+        raw.logLevel,
+        raw.priority
+      ],
+      [],
+      { includeKeys: false }
+    );
+
+    const normalizedLevel = (levelCandidate ? levelCandidate.toString().toLowerCase() : '')
+      || this.mapActionToLevel(normalizedActionKey);
+
+    const timestampCandidate = this.pickFirstLabel(
+      [
+        raw.timestamp,
+        raw.createdAt,
+        raw.eventDate,
+        raw.date,
+        raw.loggedAt,
+        raw.time,
+        raw.occurredAt
+      ]
+    );
     const timestamp = this.normalizeTimestamp(timestampCandidate);
 
-    const username = [
-      raw.username,
-      raw.user,
-      raw.userName,
-      raw.performedBy,
-      raw.actor,
-      raw.email,
-      raw.owner
-    ].find(Boolean) || 'Sistema';
+    const userInfo = this.resolveUserInfo(raw);
+    const detailInfo = this.resolveDetailInfo(raw, normalizedActionKey);
+    const documentInfo = this.resolveDocumentInfo(raw);
 
-    const details = [
-      raw.details,
-      raw.message,
-      raw.description,
-      raw.eventDescription,
-      raw.info,
-      raw.summary
-    ].find(Boolean) || `${this.formatActionLabel(actionKey)} - Sin detalles`;
+    const ip = this.pickFirstLabel(
+      [raw.ip, raw.ipAddress, raw.remoteIp, raw.sourceIp, raw.clientIp, raw.originIp]
+    ) || 'N/A';
 
-    const ip = [
-      raw.ip,
-      raw.ipAddress,
-      raw.remoteIp,
-      raw.sourceIp,
-      raw.clientIp
-    ].find(Boolean) || 'N/A';
+    const userAgent = this.pickFirstLabel(
+      [
+        raw.userAgent,
+        raw.agent,
+        raw.userAgentInfo,
+        raw.browser,
+        raw.device,
+        raw.platform,
+        raw.environment?.browser
+      ],
+      ['userAgent', 'browser', 'device', 'platform', 'os'],
+      { includeKeys: true, deep: true }
+    ) || 'N/A';
 
-    const userAgent = [
-      raw.userAgent,
-      raw.agent,
-      raw.userAgentInfo,
-      raw.browser
-    ].find(Boolean) || 'N/A';
-
-    const documentId = raw.documentId || raw.document?.id || raw.documentReference || null;
-
-    const id = raw.id || raw.logId || raw._id || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const id = this.pickFirstLabel(
+      [raw.id, raw.logId, raw._id, raw.identifier, raw.uuid],
+      ['id', 'uuid', 'logId'],
+      { includeKeys: false }
+    ) || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
     return {
       id,
       timestamp,
       level: normalizedLevel,
-      action: actionKey,
-      actionLabel: actionInfo?.name || this.formatActionLabel(actionKey),
-      username: username.toString(),
-      details: details.toString(),
-      ip: ip.toString(),
-      userAgent: userAgent.toString(),
-      documentId
+      action: normalizedActionKey,
+      actionLabel: actionInfo?.name || this.formatActionLabel(normalizedActionKey),
+      actionIcon: actionInfo?.icon || null,
+      username: userInfo.primary,
+      userSecondary: userInfo.secondary,
+      details: detailInfo.primary,
+      detailContext: detailInfo.context,
+      ip,
+      userAgent,
+      documentId: documentInfo.id,
+      documentName: documentInfo.name,
+      documentSummary: documentInfo.summary
     };
   }
 
@@ -347,7 +691,7 @@ class LogsController {
   const response = await docuFlowAPI.logs.getAll();
       
       // Extraer logs del response
-      const logs = response?.logs || response?.data || response || [];
+      const logs = this.extractLogsArray(response);
 
       if (Array.isArray(logs) && logs.length > 0) {
         this.ensureLookups();
@@ -375,22 +719,87 @@ class LogsController {
     }
   }
 
+  getFallbackIconForAction(actionKey = '') {
+    const key = actionKey?.toString().toLowerCase() || '';
+
+    if (key.includes('upload') || key.includes('create')) {
+      return 'bi-cloud-upload';
+    }
+    if (key.includes('download') || key.includes('export')) {
+      return 'bi-cloud-download';
+    }
+    if (key.includes('delete') || key.includes('remove') || key.includes('purge')) {
+      return 'bi-trash';
+    }
+    if (key.includes('restore') || key.includes('recover')) {
+      return 'bi-arrow-counterclockwise';
+    }
+    if (key.includes('share')) {
+      return 'bi-share';
+    }
+    if (key.includes('view') || key.includes('preview')) {
+      return 'bi-eye';
+    }
+    if (key.includes('comment')) {
+      return 'bi-chat-left-text';
+    }
+    if (key.includes('permission') || key.includes('role')) {
+      return 'bi-shield-check';
+    }
+    if (key.includes('login') || key.includes('auth')) {
+      return 'bi-person-lock';
+    }
+    if (key.includes('logout')) {
+      return 'bi-box-arrow-right';
+    }
+    if (key.includes('sync') || key.includes('integration')) {
+      return 'bi-arrow-repeat';
+    }
+    if (key.includes('health') || key.includes('status')) {
+      return 'bi-heart-pulse';
+    }
+    if (key.includes('error') || key.includes('fail') || key.includes('critical')) {
+      return 'bi-exclamation-triangle';
+    }
+    if (key.includes('warning')) {
+      return 'bi-exclamation-diamond';
+    }
+    return 'bi-activity';
+  }
+
   mapActionToLevel(action) {
     // Mapear acciones del backend a niveles para el frontend
+  const normalized = (action || '').toString().toLowerCase();
+  const sanitized = normalized.replace(/-/g, '_');
     const actionLevelMap = {
-      'upload': 'info',
-      'download': 'info', 
-      'delete': 'warning',
-      'comment': 'info',
-      'login': 'success',
-      'logout': 'info',
-      'error': 'error',
-      'system_error': 'error',
-      'permission_change': 'success',
-      'role_change': 'success'
+      upload: 'info',
+      file_upload: 'info',
+      download: 'info',
+      file_download: 'info',
+      delete: 'warning',
+      file_delete: 'warning',
+      restore: 'info',
+      file_restore: 'info',
+      comment: 'info',
+      comment_added: 'info',
+      login: 'success',
+      logout: 'info',
+      auth_failure: 'error',
+      session_timeout: 'warning',
+      error: 'error',
+      system_error: 'error',
+      security_alert: 'critical',
+      permission_change: 'success',
+      role_change: 'success',
+      analytics_export: 'info',
+      export: 'info',
+      audit: 'audit',
+      system_health_check: 'info',
+      integration_sync: 'info',
+      api_request: 'info'
     };
-    
-    return actionLevelMap[action] || 'info';
+
+    return actionLevelMap[sanitized] || actionLevelMap[normalized] || 'info';
   }
 
   generateLogDetails(action) {
@@ -511,22 +920,41 @@ class LogsController {
   }
 
   renderLogRow(log, isSelected = false) {
-  const actionInfo = this.getActionInfo(log.action);
-  const levelInfo = this.getLevelInfo(log.level);
-    const dateLabel = this.formatDate(log.timestamp);
-    const timeLabel = this.formatTime(log.timestamp);
+    const actionInfo = this.getActionInfo(log.action);
+    const levelInfo = this.getLevelInfo(log.level);
+
     const levelLabel = levelInfo?.name || this.formatActionLabel(log.level || 'info');
     const levelColor = levelInfo?.color || 'secondary';
     const actionLabel = this.escapeHtml(actionInfo?.name || log.actionLabel || this.formatActionLabel(log.action));
+    const actionIcon = this.escapeHtml(actionInfo?.icon || this.getFallbackIconForAction(log.action));
     const usernameLabel = this.escapeHtml(log.username || '—');
-    const detailsLabel = this.escapeHtml(log.details || '—');
+    const userSecondary = log.userSecondary ? `<small class="text-muted d-block">${this.escapeHtml(log.userSecondary)}</small>` : '';
+
+    const detailsPrimary = this.escapeHtml(log.details || '—');
+    const detailTitle = this.escapeHtml(log.details || '');
+    const detailContext = log.detailContext ? `<small class="text-muted d-block">${this.escapeHtml(log.detailContext)}</small>` : '';
+
+    const metadataChips = [];
+    if (log.documentName) {
+      metadataChips.push(`<span class="badge rounded-pill bg-light text-dark border"><i class="bi bi-file-earmark-text me-1"></i>${this.escapeHtml(log.documentName)}</span>`);
+    }
+    if (log.documentId && log.documentId !== log.documentName) {
+      metadataChips.push(`<span class="badge rounded-pill bg-light text-muted border">ID: ${this.escapeHtml(String(log.documentId))}</span>`);
+    }
+    const documentSummary = log.documentSummary ? `<small class="text-muted d-block mt-1">${this.escapeHtml(log.documentSummary)}</small>` : '';
+    const metadataBlock = metadataChips.length > 0
+      ? `<div class="d-flex flex-wrap gap-1 mt-2">${metadataChips.join('')}</div>`
+      : '';
+
+    const relativeLabel = this.formatRelativeTimestamp(log.timestamp);
+    const dateLabel = this.formatDate(log.timestamp);
+    const timeLabel = this.formatTime(log.timestamp);
     const ipLabel = this.escapeHtml(log.ip || '—');
+
     const documentIdAttr = log.documentId !== null && log.documentId !== undefined
       ? this.escapeHtml(String(log.documentId))
       : '';
-    
-    // La estructura <TR> y <TD> es crucial para que la tabla funcione.
-    // Este bloque crea una fila (TR) con 8 celdas (TD) que coinciden con las 8 columnas del encabezado.
+
     return `
       <tr class="log-row${isSelected ? ' selected' : ''}" data-log-id="${log.id}">
         <td>
@@ -534,8 +962,8 @@ class LogsController {
         </td>
         <td>
           <div class="log-timestamp">
-            <strong>${timeLabel}</strong>
-            <small class="text-muted d-block">${dateLabel}</small>
+            <strong>${relativeLabel || timeLabel}</strong>
+            <small class="text-muted d-block">${dateLabel} · ${timeLabel}</small>
           </div>
         </td>
         <td>
@@ -545,28 +973,36 @@ class LogsController {
         </td>
         <td>
           <div class="action-info">
-            <i class="bi ${actionInfo?.icon || 'bi-circle'} me-2"></i>
-            ${actionLabel}
+            <i class="bi ${actionIcon || 'bi-circle'} me-2"></i>
+            <span class="fw-semibold">${actionLabel}</span>
           </div>
         </td>
         <td>
           <div class="user-info">
             <strong>${usernameLabel}</strong>
+            ${userSecondary}
           </div>
         </td>
         <td>
-          <span class="log-row-details" title="${detailsLabel}">
-            ${detailsLabel}
-          </span>
+          <div class="log-details-cell">
+            <span class="log-row-details" title="${detailTitle}">
+              ${detailsPrimary}
+            </span>
+            ${detailContext}
+            ${metadataBlock}
+            ${documentSummary}
+          </div>
         </td>
-        <td>${ipLabel}</td>
+        <td>
+          <span class="text-monospace">${ipLabel}</span>
+        </td>
         <td>
           <div class="log-actions">
             <button class="btn btn-sm btn-outline-primary" data-action="view" data-log-id="${log.id}">
               <i class="bi bi-eye"></i>
             </button>
-            ${log.documentId !== null && log.documentId !== undefined ? `
-              <button class="btn btn-sm btn-outline-info" data-action="document" data-log-id="${log.id}" data-document-id="${documentIdAttr}">
+            ${(log.documentId !== null && log.documentId !== undefined) || log.documentName ? `
+              <button class="btn btn-sm btn-outline-info" data-action="document" data-log-id="${log.id}" data-document-id="${documentIdAttr}" ${log.documentName ? `data-document-name="${this.escapeHtml(log.documentName)}"` : ''}>
                 <i class="bi bi-file-earmark"></i>
               </button>
             ` : ''}
@@ -640,13 +1076,27 @@ class LogsController {
 
     setText('detailId', log.id);
     setText('detailTimestamp', `${this.formatDate(log.timestamp)} ${this.formatTime(log.timestamp)}`);
-    setText('detailUser', log.username || 'Sistema');
+    const userLabel = [log.username || 'Sistema', log.userSecondary].filter(Boolean);
+    setText('detailUser', userLabel.join(' · ') || 'Sistema');
     setText('detailIp', log.ip || 'N/A');
     setText('detailUserAgent', log.userAgent || 'N/A');
 
     const detailMessage = document.getElementById('detailMessage');
     if (detailMessage) {
-      detailMessage.textContent = log.details || '—';
+      const details = this.escapeHtml(log.details || '—');
+      const context = log.detailContext ? `<small class="text-muted d-block">${this.escapeHtml(log.detailContext)}</small>` : '';
+
+      const metadataChips = [];
+      if (log.documentName) {
+        metadataChips.push(`<span class="badge rounded-pill bg-light text-dark border me-1"><i class="bi bi-file-earmark-text me-1"></i>${this.escapeHtml(log.documentName)}</span>`);
+      }
+      if (log.documentId && log.documentId !== log.documentName) {
+        metadataChips.push(`<span class="badge rounded-pill bg-light text-muted border">ID: ${this.escapeHtml(String(log.documentId))}</span>`);
+      }
+      const metadataBlock = metadataChips.length ? `<div class="d-flex flex-wrap gap-1 mt-2">${metadataChips.join('')}</div>` : '';
+      const summary = log.documentSummary ? `<small class="text-muted d-block mt-1">${this.escapeHtml(log.documentSummary)}</small>` : '';
+
+      detailMessage.innerHTML = `<p class="mb-1">${details}</p>${context}${metadataBlock}${summary}`;
     }
   }
 
@@ -695,6 +1145,46 @@ class LogsController {
       minute: '2-digit',
       second: '2-digit'
     });
+  }
+
+  formatRelativeTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    const diffSeconds = Math.round((Date.now() - date.getTime()) / 1000);
+    const absSeconds = Math.abs(diffSeconds);
+
+    let formatter = this.relativeTimeFormatter;
+    if (!formatter && typeof Intl !== 'undefined' && typeof Intl.RelativeTimeFormat === 'function') {
+      formatter = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+      this.relativeTimeFormatter = formatter;
+    }
+
+    if (!formatter) {
+      return '';
+    }
+
+    if (absSeconds < 60) {
+      return formatter.format(-diffSeconds, 'second');
+    }
+    if (absSeconds < 3600) {
+      return formatter.format(-Math.round(diffSeconds / 60), 'minute');
+    }
+    if (absSeconds < 86400) {
+      return formatter.format(-Math.round(diffSeconds / 3600), 'hour');
+    }
+    if (absSeconds < 604800) {
+      return formatter.format(-Math.round(diffSeconds / 86400), 'day');
+    }
+    if (absSeconds < 2629800) {
+      return formatter.format(-Math.round(diffSeconds / 604800), 'week');
+    }
+    if (absSeconds < 31557600) {
+      return formatter.format(-Math.round(diffSeconds / 2629800), 'month');
+    }
+    return formatter.format(-Math.round(diffSeconds / 31557600), 'year');
   }
 
   updatePagination() {
@@ -787,13 +1277,13 @@ class LogsController {
       if (typeof log.timestamp === 'string' && log.timestamp.startsWith(today)) {
         acc.today += 1;
       }
-      if (log.level === 'error') {
+      if (['error', 'critical', 'fatal'].includes(log.level)) {
         acc.errors += 1;
       }
-      if (log.level === 'warning') {
+      if (['warning', 'notice'].includes(log.level)) {
         acc.warnings += 1;
       }
-      if (log.level === 'success') {
+      if (['success', 'ok'].includes(log.level)) {
         acc.success += 1;
       }
       return acc;
@@ -808,15 +1298,15 @@ class LogsController {
       if (log.username) {
         acc.uniqueUsers.add(log.username.toLowerCase());
       }
-      if (log.action === 'upload') {
+      if (['upload', 'file_upload'].includes(log.action)) {
         acc.uploads += 1;
       }
-      if (log.action === 'download') {
+      if (['download', 'file_download', 'export', 'analytics_export'].includes(log.action)) {
         acc.downloads += 1;
       }
 
       const today = acc.todayString;
-      if (log.level === 'error' && typeof log.timestamp === 'string' && log.timestamp.startsWith(today)) {
+      if (['error', 'critical', 'fatal'].includes(log.level) && typeof log.timestamp === 'string' && log.timestamp.startsWith(today)) {
         acc.errorsToday += 1;
       }
 
@@ -939,19 +1429,28 @@ class LogsController {
   }
 
   generateCSV(dataset = []) {
-    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Detalles', 'IP', 'Documento'];
-    const rows = dataset.map(log => [
-      this.formatDate(log.timestamp),
-      this.formatTime(log.timestamp),
-      log.level,
-      log.actionLabel || log.action,
-      log.username || 'Sistema',
-      `"${(log.details || '').replace(/"/g, '""')}"`,
-      log.ip || 'N/A',
-      log.documentId || ''
-    ]);
-    
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Usuario secundario', 'Detalles', 'Contexto', 'IP', 'Documento', 'ID Documento'];
+    const rows = dataset.map((log) => {
+      const values = [
+        this.formatDate(log.timestamp),
+        this.formatTime(log.timestamp),
+        log.level || '',
+        log.actionLabel || log.action || '',
+        log.username || 'Sistema',
+        log.userSecondary || '',
+        log.details || '',
+        log.detailContext || '',
+        log.ip || 'N/A',
+        log.documentName || '',
+        log.documentId || ''
+      ];
+
+      return values
+        .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
+        .join(',');
+    });
+
+    return [headers.join(','), ...rows].join('\n');
   }
 
   async downloadDailyLog() {
@@ -985,19 +1484,28 @@ class LogsController {
   }
 
   generateDailyCSV(logs) {
-    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Detalles', 'IP', 'Documento'];
-    const rows = logs.map(log => [
-      this.formatDate(log.timestamp),
-      this.formatTime(log.timestamp),
-      log.level,
-      log.actionLabel || log.action,
-      log.username || 'Sistema',
-      `"${(log.details || '').replace(/"/g, '""')}"`,
-      log.ip || 'N/A',
-      log.documentId || ''
-    ]);
-    
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const headers = ['Fecha', 'Hora', 'Nivel', 'Acción', 'Usuario', 'Usuario secundario', 'Detalles', 'Contexto', 'IP', 'Documento', 'ID Documento'];
+    const rows = logs.map((log) => {
+      const values = [
+        this.formatDate(log.timestamp),
+        this.formatTime(log.timestamp),
+        log.level || '',
+        log.actionLabel || log.action || '',
+        log.username || 'Sistema',
+        log.userSecondary || '',
+        log.details || '',
+        log.detailContext || '',
+        log.ip || 'N/A',
+        log.documentName || '',
+        log.documentId || ''
+      ];
+
+      return values
+        .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
+        .join(',');
+    });
+
+    return [headers.join(','), ...rows].join('\n');
   }
 
   handleClearOldLogs(days = 30) {
